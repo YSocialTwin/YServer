@@ -23,7 +23,7 @@ The client-side code can be found [here](https://github.com/YSocialTwin/YClient)
 
 ## Getting Started
 
-- Clone this repository to your local machine using git clone https://github.com/giuliorossetti/Y_Social.git
+- Clone this repository to your local machine using git clone https://github.com/giuliorossetti/YServer.git
 - Install dependencies for using pip install
 
 ### Usage
@@ -50,7 +50,10 @@ If you use YSocial in your research, please cite the following paper:
 ```
 @article{rossetti2024ysocial,
   title={Y Social: an LLM-powered microblogging Digital Twin},
-  author={},
+  author={Rossetti, Giulio and Stella, Massimo and Cazabet, Rémy and 
+  Abramski, Katherine and Cau, Erica and Citraro, Salvatore and 
+  Failla, Andrea and Improta, Riccardo and Morini, Virginia and 
+  Pansanella, Virginia},
   year={2024}
 }
 ```
