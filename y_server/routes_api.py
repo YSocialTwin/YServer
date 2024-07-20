@@ -23,6 +23,12 @@ from y_server.modals import (
 
 @app.route("/reset", methods=["POST"])
 def reset_experiment():
+    """
+    Reset the experiment.
+    Delete all the data from the database.
+
+    :return: the status of the reset
+    """
     db.session.query(User_mgmt).delete()
     db.session.query(Post).delete()
     db.session.query(Reactions).delete()
@@ -41,6 +47,11 @@ def reset_experiment():
 
 @app.route("/current_time", methods=["GET"])
 def current_time():
+    """
+    Get the current time of the simulation.
+
+    :return: a json object with the current time
+    """
     cround = Rounds.query.order_by(desc(Rounds.id)).first()
     if cround is None:
         cround = Rounds(day=0, hour=0)
@@ -53,6 +64,11 @@ def current_time():
 
 @app.route("/update_time", methods=["POST"])
 def update_time():
+    """
+    Update the time of the simulation.
+
+    :return: a json object with the updated time
+    """
     data = json.loads(request.get_data())
     day = int(data["day"])
     hour = int(data["round"])
@@ -69,6 +85,11 @@ def update_time():
 
 @app.route("/search", methods=["POST"])
 def search():
+    """
+    Search posts based on the most recently used hashtags for the user.
+
+    :return: a json object with the post ids
+    """
     data = json.loads(request.get_data())
     uid = int(data["uid"])
     vround = int(data["visibility_rounds"])
@@ -116,6 +137,11 @@ def search():
 
 @app.route("/read_mentions", methods=["POST"])
 def read_mention():
+    """
+    Search for recent mentions for the user.
+
+    :return: a json object with the post ids mentioning the user
+    """
     data = json.loads(request.get_data())
     uid = int(data["uid"])
     vround = int(data["visibility_rounds"])
@@ -145,6 +171,11 @@ def read_mention():
 
 @app.route("/read", methods=["POST"])
 def read():
+    """
+    Return a list of candidate posts for the user as filtered by the content recommendation system.
+
+    :return: a json object with the post ids
+    """
     data = json.loads(request.get_data())
     limit = data["limit"]
     mode = data["mode"]
@@ -342,6 +373,11 @@ def read():
 
 @app.route("/get_user", methods=["POST"])
 def get_user():
+    """
+    Get user information.
+
+    :return: a json object with the user information
+    """
     data = json.loads(request.get_data())
     username = data["username"]
     email = data["email"]
@@ -375,6 +411,11 @@ def get_user():
 
 @app.route("/register", methods=["POST"])
 def register():
+    """
+    Register a new user.
+
+    :return: a json object with the status of the registration
+    """
     data = json.loads(request.get_data())
     username = data["name"]
     email = data["email"]
@@ -425,6 +466,11 @@ def register():
 
 @app.route("/update_user", methods=["POST"])
 def update_user():
+    """
+    Update user information.
+
+    :return: a json object with the status of the update
+    """
     data = json.loads(request.get_data())
 
     user = User_mgmt.query.filter_by(
@@ -447,6 +493,11 @@ def update_user():
 
 @app.route("/user_exists", methods=["POST"])
 def user_exists():
+    """
+    Check if the user exists.
+
+    :return: a json object with the status of the user
+    """
     data = json.loads(request.get_data())
     user = User_mgmt.query.filter_by(username=data["name"], email=data["email"]).first()
 
@@ -458,6 +509,11 @@ def user_exists():
 
 @app.route("/post", methods=["POST"])
 def add_post():
+    """
+    Add a new post.
+
+    :return: a json object with the status of the post
+    """
     data = json.loads(request.get_data())
     account_id = data["user_id"]
     text = data["tweet"].strip('"')
@@ -526,6 +582,11 @@ def add_post():
     methods=["POST", "GET"],
 )
 def share():
+    """
+    Share a post containing a news article.
+
+    :return: a json object with the status of the share
+    """
     data = json.loads(request.get_data())
     account_id = data["user_id"]
     post_id = data["post_id"]
@@ -595,6 +656,11 @@ def share():
     methods=["POST", "GET"],
 )
 def add_comment():
+    """
+    Comment on a post.
+
+    :return: a json object with the status of the comment
+    """
     data = json.loads(request.get_data())
     account_id = data["user_id"]
     post_id = data["post_id"]
@@ -658,6 +724,11 @@ def add_comment():
 
 @app.route("/news", methods=["POST"])
 def comment_news():
+    """
+    Comment on a news article.
+
+    :return: a json object with the status of the comment
+    """
     data = json.loads(request.get_data())
     account_id = data["user_id"]
     text = data["tweet"].strip('"')
@@ -767,6 +838,11 @@ def comment_news():
     methods=["POST", "GET"],
 )
 def post_thread():
+    """
+    Get the thread of a post.
+
+    :return: a json object with the thread
+    """
     data = json.loads(request.get_data())
     post_id = data["post_id"]
 
@@ -788,6 +864,11 @@ def post_thread():
     methods=["POST", "GET"],
 )
 def get_post():
+    """
+    Get the post.
+
+    :return: a json object with the post
+    """
     data = json.loads(request.get_data())
     post_id = data["post_id"]
 
@@ -801,6 +882,11 @@ def get_post():
     methods=["POST", "GET"],
 )
 def get_article():
+    """
+    Get the news article.
+
+    :return: a json object with the article
+    """
     data = json.loads(request.get_data())
     post_id = data["post_id"]
 
@@ -818,6 +904,11 @@ def get_article():
     methods=["POST", "GET"],
 )
 def get_user_from_post():
+    """
+    Get the author of a post.
+
+    :return: a json object with the author
+    """
     data = json.loads(request.get_data())
     post_id = data["post_id"]
 
@@ -831,6 +922,11 @@ def get_user_from_post():
     methods=["POST"],
 )
 def add_reaction():
+    """
+    Add a reaction to a post/comment.
+
+    :return: a json object with the status of the reaction
+    """
     data = json.loads(request.get_data())
     account_id = data["user_id"]
     post_id = data["post_id"]
@@ -855,6 +951,11 @@ def add_reaction():
     methods=["POST"],
 )
 def add_follow():
+    """
+    Add a follow/unfollow relationship.
+
+    :return: a json object with the status of the follow
+    """
     data = json.loads(request.get_data())
     user_id = data["user_id"]
     target = data["target"]
@@ -895,6 +996,11 @@ def add_follow():
     methods=["GET"],
 )
 def followers():
+    """
+    Get the followers of a user.
+
+    :return: a json object with the followers
+    """
     data = json.loads(request.get_data())
     user_id = data["user_id"]
 
@@ -916,6 +1022,11 @@ def followers():
 
 @app.route("/timeline", methods=["GET"])
 def get_timeline():
+    """
+    Get the timeline of a user.
+
+    :return: a json object with the timeline
+    """
     data = json.loads(request.get_data())
     user_id = data["user_id"]
 
@@ -942,6 +1053,11 @@ def get_timeline():
 
 @app.route("/follow_suggestions", methods=["POST"])
 def get_follow_suggestions():
+    """
+    Get follow suggestions for a user based on the follow recommender system.
+
+    :return: a json object with the follow suggestions
+    """
     data = json.loads(request.get_data())
     user_id = int(data["user_id"])
     n_neighbors = int(data["n_neighbors"])
@@ -1031,6 +1147,12 @@ def get_follow_suggestions():
 
 
 def __get_two_hops_neighbors(node_id):
+    """
+    Get the two hops neighbors of a user.
+
+    :param node_id: the user id
+    :return: the two hops neighbors
+    """
     # (node_id, direct_neighbors)
     first_order_followers = set(
         [
@@ -1057,6 +1179,12 @@ def __get_two_hops_neighbors(node_id):
     return first_order_followers, candidate_to_follower
 
 def __get_users_leanings(agents):
+    """
+    Get the political leaning of a list of users.
+
+    :param agents: the list of users
+    :return: the political leaning of the users
+    """
     leanings = {}
     for agent in agents:
         leanings[agent] = User_mgmt.query.filter_by(id=agent).first().leaning
