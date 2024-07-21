@@ -404,7 +404,10 @@ def get_user():
             "education_level": user.education_level,
             "joined_on": user.joined_on,
             "owner": user.owner,
+            "round_actions": user.round_actions,
             "frec_sys": user.frecsys_type,
+            "gender": user.gender,
+            "nationality": user.nationality
         }
     )
 
@@ -434,7 +437,10 @@ def register():
     language = data["language"]
     education_level = data["education_level"]
     joined_on = int(data["joined_on"])
+    round_actions = int(data["round_actions"])
     owner = data["owner"]
+    gender = data["gender"]
+    nationality = data["nationality"]
 
     user = User_mgmt.query.filter_by(username=data["name"], email=data["email"]).first()
 
@@ -456,7 +462,10 @@ def register():
             language=language,
             education_level=education_level,
             joined_on=joined_on,
+            round_actions=round_actions,
             owner=owner,
+            gender=gender,
+            nationality=nationality
         )
         db.session.add(user)
         db.session.commit()
