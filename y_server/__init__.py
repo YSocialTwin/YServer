@@ -11,8 +11,9 @@ if not os.path.exists('./experiments'):
 # read the experiment configuration
 config = json.load(open("config_files/exp_config.json"))
 
-# copy the clean database to the experiments folder
-shutil.copyfile("data_schema/database_clean_server.db", f"experiments/{config['name']}.db")
+if not os.path.exists(f"experiments/{config['name']}.db") or config["reset_db"] == "True":
+    # copy the clean database to the experiments folder
+    shutil.copyfile("data_schema/database_clean_server.db", f"experiments/{config['name']}.db")
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "4YrzfpQ4kGXjuP6w"

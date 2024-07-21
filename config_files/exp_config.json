@@ -1,3 +1,7 @@
 {
-  "name": "database"
+  "name": "database",
+  "host": "0.0.0.0",
+  "port": 5010,
+  "debug": "True",
+  "reset_db": "False"
 }
