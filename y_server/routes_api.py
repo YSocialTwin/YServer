@@ -407,7 +407,7 @@ def get_user():
             "round_actions": user.round_actions,
             "frec_sys": user.frecsys_type,
             "gender": user.gender,
-            "nationality": user.nationality
+            "nationality": user.nationality,
         }
     )
 
@@ -465,7 +465,7 @@ def register():
             round_actions=round_actions,
             owner=owner,
             gender=gender,
-            nationality=nationality
+            nationality=nationality,
         )
         db.session.add(user)
         db.session.commit()
@@ -1151,7 +1151,6 @@ def get_follow_suggestions():
             res[user] = res[user] * leaning_biased
     res = {k: v / total for k, v in res.items() if v > 0}
 
-
     return json.dumps(res)
 
 
@@ -1186,6 +1185,7 @@ def __get_two_hops_neighbors(node_id):
         candidate_to_follower[node.user_id].add(node.follower_id)
 
     return first_order_followers, candidate_to_follower
+
 
 def __get_users_leanings(agents):
     """
