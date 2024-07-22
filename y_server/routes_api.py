@@ -468,7 +468,10 @@ def register():
             nationality=nationality,
         )
         db.session.add(user)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except:
+            return json.dumps({"status": 404})
 
     return json.dumps({"status": 200})
 
