@@ -244,7 +244,7 @@ def read():
 
         # get followers
         follower = Follow.query.filter_by(action="follow", user_id=uid)
-        follower_ids = [f.follower_id for f in follower]
+        follower_ids = [f.follower_id for f in follower if f.follower_id != uid]
 
         # get posts from followers in reverse chronological order
         if articles:
@@ -292,7 +292,7 @@ def read():
 
         # get followers
         follower = Follow.query.filter_by(action="follow", user_id=uid)
-        follower_ids = [f.follower_id for f in follower]
+        follower_ids = [f.follower_id for f in follower if f.follower_id != uid]
 
         # get posts from followers ordered by likes and reverse chronologically
         if articles:
