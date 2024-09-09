@@ -21,4 +21,4 @@ app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///../experiments/{config['name
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
-from y_server import routes_api
+from y_server.routes import *
