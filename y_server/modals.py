@@ -119,3 +119,12 @@ class Websites(db.Model):
     last_fetched = db.Column(db.Integer, nullable=False)
     language = db.Column(db.String(10), nullable=False)
     country = db.Column(db.String(10), nullable=False)
+
+
+class Voting(db.Model):
+    vid = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False)
+    preference = db.Column(db.String(10), nullable=False)
+    content_type = db.Column(db.String(10), nullable=False)
+    content_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
+    round = db.Column(db.Integer, nullable=False)
