@@ -2,11 +2,8 @@ import json
 from flask import request
 from y_server import app, db
 from sqlalchemy import desc
-from y_server.modals import (
-    Post,
-    User_mgmt,
-    Reactions,
-)
+from y_server.modals import Post, User_mgmt, Reactions, User_interest, Interests
+
 
 @app.route("/get_user", methods=["POST"])
 def get_user():
@@ -26,7 +23,6 @@ def get_user():
             "id": user.id,
             "username": user.username,
             "email": user.email,
-            "interests": user.interests.split("|"),
             "leaning": user.leaning,
             "age": int(user.age),
             "user_type": user.user_type,
@@ -60,7 +56,6 @@ def register():
     username = data["name"]
     email = data["email"]
     password = data["password"]
-    interests = "|".join(data["interests"])
 
     leaning = data["leaning"]
     age = int(data["age"])
@@ -86,7 +81,6 @@ def register():
             username=username,
             email=email,
             password=password,
-            interests=interests,
             leaning=leaning,
             age=age,
             user_type=user_type,
@@ -155,6 +149,7 @@ def user_exists():
 
     return json.dumps({"status": 200, "id": user.id})
 
+
 @app.route(
     "/get_user_from_post",
     methods=["POST", "GET"],
@@ -167,10 +162,10 @@ def get_user_from_post():
     """
     data = json.loads(request.get_data())
     post_id = data["post_id"]
-
     post = Post.query.filter_by(id=post_id).first()
 
     return json.dumps(post.user_id)
+
 
 @app.route("/timeline", methods=["GET"])
 def get_timeline():
@@ -199,5 +194,89 @@ def get_timeline():
                 "comments": len(list(Post.query.filter_by(comment_to=post.id))),
             }
         )
+
+    return json.dumps(res)
+
+
+@app.route("/set_interests", methods=["POST"])
+def set_interests():
+    """
+    Set the interests of a user.
+
+    :return: a json object with the status of the update
+    """
+    data = json.loads(request.get_data())
+
+    for interest in data:
+        ints = Interests(
+            interest=interest,
+        )
+        db.session.add(ints)
+        db.session.commit()
+
+    return json.dumps({"status": 200})
+
+
+@app.route("/set_user_interests", methods=["POST"])
+def set_user_interests():
+    """
+    Set the interests of a user.
+
+    :return: a json object with the status of the update
+    """
+    data = json.loads(request.get_data())
+    user_id = data["user_id"]
+    interests = data["interests"]
+    round_id = data["round"]
+    for interest in interests:
+        # check if the interest is specified as id or by name
+        if isinstance(interest, str):
+            interest = Interests.query.filter_by(interest=interest).first().iid
+
+        user_interest = User_interest(
+            user_id=user_id, interest_id=interest, round_id=round_id
+        )
+        db.session.add(user_interest)
+        db.session.commit()
+
+    return json.dumps({"status": 200})
+
+
+@app.route("/get_user_interests", methods=["GET"])
+def get_user_interests():
+    """
+    Get the interests of a user.
+
+    :return: a json object with the interests
+    """
+    data = json.loads(request.get_data())
+    user_id = int(data["user_id"])
+    round_id = int(data["round_id"])
+    n_interests = int(data["n_interests"])
+    time_window = int(data["time_window"])
+    base_rounds = max(0, round_id - time_window)
+
+    # get the top n_interests interests of the user in the time window
+    interests = (
+        db.session.query(
+            User_interest.interest_id,
+            Interests.interest,
+            db.func.count(User_interest.interest_id).label("count"),
+        )
+        .join(Interests, User_interest.interest_id == Interests.iid)
+        .filter(
+            User_interest.user_id == user_id,
+            User_interest.round_id >= base_rounds,
+            User_interest.round_id <= round_id,
+        )
+        .group_by(User_interest.interest_id)
+        .order_by(db.desc(db.func.count(User_interest.interest_id)))
+        .limit(n_interests)
+        .all()
+    )
+
+    res = []
+    for interest in interests:
+        res.append({"id": int(interest[0]), "topic": interest.interest})
 
     return json.dumps(res)

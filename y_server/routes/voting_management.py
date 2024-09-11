@@ -12,11 +12,11 @@ def cast_preference():
 
     # add data to Vote table
     vote = Voting(
-        round=int(data['tid']),
-        user_id=int(data['user_id']),
-        preference=data['vote'],
-        content_type=data['content_type'],
-        content_id=int(data['content_id'])
+        round=int(data["tid"]),
+        user_id=int(data["user_id"]),
+        preference=data["vote"],
+        content_type=data["content_type"],
+        content_id=int(data["content_id"]),
     )
     db.session.add(vote)
     db.session.commit()

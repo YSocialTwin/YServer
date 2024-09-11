@@ -8,6 +8,7 @@ from y_server.modals import (
     Follow,
 )
 
+
 @app.route(
     "/follow",
     methods=["POST"],
@@ -80,7 +81,6 @@ def followers():
         )
 
     return json.dumps(res)
-
 
 
 @app.route("/follow_suggestions", methods=["POST"])

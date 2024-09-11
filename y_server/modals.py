@@ -9,7 +9,6 @@ class User_mgmt(UserMixin, db.Model):
     password = db.Column(db.String(80), nullable=False)
     leaning = db.Column(db.String(10), default="neutral")
     user_type = db.Column(db.String(10), nullable=False, default="user")
-    interests = db.Column(db.String(100), default="")
     age = db.Column(db.Integer, default=0)
     oe = db.Column(db.String(50))
     co = db.Column(db.String(50))
@@ -128,3 +127,21 @@ class Voting(db.Model):
     content_type = db.Column(db.String(10), nullable=False)
     content_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
     round = db.Column(db.Integer, nullable=False)
+
+
+class Interests(db.Model):
+    iid = db.Column(db.Integer, primary_key=True)
+    interest = db.Column(db.String(20), nullable=False)
+
+
+class User_interest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False)
+    interest_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
+    round_id = db.Column(db.Integer, db.ForeignKey("rounds.id"), nullable=False)
+
+
+class Post_topics(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
+    topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
