@@ -172,6 +172,8 @@ def get_follow_suggestions():
     for user in res:
         if leanings[user] == l_source:
             res[user] = res[user] * leaning_biased
+
+    total = sum(res.values())
     res = {k: v / total for k, v in res.items() if v > 0}
 
     return json.dumps(res)

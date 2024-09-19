@@ -41,6 +41,7 @@ def get_user():
             "frec_sys": user.frecsys_type,
             "gender": user.gender,
             "nationality": user.nationality,
+            "toxicity": user.toxicity
         }
     )
 
@@ -73,6 +74,7 @@ def register():
     owner = data["owner"]
     gender = data["gender"]
     nationality = data["nationality"]
+    toxicity = data["toxicity"]
 
     user = User_mgmt.query.filter_by(username=data["name"], email=data["email"]).first()
 
@@ -97,6 +99,7 @@ def register():
             owner=owner,
             gender=gender,
             nationality=nationality,
+            toxicity=toxicity,
         )
         db.session.add(user)
         try:
