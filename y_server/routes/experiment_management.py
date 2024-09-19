@@ -12,6 +12,10 @@ from y_server.modals import (
     Recommendations,
     Websites,
     Articles,
+    Voting,
+    Interests,
+    Post_topics,
+    User_interest,
 )
 
 
@@ -35,7 +39,9 @@ def reset_experiment():
     db.session.query(Recommendations).delete()
     db.session.query(Websites).delete()
     db.session.query(Articles).delete()
+    db.session.query(Interests).delete()
+    db.session.query(User_interest).delete()
+    db.session.query(Voting).delete()
+    db.session.query(Post_topics).delete()
     db.session.commit()
     return {"status": 200}
-
-

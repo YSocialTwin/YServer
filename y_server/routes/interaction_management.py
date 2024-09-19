@@ -8,6 +8,7 @@ from y_server.modals import (
     Follow,
 )
 
+
 @app.route(
     "/follow",
     methods=["POST"],
@@ -80,7 +81,6 @@ def followers():
         )
 
     return json.dumps(res)
-
 
 
 @app.route("/follow_suggestions", methods=["POST"])
@@ -172,6 +172,8 @@ def get_follow_suggestions():
     for user in res:
         if leanings[user] == l_source:
             res[user] = res[user] * leaning_biased
+
+    total = sum(res.values())
     res = {k: v / total for k, v in res.items() if v > 0}
 
     return json.dumps(res)

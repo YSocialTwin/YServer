@@ -13,6 +13,7 @@ from y_server.modals import (
     Websites,
 )
 
+
 @app.route("/news", methods=["POST"])
 def comment_news():
     """

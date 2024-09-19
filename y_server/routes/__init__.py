@@ -8,7 +8,7 @@ config = json.load(open("config_files/exp_config.json"))
 
 import importlib
 
-for module in config['modules']:
+for module in config["modules"]:
     try:
         importlib.import_module(f".{module}_management", "y_server.routes")
     except:

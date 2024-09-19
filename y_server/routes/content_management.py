@@ -14,7 +14,9 @@ from y_server.modals import (
     Mentions,
     User_mgmt,
     Emotions,
-    Post_emotions
+    Post_emotions,
+    Post_topics,
+    Interests,
 )
 
 
@@ -66,7 +68,11 @@ def read():
             posts = [
                 (
                     db.session.query(Post, func.count(Reactions.user_id).label("total"))
-                    .filter(Post.round >= visibility, Post.news_id != -1, Post.user_id != uid)
+                    .filter(
+                        Post.round >= visibility,
+                        Post.news_id != -1,
+                        Post.user_id != uid,
+                    )
                     .join(Reactions)
                     .group_by(Post)
                     .order_by(desc("total"), desc(Post.id))
@@ -118,7 +124,11 @@ def read():
         if additional_posts_limit != 0:
             if articles:
                 additional_posts = (
-                    Post.query.filter(Post.round >= visibility, Post.news_id != -1, Post.user_id != uid)
+                    Post.query.filter(
+                        Post.round >= visibility,
+                        Post.news_id != -1,
+                        Post.user_id != uid,
+                    )
                     .order_by(desc(Post.id))
                     .limit(additional_posts_limit)
                 )
@@ -319,6 +329,7 @@ def add_post():
     emotions = data["emotions"]
     hastags = data["hashtags"]
     mentions = data["mentions"]
+    topics = data["topics"]
     tid = int(data["tid"])
 
     user = User_mgmt.query.filter_by(id=account_id).first()
@@ -337,6 +348,11 @@ def add_post():
 
     post.thread_id = post.id
     db.session.commit()
+
+    for topic_id in topics:
+        tp = Post_topics(post_id=post.id, topic_id=topic_id)
+        db.session.add(tp)
+        db.session.commit()
 
     for emotion in emotions:
         if len(emotion) < 1:
@@ -469,7 +485,6 @@ def add_comment():
     return json.dumps({"status": 200})
 
 
-
 @app.route(
     "/post_thread",
     methods=["POST", "GET"],
@@ -514,8 +529,6 @@ def get_post():
     return json.dumps(post.tweet)
 
 
-
-
 @app.route(
     "/reaction",
     methods=["POST"],
@@ -544,3 +557,36 @@ def add_reaction():
 
     return json.dumps({"status": 200})
 
+
+@app.route("/get_post_topics", methods=["GET"])
+def get_post_topics():
+    """
+    Get the topics of a post.
+
+    :return: a json object with the topics
+    """
+    data = json.loads(request.get_data())
+    post_id = data["post_id"]
+
+    post_topics = Post_topics.query.filter_by(post_id=post_id)
+
+    res = []
+    for topic in post_topics:
+        res.append(topic.topic_id)
+
+    return json.dumps(res)
+
+
+@app.route("/get_thread_root", methods=["GET"])
+def get_thread_root():
+    """
+    Get the root of a thread.
+
+    :return: a json object with the root
+    """
+    data = json.loads(request.get_data())
+    post_id = data["post_id"]
+
+    post = Post.query.filter_by(id=post_id).first()
+
+    return json.dumps(post.thread_id)

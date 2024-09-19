@@ -6,6 +6,7 @@ from y_server.modals import (
     Rounds,
 )
 
+
 @app.route("/current_time", methods=["GET"])
 def current_time():
     """

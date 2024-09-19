@@ -28,12 +28,33 @@ The client-side code can be found [here](https://github.com/YSocialTwin/YClient)
 
 ### Usage
 
-Start the server with the following command:
+Set the server preferences modifying the file `config_files/exp_config.json`:
+
+```json
+{
+  "name": "local_test",
+  "host": "0.0.0.0",
+  "port": 5010,
+  "reset_db": "True",
+  "modules": ["news", "voting"]
+}
+```
+where:
+- `name` is the name of the experiment (will be used to name the simulation database - which will be created under the folder `experiments`);
+- `host` is the IP address of the server;
+- `port` is the port of the server;
+- `reset_db` is a flag to reset the database at each server start;
+- `modules` is a list of additional modules to be loaded by the server (e.g., news, voting). Please note that the YClient must be configured to use the same modules.
+
+Once the simulation is configured, start the YServer with the following command:
 
 ```bash
 python y_server.py
 ```
 
+#### Modules
+- **News**: This module allows the server to access online news sources leveraging RSS feeds.
+- **Voting**: This module allows the agents to cast their voting intention after interacting with peers contents (designed to perform political debate simulation).
 
 ## Contribution
 
