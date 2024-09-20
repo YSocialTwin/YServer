@@ -16,7 +16,6 @@ from y_server.modals import (
     Emotions,
     Post_emotions,
     Post_topics,
-    Interests,
 )
 
 

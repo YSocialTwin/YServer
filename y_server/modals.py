@@ -39,6 +39,7 @@ class Post(db.Model):
     comment_to = db.Column(db.Integer, default=-1)
     thread_id = db.Column(db.Integer)
     news_id = db.Column(db.String(50), db.ForeignKey("articles.id"), default=None)
+    image_id = db.Column(db.Integer(), db.ForeignKey("images.id"), default=None)
     shared_from = db.Column(db.Integer, default=-1)
 
 
@@ -146,3 +147,10 @@ class Post_topics(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
     topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
+
+
+class Images(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    url = db.Column(db.String(200), nullable=True)
+    description = db.Column(db.String(400), nullable=True)
+    article_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=True)

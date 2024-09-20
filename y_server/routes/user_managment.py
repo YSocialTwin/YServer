@@ -41,7 +41,7 @@ def get_user():
             "frec_sys": user.frecsys_type,
             "gender": user.gender,
             "nationality": user.nationality,
-            "toxicity": user.toxicity
+            "toxicity": user.toxicity,
         }
     )
 

@@ -31,7 +31,6 @@ def comment_news():
     title = data["title"]
     summary = data["summary"]
     link = data["link"]
-    published = data["published"]
     publisher = data["publisher"]
     rss = data["rss"]
     leaning = data["leaning"]
@@ -67,62 +66,83 @@ def comment_news():
             summary=summary,
             link=link,
             website_id=website_id,
-            fetched_on=published,
+            fetched_on=fetched_on,
         )
         db.session.add(article)
         db.session.commit()
     article_id = Articles.query.filter_by(link=link, website_id=website_id).first().id
 
-    post = Post(
-        tweet=text,
-        round=tid,
-        user_id=user.id,
-        comment_to=-1,
-        news_id=article_id,
-    )
+    # add post only if the text is not empty
+    # (this might happen if the method is called to save the article for image processing)
+    if len(text) > 0:
+        post = Post(
+            tweet=text,
+            round=tid,
+            user_id=user.id,
+            comment_to=-1,
+            news_id=article_id,
+        )
 
-    db.session.add(post)
-    db.session.commit()
-
-    post.thread_id = post.id
-    db.session.commit()
-
-    for emotion in emotions:
-        if len(emotion) < 1:
-            continue
-
-        em = Emotions.query.filter_by(emotion=emotion).first()
-        if em is not None:
-            post_emotion = Post_emotions(post_id=post.id, emotion_id=em.id)
-            db.session.add(post_emotion)
-            db.session.commit()
-
-    for tag in hastags:
-        if len(tag) < 4:
-            continue
-
-        ht = Hashtags.query.filter_by(hashtag=tag).first()
-        if ht is None:
-            ht = Hashtags(hashtag=tag)
-            db.session.add(ht)
-            db.session.commit()
-            ht = Hashtags.query.filter_by(hashtag=tag).first()
-
-        post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
-        db.session.add(post_tag)
+        db.session.add(post)
         db.session.commit()
 
-    for mention in mentions:
-        if len(mention) < 1:
-            continue
+        post.thread_id = post.id
+        db.session.commit()
 
-        us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
-        if us is not None:
-            mention = Mentions(user_id=us.id, post_id=post.id, round=tid)
-            db.session.add(mention)
+        for emotion in emotions:
+            if len(emotion) < 1:
+                continue
+
+            em = Emotions.query.filter_by(emotion=emotion).first()
+            if em is not None:
+                post_emotion = Post_emotions(post_id=post.id, emotion_id=em.id)
+                db.session.add(post_emotion)
+                db.session.commit()
+
+        for tag in hastags:
+            if len(tag) < 4:
+                continue
+
+            ht = Hashtags.query.filter_by(hashtag=tag).first()
+            if ht is None:
+                ht = Hashtags(hashtag=tag)
+                db.session.add(ht)
+                db.session.commit()
+                ht = Hashtags.query.filter_by(hashtag=tag).first()
+
+            post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
+            db.session.add(post_tag)
             db.session.commit()
 
-    return json.dumps({"status": 200})
+        for mention in mentions:
+            if len(mention) < 1:
+                continue
+
+            us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
+            if us is not None:
+                mention = Mentions(user_id=us.id, post_id=post.id, round=tid)
+                db.session.add(mention)
+                db.session.commit()
+
+    return json.dumps({"status": 200, "article_id": article_id})
+
+
+@app.route("/get_article_by_title", methods=["POST", "GET"])
+def article_by_title():
+    """
+    Get the news article by title.
+
+    :return: a json object with the article
+    """
+    data = json.loads(request.get_data())
+    title = data["title"]
+
+    # get article from title
+    article = Articles.query.filter_by(title=title).first()
+    if article is not None:
+        return json.dumps({"article_id": article.news_id})
+    else:
+        return json.dumps({"status": 404})
 
 
 @app.route(
