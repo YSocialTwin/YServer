@@ -12,7 +12,7 @@ from y_server.modals import (
 
 
 @app.route("/comment_image", methods=["POST"])
-def comment_image():
+def post_image():
     """
     Comment on an image.
 
