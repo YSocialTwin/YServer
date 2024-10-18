@@ -154,3 +154,9 @@ class Images(db.Model):
     url = db.Column(db.String(200), nullable=True)
     description = db.Column(db.String(400), nullable=True)
     article_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=True)
+
+
+class Article_topics(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    article_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=False)
+    topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)

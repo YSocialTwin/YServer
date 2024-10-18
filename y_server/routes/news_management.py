@@ -11,6 +11,9 @@ from y_server.modals import (
     Mentions,
     Articles,
     Websites,
+    Interests,
+    Article_topics,
+    Post_topics
 )
 
 
@@ -123,6 +126,27 @@ def comment_news():
                 mention = Mentions(user_id=us.id, post_id=post.id, round=tid)
                 db.session.add(mention)
                 db.session.commit()
+
+    if "topics" in data:
+        for topic in data["topics"]:
+            if len(topic) < 1:
+                continue
+
+            interests = Interests.query.filter_by(interest=topic).first()
+            if interests is None:
+                interests = Interests(interest=topic)
+                db.session.add(interests)
+                db.session.commit()
+
+            interests = Interests.query.filter_by(interest=topic).first()
+
+            at = Article_topics.query.filter_by(article_id=article_id, topic_id=interests.iid).first()
+            if at is None:
+                at = Article_topics(article_id=article_id, topic_id=interests.iid)
+                db.session.add(at)
+
+            pt = Post_topics(post_id=post.id, topic_id=interests.iid)
+            db.session.add(pt)
 
     return json.dumps({"status": 200, "article_id": article_id})
 
