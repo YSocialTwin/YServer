@@ -25,6 +25,7 @@ class User_mgmt(UserMixin, db.Model):
     nationality = db.Column(db.String(15), default=None)
     round_actions = db.Column(db.Integer, default=3)
     toxicity = db.Column(db.String(10), default="no")
+    is_page = db.Column(db.Integer, default=0)
 
     posts = db.relationship("Post", backref="author", lazy=True)
     liked = db.relationship("Reactions", backref="liked_by", lazy=True)

@@ -42,6 +42,7 @@ def get_user():
             "gender": user.gender,
             "nationality": user.nationality,
             "toxicity": user.toxicity,
+            "is_page": user.is_page,
         }
     )
 
@@ -75,6 +76,10 @@ def register():
     gender = data["gender"]
     nationality = data["nationality"]
     toxicity = data["toxicity"]
+    if "is_page" in data:
+        is_page = data["is_page"]
+    else:
+        is_page = 0
 
     user = User_mgmt.query.filter_by(username=data["name"], email=data["email"]).first()
 
@@ -100,6 +105,7 @@ def register():
             gender=gender,
             nationality=nationality,
             toxicity=toxicity,
+            is_page=is_page,
         )
         db.session.add(user)
         try:

@@ -32,9 +32,11 @@ def read():
     vround = int(data["visibility_rounds"])
     try:
         uid = int(data["uid"])
-        fratio = float(data["followers_ratio"])
     except:
         uid = None
+    try:
+        fratio = float(data["followers_ratio"])
+    except:
         fratio = 1
     articles = False
     if "article" in data:
@@ -49,14 +51,14 @@ def read():
         if articles:
             posts = [
                 db.session.query(Post)
-                .filter(Post.round >= visibility, Post.news_id != -1)
+                .filter(Post.round >= visibility, Post.news_id != -1, Post.user_id != uid)
                 .order_by(desc(Post.id))
                 .limit(10)
             ]
         else:
             posts = [
                 db.session.query(Post)
-                .filter(Post.round >= visibility)
+                .filter(Post.round >= visibility, Post.user_id != uid)
                 .order_by(desc(Post.id))
                 .limit(10)
             ]
@@ -106,6 +108,7 @@ def read():
                 Post.query.filter(
                     Post.round >= visibility,
                     Post.news_id != -1,
+                    Post.user_id != uid,
                     Post.user_id.in_(follower_ids),
                 )
                 .order_by(desc(Post.id))
@@ -179,25 +182,25 @@ def read():
         if additional_posts_limit != 0:
             if articles:
                 additional_posts = (
-                    Post.query.filter(Post.round >= visibility, Post.news_id != -1)
+                    Post.query.filter(Post.round >= visibility, Post.news_id != -1, Post.user_id != uid)
                     .order_by(desc(Post.id))
                     .limit(additional_posts_limit)
                 )
             else:
                 additional_posts = (
-                    Post.query.filter(Post.round >= visibility)
+                    Post.query.filter(Post.round >= visibility, Post.user_id != uid)
                     .order_by(desc(Post.id))
                     .limit(additional_posts_limit)
                 )
 
-        posts = [posts, additional_posts]
+            posts = [posts, additional_posts]
 
     else:
         # get posts in random order
         if articles:
             posts = [
                 (
-                    Post.query.filter(Post.round >= visibility, Post.news_id != -1)
+                    Post.query.filter(Post.round >= visibility, Post.news_id != -1, Post.user_id != uid)
                     .order_by(func.random())
                     .limit(limit)
                 )
@@ -205,7 +208,7 @@ def read():
         else:
             posts = [
                 (
-                    Post.query.filter(Post.round >= visibility)
+                    Post.query.filter(Post.round >= visibility, Post.user_id != uid)
                     .order_by(func.random())
                     .limit(limit)
                 )
