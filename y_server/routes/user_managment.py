@@ -116,6 +116,27 @@ def register():
     return json.dumps({"status": 200})
 
 
+@app.route("/churn", methods=["POST"])
+def churn():
+    """
+    Churn a user.
+
+    :return:
+    """
+
+    data = json.loads(request.get_data())
+    user_id = data["user_id"]
+    left_on = data["left_on"]
+
+    try:
+        user = User_mgmt.query.filter_by(id=user_id).first()
+        user.left_on = left_on
+        db.session.commit()
+        return json.dumps({"status": 200})
+    except:
+        return json.dumps({"status": 404})
+
+
 @app.route("/update_user", methods=["POST"])
 def update_user():
     """
