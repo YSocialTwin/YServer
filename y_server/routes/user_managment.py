@@ -117,24 +117,33 @@ def register():
 
 
 @app.route("/churn", methods=["POST"])
-def churn():
+def churn_agents():
     """
-    Churn a user.
+    Churn users that do not post for a while.
 
     :return:
     """
 
     data = json.loads(request.get_data())
-    user_id = data["user_id"]
+    n_users = data["n_users"]
     left_on = data["left_on"]
 
-    try:
+    #  get the max round value from the post table for each user
+    query = (db.session.query(Post.user_id, db.func.max(Post.round)).
+             join(User_mgmt, Post.user_id == User_mgmt.id).
+             filter(User_mgmt.left_on.is_(None), User_mgmt.is_page == 0).
+             group_by(Post.user_id)).order_by(db.func.max(Post.round).asc()).limit(n_users)
+
+    results = query.all()
+
+    removed = {}
+    for user_id, _ in results:
         user = User_mgmt.query.filter_by(id=user_id).first()
         user.left_on = left_on
         db.session.commit()
-        return json.dumps({"status": 200})
-    except:
-        return json.dumps({"status": 404})
+        removed[user_id] = None
+
+    return json.dumps({"status": 200, "removed": removed})
 
 
 @app.route("/update_user", methods=["POST"])
