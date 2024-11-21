@@ -6,6 +6,8 @@ This repository contains the code for the **server-side** of the application.
 
 The client-side code can be found [here](https://github.com/YSocialTwin/YClient)
 
+For more information, please refer to the official [documentation](https://ysocialtwin.github.io/)
+
 #### Features
 
 - Realistic agent simulations using LLMs

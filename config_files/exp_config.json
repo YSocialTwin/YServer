@@ -4,5 +4,5 @@
   "port": 5010,
   "debug": "True",
   "reset_db": "True",
-  "modules": ["news", "voting"]
+  "modules": ["news", "voting", "image"]
 }

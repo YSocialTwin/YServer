@@ -2,7 +2,7 @@ import json
 from flask import request
 from y_server import app, db
 from sqlalchemy import desc
-from y_server.modals import Post, User_mgmt, Reactions, User_interest, Interests
+from y_server.modals import Post, User_mgmt, Reactions, User_interest, Interests, Rounds
 
 
 @app.route("/get_user", methods=["POST"])
@@ -41,7 +41,8 @@ def get_user():
             "frec_sys": user.frecsys_type,
             "gender": user.gender,
             "nationality": user.nationality,
-            "toxicity": user.toxicity
+            "toxicity": user.toxicity,
+            "is_page": user.is_page,
         }
     )
 
@@ -75,6 +76,10 @@ def register():
     gender = data["gender"]
     nationality = data["nationality"]
     toxicity = data["toxicity"]
+    if "is_page" in data:
+        is_page = data["is_page"]
+    else:
+        is_page = 0
 
     user = User_mgmt.query.filter_by(username=data["name"], email=data["email"]).first()
 
@@ -100,6 +105,7 @@ def register():
             gender=gender,
             nationality=nationality,
             toxicity=toxicity,
+            is_page=is_page,
         )
         db.session.add(user)
         try:
@@ -108,6 +114,36 @@ def register():
             return json.dumps({"status": 404})
 
     return json.dumps({"status": 200})
+
+
+@app.route("/churn", methods=["POST"])
+def churn_agents():
+    """
+    Churn users that do not post for a while.
+
+    :return:
+    """
+
+    data = json.loads(request.get_data())
+    n_users = data["n_users"]
+    left_on = data["left_on"]
+
+    #  get the max round value from the post table for each user
+    query = (db.session.query(Post.user_id, db.func.max(Post.round)).
+             join(User_mgmt, Post.user_id == User_mgmt.id).
+             filter(User_mgmt.left_on.is_(None), User_mgmt.is_page == 0).
+             group_by(Post.user_id)).order_by(db.func.max(Post.round).asc()).limit(n_users)
+
+    results = query.all()
+
+    removed = {}
+    for user_id, _ in results:
+        user = User_mgmt.query.filter_by(id=user_id).first()
+        user.left_on = left_on
+        db.session.commit()
+        removed[user_id] = None
+
+    return json.dumps({"status": 200, "removed": removed})
 
 
 @app.route("/update_user", methods=["POST"])
