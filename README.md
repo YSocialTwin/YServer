@@ -51,7 +51,7 @@ where:
 Once the simulation is configured, start the YServer with the following command:
 
 ```bash
-python y_server.py
+python y_server_run.py
 ```
 
 #### Modules
