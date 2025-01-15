@@ -1,5 +1,5 @@
 import json
-
+import os
 
 def start_server(config):
     """
@@ -18,7 +18,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-c",
         "--config_file",
-        default="config_files/exp_config.json",
+        default=f"config_files{os.sep}exp_config.json",
         help="JSON file describing the simulation configuration",
     )
     args = parser.parse_args()

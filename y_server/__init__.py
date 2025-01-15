@@ -6,20 +6,20 @@ import os
 
 try:
     # read the experiment configuration
-    config = json.load(open("config_files/exp_config.json"))
+    config = json.load(open(f"config_files{os.sep}exp_config.json"))
 
     # create the experiments folder
-    if not os.path.exists("./experiments"):
-        os.mkdir("./experiments")
+    if not os.path.exists(f".{os.sep}experiments"):
+        os.mkdir(f".{os.sep}experiments")
 
 
     if (
-        not os.path.exists(f"experiments/{config['name']}.db")
+        not os.path.exists(f"experiments{os.sep}{config['name']}.db")
         or config["reset_db"] == "True"
     ):
         # copy the clean database to the experiments folder
         shutil.copyfile(
-            "data_schema/database_clean_server.db", f"experiments/{config['name']}.db"
+            f"data_schema{os.sep}database_clean_server.db", f"experiments{os.sep}{config['name']}.db"
         )
 
     app = Flask(__name__)
