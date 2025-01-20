@@ -282,6 +282,9 @@ def set_user_interests():
                 db.session.commit()
                 iid = Interests.query.filter_by(interest=interest).first().iid
 
+        else:
+            iid = interest
+
         user_interest = User_interest(
             user_id=user_id, interest_id=iid, round_id=round_id
         )
