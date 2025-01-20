@@ -267,13 +267,23 @@ def set_user_interests():
     user_id = data["user_id"]
     interests = data["interests"]
     round_id = data["round"]
+
     for interest in interests:
         # check if the interest is specified as id or by name
         if isinstance(interest, str):
-            interest = Interests.query.filter_by(interest=interest).first().iid
+            try:
+                iid = Interests.query.filter_by(interest=interest).first().iid
+            except:
+                # add interest to the interest table
+                ints = Interests(
+                    interest=interest,
+                )
+                db.session.add(ints)
+                db.session.commit()
+                iid = Interests.query.filter_by(interest=interest).first().iid
 
         user_interest = User_interest(
-            user_id=user_id, interest_id=interest, round_id=round_id
+            user_id=user_id, interest_id=iid, round_id=round_id
         )
         db.session.add(user_interest)
         db.session.commit()
