@@ -270,6 +270,7 @@ def set_user_interests():
 
     for interest in interests:
         # check if the interest is specified as id or by name
+        iid = None
         if isinstance(interest, str):
             try:
                 iid = Interests.query.filter_by(interest=interest).first().iid
