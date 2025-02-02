@@ -100,6 +100,22 @@ def get_follow_suggestions():
     except:
         rectype = "random"
 
+    res = __follow_suggestions(rectype, user_id, n_neighbors, leaning_biased)
+
+    return json.dumps(res)
+
+
+def __follow_suggestions(rectype, user_id, n_neighbors, leaning_biased):
+    """
+    Get follow suggestions for a user based on the follow recommender system.
+
+    :param rectype:
+    :param user_id:
+    :param n_neighbors:
+    :param leaning_biased:
+    :return:
+    """
+
     res = {}
 
     if rectype == "random":
@@ -176,7 +192,7 @@ def get_follow_suggestions():
     total = sum(res.values())
     res = {k: v / total for k, v in res.items() if v > 0}
 
-    return json.dumps(res)
+    return res
 
 
 def __get_two_hops_neighbors(node_id):
