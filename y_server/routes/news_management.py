@@ -13,8 +13,11 @@ from y_server.modals import (
     Websites,
     Interests,
     Article_topics,
-    Post_topics
+    Post_topics,
+    Post_Sentiment,
 )
+
+from y_server.content_analysis import vader_sentiment
 
 
 @app.route("/news", methods=["POST"])
@@ -77,7 +80,10 @@ def comment_news():
 
     # add post only if the text is not empty
     # (this might happen if the method is called to save the article for image processing)
-    if len(text) > 0:
+    if len(text) == 0:
+        post = None
+
+    else:
         post = Post(
             tweet=text,
             round=tid,
@@ -127,7 +133,11 @@ def comment_news():
                 db.session.add(mention)
                 db.session.commit()
 
-    if "topics" in data:
+    if post is not None and "topics" in data:
+
+        # compute sentiment
+        sentiment = vader_sentiment(text)
+
         for topic in data["topics"]:
             if len(topic) < 1:
                 continue
@@ -147,6 +157,20 @@ def comment_news():
 
             pt = Post_topics(post_id=post.id, topic_id=interests.iid)
             db.session.add(pt)
+
+            post_sentiment = Post_Sentiment(
+                post_id=post.id,
+                user_id=user.id,
+                pos=sentiment["pos"],
+                neg=sentiment["neg"],
+                neu=sentiment["neu"],
+                compound=sentiment["compound"],
+                round=tid,
+                is_post=1,
+                topic_id=interests.iid,
+            )
+            db.session.add(post_sentiment)
+            db.session.commit()
 
     return json.dumps({"status": 200, "article_id": article_id})
 
@@ -226,6 +250,38 @@ def share():
 
     post.thread_id = post.id
     db.session.commit()
+
+    sentiment = vader_sentiment(text)
+    topics = Post_topics.query.filter_by(post_id=post_id).all()
+
+    sentiment_parent = Post_Sentiment.query.filter_by(post_id=post_id).first()
+    if sentiment_parent is not None:
+        sentiment_parent = sentiment_parent.compound
+        # thresholding
+        if sentiment_parent > 0.05:
+            sentiment_parent = "pos"
+        elif sentiment_parent < -0.05:
+            sentiment_parent = "neg"
+        else:
+            sentiment_parent = "neu"
+    else:
+        sentiment_parent = ""
+
+    for topic in topics:
+        post_sentiment = Post_Sentiment(
+            post_id=post.id,
+            user_id=user.id,
+            pos=sentiment["pos"],
+            neg=sentiment["neg"],
+            neu=sentiment["neu"],
+            compound=sentiment["compound"],
+            sentiment_parent=sentiment_parent,
+            round=tid,
+            is_post=1,
+            topic_id=topic.topic_id,
+        )
+        db.session.add(post_sentiment)
+        db.session.commit()
 
     for emotion in emotions:
         if len(emotion) < 1:

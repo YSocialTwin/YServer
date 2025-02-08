@@ -16,7 +16,11 @@ from y_server.modals import (
     Emotions,
     Post_emotions,
     Post_topics,
+    Post_Sentiment,
+    Interests
 )
+from y_server.content_analysis import vader_sentiment
+
 
 
 @app.route("/read", methods=["POST"])
@@ -348,12 +352,28 @@ def add_post():
     db.session.add(post)
     db.session.commit()
 
+    sentiment = vader_sentiment(text)
+
     post.thread_id = post.id
     db.session.commit()
 
     for topic_id in topics:
         tp = Post_topics(post_id=post.id, topic_id=topic_id)
         db.session.add(tp)
+        db.session.commit()
+
+        post_sentiment = Post_Sentiment(
+            post_id=post.id,
+            user_id=user.id,
+            pos=sentiment["pos"],
+            neg=sentiment["neg"],
+            neu=sentiment["neu"],
+            compound=sentiment["compound"],
+            round=tid,
+            is_post=1,
+            topic_id=topic_id
+        )
+        db.session.add(post_sentiment)
         db.session.commit()
 
     for emotion in emotions:
@@ -426,7 +446,7 @@ def add_comment():
 
     text = text.strip("-")
 
-    post = Post(
+    new_post = Post(
         tweet=text,
         round=tid,
         user_id=user.id,
@@ -434,8 +454,43 @@ def add_comment():
         thread_id=post.thread_id,
     )
 
-    db.session.add(post)
+    db.session.add(new_post)
     db.session.commit()
+
+    # get sentiment of the post is responding to
+    sentiment_parent = Post_Sentiment.query.filter_by(post_id=post_id).first()
+    if sentiment_parent is not None:
+        sentiment_parent = sentiment_parent.compound
+        # thresholding
+        if sentiment_parent > 0.05:
+            sentiment_parent = "pos"
+        elif sentiment_parent < -0.05:
+            sentiment_parent = "neg"
+        else:
+            sentiment_parent = "neu"
+    else:
+        sentiment_parent = ""
+
+    sentiment = vader_sentiment(text)
+
+    # get topics associated to post.id
+    post_topics = Post_topics.query.filter_by(post_id=post.thread_id).all()
+    for topic in post_topics:
+
+        post_sentiment = Post_Sentiment(
+            post_id=new_post.id,
+            user_id=user.id,
+            pos=sentiment["pos"],
+            neg=sentiment["neg"],
+            neu=sentiment["neu"],
+            compound=sentiment["compound"],
+            sentiment_parent=sentiment_parent,
+            round=tid,
+            is_comment=1,
+            topic_id=topic.topic_id
+        )
+        db.session.add(post_sentiment)
+        db.session.commit()
 
     for emotion in emotions:
         if len(emotion) < 1:
@@ -443,7 +498,7 @@ def add_comment():
 
         em = Emotions.query.filter_by(emotion=emotion).first()
         if em is not None:
-            post_emotion = Post_emotions(post_id=post.id, emotion_id=em.id)
+            post_emotion = Post_emotions(post_id=new_post.id, emotion_id=em.id)
             db.session.add(post_emotion)
             db.session.commit()
 
@@ -458,7 +513,7 @@ def add_comment():
             db.session.commit()
             ht = Hashtags.query.filter_by(hashtag=tag).first()
 
-        post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
+        post_tag = Post_hashtags(post_id=new_post.id, hashtag_id=ht.id)
         db.session.add(post_tag)
         db.session.commit()
 
@@ -468,7 +523,7 @@ def add_comment():
 
         us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
         if us is not None:
-            mn = Mentions(user_id=us.id, post_id=post.id, round=tid)
+            mn = Mentions(user_id=us.id, post_id=new_post.id, round=tid)
             db.session.add(mn)
             db.session.commit()
         else:
@@ -510,6 +565,56 @@ def post_thread():
         res.append(
             f"@{User_mgmt.query.filter_by(id=user).first().username} - {post.tweet}\n"
         )
+    return json.dumps(res)
+
+
+@app.route("/get_post_topics_name", methods=["GET", "POST"])
+def get_post_topics_name():
+    """
+    Get the topics of a post.
+
+    :return: a json object with the topics
+    """
+    data = json.loads(request.get_data())
+    post_id = data["post_id"]
+
+    post_topics = Post_topics.query.filter_by(post_id=post_id).all()
+
+    res = []
+    for topic in post_topics:
+        tp = Interests.query.filter_by(iid=topic.topic_id).first()
+        if tp is not None:
+            res.append(tp.interest)
+
+    return json.dumps(res)
+
+
+@app.route("/get_sentiment", methods=["POST", "GET"])
+def get_sentiment():
+    """
+    Get the sentiment of a post.
+
+    :return: a json object with the sentiment
+    """
+    data = json.loads(request.get_data())
+    user_id = data["user_id"]
+    interests = data["interests"]
+
+    res = []
+
+    for interest in interests:
+        topic = Interests.query.filter_by(interest=interest).first()
+        post_sentiment = Post_Sentiment.query.filter_by(user_id=user_id, topic_id=topic.iid).order_by(desc(Post_Sentiment.id)).first()
+        if post_sentiment is not None:
+            # thresholding compound
+            if post_sentiment.compound > 0.05:
+                sentiment = "positive"
+            elif post_sentiment.compound < -0.05:
+                sentiment = "negative"
+            else:
+                sentiment = "neutral"
+            res.append({"topic": interest, "sentiment": sentiment})
+
     return json.dumps(res)
 
 
@@ -556,6 +661,35 @@ def add_reaction():
         db.session.commit()
     except:
         pass
+
+    # get compound sentiment of post
+    post_sentiment = Post_Sentiment.query.filter_by(post_id=int(post_id)).all()
+    for topic_sentiment in post_sentiment:
+        topic_id = topic_sentiment.topic_id
+        compound = topic_sentiment.compound
+        # thresholding compound
+        if compound > 0.05:
+            sentiment = "pos"
+        elif compound < -0.05:
+            sentiment = "neg"
+        else:
+            sentiment = "neu"
+
+        # create reaction sentiment
+        reaction_sentiment = Post_Sentiment(
+            post_id=post_id,
+            user_id=user.id,
+            pos=0 if rtype == "dislike" else 1,
+            neg=0 if rtype == "like" else 1,
+            neu=0,
+            compound=1 if rtype == "like" else -1,
+            sentiment_parent=sentiment,
+            round=tid,
+            is_reaction=1,
+            topic_id=topic_id
+        )
+        db.session.add(reaction_sentiment)
+        db.session.commit()
 
     return json.dumps({"status": 200})
 

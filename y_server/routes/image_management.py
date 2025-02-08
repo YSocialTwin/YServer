@@ -8,7 +8,10 @@ from y_server.modals import (
     Post_emotions,
     Hashtags,
     Post_hashtags,
+    Post_Sentiment,
 )
+
+from y_server.content_analysis import vader_sentiment
 
 
 @app.route("/comment_image", methods=["POST"])
@@ -51,6 +54,21 @@ def post_image():
     )
 
     db.session.add(post)
+    db.session.commit()
+
+    sentiment = vader_sentiment(text)
+    post_sentiment = Post_Sentiment(
+        post_id=post.id,
+        user_id=account_id,
+        pos=sentiment["pos"],
+        neg=sentiment["neg"],
+        neu=sentiment["neu"],
+        compound=sentiment["compound"],
+        round=tid,
+        is_post=1,
+        topic_id=-1,
+    )
+    db.session.add(post_sentiment)
     db.session.commit()
 
     post.thread_id = post.id

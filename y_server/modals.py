@@ -162,3 +162,20 @@ class Article_topics(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     article_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=False)
     topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
+
+
+class Post_Sentiment(db.Model):
+    __tablename__ = "post_sentiment"
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False)
+    round = db.Column(db.Integer, db.ForeignKey("rounds.id"), nullable=False)
+    topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
+    is_post = db.Column(db.Integer, default=0)
+    is_comment = db.Column(db.Integer, default=0)
+    is_reaction = db.Column(db.Integer, default=0)
+    neg = db.Column(db.REAL)
+    neu = db.Column(db.REAL)
+    pos = db.Column(db.REAL)
+    compound = db.Column(db.REAL)
+    sentiment_parent = db.Column(db.String(5), default="")
