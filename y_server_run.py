@@ -1,11 +1,16 @@
 import json
 import os
 
+
 def start_server(config):
     """
     Start the app
     """
     from y_server import app
+    import nltk
+
+    nltk.download('vader_lexicon')
+
     debug = False
     app.run(debug=debug, port=int(config["port"]), host=config["host"])
 
