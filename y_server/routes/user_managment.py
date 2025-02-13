@@ -5,7 +5,7 @@ from sqlalchemy import desc
 from y_server.modals import Post, User_mgmt, Reactions, User_interest, Interests, Rounds
 
 
-@app.route("/get_user_id", methods=["GET"])
+@app.route("/get_user_id", methods=["GET", "POST"])
 def get_user_id():
     """
     Get the user id.
