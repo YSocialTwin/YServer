@@ -22,7 +22,6 @@ from y_server.modals import (
 from y_server.content_analysis import vader_sentiment
 
 
-
 @app.route("/read", methods=["POST"])
 def read():
     """
@@ -45,6 +44,14 @@ def read():
     articles = False
     if "article" in data:
         articles = True
+        # get the user
+        us = User_mgmt.query.filter_by(id=uid).first()
+        # get news pages ids having the same user leaning
+        pages = User_mgmt.query.filter_by(is_page=1, leaning=us.leaning).all()
+        if pages is not None:
+            pages = [x.id for x in pages]
+        else:
+            pages = []
 
     # visibility
     current_round = Rounds.query.order_by(desc(Rounds.id)).first()
@@ -55,7 +62,7 @@ def read():
         if articles:
             posts = [
                 db.session.query(Post)
-                .filter(Post.round >= visibility, Post.news_id != -1, Post.user_id != uid)
+                .filter(Post.round >= visibility, Post.news_id != -1, Post.user_id in pages)
                 .order_by(desc(Post.id))
                 .limit(10)
             ]
@@ -76,7 +83,7 @@ def read():
                     .filter(
                         Post.round >= visibility,
                         Post.news_id != -1,
-                        Post.user_id != uid,
+                        Post.user_id in pages,
                     )
                     .join(Reactions)
                     .group_by(Post)
@@ -112,7 +119,7 @@ def read():
                 Post.query.filter(
                     Post.round >= visibility,
                     Post.news_id != -1,
-                    Post.user_id != uid,
+                    Post.user_id in pages,
                     Post.user_id.in_(follower_ids),
                 )
                 .order_by(desc(Post.id))
@@ -167,7 +174,7 @@ def read():
                 .filter(
                     Post.round >= visibility,
                     Post.news_id != -1,
-                    Post.user_id.in_(follower_ids),
+                    Post.user_id in pages,
                 )
                 .group_by(Post)
                 .order_by(desc("total"), desc(Post.id))
@@ -186,7 +193,7 @@ def read():
         if additional_posts_limit != 0:
             if articles:
                 additional_posts = (
-                    Post.query.filter(Post.round >= visibility, Post.news_id != -1, Post.user_id != uid)
+                    Post.query.filter(Post.round >= visibility, Post.news_id != -1, Post.user_id in pages)
                     .order_by(desc(Post.id))
                     .limit(additional_posts_limit)
                 )
@@ -204,7 +211,7 @@ def read():
         if articles:
             posts = [
                 (
-                    Post.query.filter(Post.round >= visibility, Post.news_id != -1, Post.user_id != uid)
+                    Post.query.filter(Post.round >= visibility, Post.news_id != -1, Post.user_id in pages)
                     .order_by(func.random())
                     .limit(limit)
                 )

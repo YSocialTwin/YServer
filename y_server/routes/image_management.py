@@ -29,7 +29,10 @@ def post_image():
     tid = int(data["tid"])
     image_url = data["image_url"]
     image_description = data["image_description"]
-    article_id = int(data["article_id"])
+    try:
+        article_id = int(data["article_id"])
+    except:
+        article_id = None
 
     # check if image exists
     image = Images.query.filter_by(url=image_url).first()
