@@ -11,7 +11,7 @@ from y_server.modals import (
     Post_Sentiment,
 )
 
-from y_server.content_analysis import vader_sentiment
+from y_server.content_analysis import vader_sentiment, toxicity
 
 
 @app.route("/comment_image", methods=["POST"])
@@ -60,6 +60,9 @@ def post_image():
     db.session.commit()
 
     sentiment = vader_sentiment(text)
+
+    toxicity(text, app.config["perspective_api"], post.id, db)
+
     post_sentiment = Post_Sentiment(
         post_id=post.id,
         user_id=account_id,

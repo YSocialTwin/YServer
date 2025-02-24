@@ -179,3 +179,18 @@ class Post_Sentiment(db.Model):
     pos = db.Column(db.REAL)
     compound = db.Column(db.REAL)
     sentiment_parent = db.Column(db.String(5), default="")
+
+
+class Post_Toxicity(db.Model):
+    __tablename__ = "post_toxicity"
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
+    toxicity = db.Column(db.REAL, default=0)
+    severe_toxicity = db.Column(db.REAL, default=0)
+    identity_attack = db.Column(db.REAL, default=0)
+    insult = db.Column(db.REAL, default=0)
+    profanity = db.Column(db.REAL, default=0)
+    threat = db.Column(db.REAL, default=0)
+    sexually_explicit = db.Column(db.REAL, default=0)
+    flirtation = db.Column(db.REAL, default=0)
+

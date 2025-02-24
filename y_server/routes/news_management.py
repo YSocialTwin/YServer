@@ -17,7 +17,7 @@ from y_server.modals import (
     Post_Sentiment,
 )
 
-from y_server.content_analysis import vader_sentiment
+from y_server.content_analysis import vader_sentiment, toxicity
 
 
 @app.route("/news", methods=["POST"])
@@ -138,6 +138,8 @@ def comment_news():
         # compute sentiment
         sentiment = vader_sentiment(text)
 
+        toxicity(text, app.config["perspective_api"], post.id, db)
+
         for topic in data["topics"]:
             if len(topic) < 1:
                 continue
@@ -252,6 +254,9 @@ def share():
     db.session.commit()
 
     sentiment = vader_sentiment(text)
+
+    toxicity(text, app.config["perspective_api"], post.id, db)
+
     topics = Post_topics.query.filter_by(post_id=post_id).all()
 
     sentiment_parent = Post_Sentiment.query.filter_by(post_id=post_id).first()

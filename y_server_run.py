@@ -12,6 +12,7 @@ def start_server(config):
     nltk.download('vader_lexicon')
 
     debug = False
+    app.config["perspective_api"] = config["perspective_api"]
     app.run(debug=debug, port=int(config["port"]), host=config["host"])
 
 

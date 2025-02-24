@@ -19,7 +19,7 @@ from y_server.modals import (
     Post_Sentiment,
     Interests
 )
-from y_server.content_analysis import vader_sentiment
+from y_server.content_analysis import vader_sentiment, toxicity
 
 
 @app.route("/read", methods=["POST"])
@@ -361,6 +361,8 @@ def add_post():
 
     sentiment = vader_sentiment(text)
 
+    toxicity(text, app.config["perspective_api"], post.id, db)
+
     post.thread_id = post.id
     db.session.commit()
 
@@ -479,6 +481,8 @@ def add_comment():
         sentiment_parent = ""
 
     sentiment = vader_sentiment(text)
+
+    toxicity(text, app.config["perspective_api"], new_post.id, db)
 
     # get topics associated to post.id
     post_topics = Post_topics.query.filter_by(post_id=post.thread_id).all()
