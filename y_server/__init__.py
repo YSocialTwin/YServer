@@ -43,6 +43,11 @@ except: # Y Web subprocess
     app.config["SECRET_KEY"] = "4YrzfpQ4kGXjuP6w"
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///../experiments/dummy.db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    # Manually add check_same_thread=False
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "connect_args": {"check_same_thread": False}
+    }
+
     db = SQLAlchemy(app)
 
 from y_server.routes import *
