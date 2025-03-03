@@ -35,7 +35,7 @@ def post_image():
         article_id = None
 
     # check if image exists
-    image = Images.query.filter_by(url=image_url).first()
+    image = db.session.query(Images).filter_by(url=image_url).first()
     if image is None:
         image = Images(
             url=image_url,
@@ -46,7 +46,7 @@ def post_image():
         db.session.commit()
 
     # get image id
-    image_id = Images.query.filter_by(url=image_url).first().id
+    image_id = db.session.query(Images).filter_by(url=image_url).first()
 
     post = Post(
         tweet=text,
