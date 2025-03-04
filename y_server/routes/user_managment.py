@@ -93,6 +93,8 @@ def register():
     gender = data["gender"]
     nationality = data["nationality"]
     toxicity = data["toxicity"]
+    daily_activity_level = data["daily_activity_level"]
+
     if "is_page" in data:
         is_page = data["is_page"]
     else:
@@ -123,6 +125,7 @@ def register():
             nationality=nationality,
             toxicity=toxicity,
             is_page=is_page,
+            daily_activity_level=daily_activity_level
         )
         db.session.add(user)
         try:
