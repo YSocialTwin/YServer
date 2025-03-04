@@ -125,7 +125,7 @@ def register():
             nationality=nationality,
             toxicity=toxicity,
             is_page=is_page,
-            daily_activity_level=daily_activity_level
+            daily_activity_level=daily_activity_level,
         )
         db.session.add(user)
         try:
@@ -149,10 +149,16 @@ def churn_agents():
     left_on = data["left_on"]
 
     #  get the max round value from the post table for each user
-    query = (db.session.query(Post.user_id, db.func.max(Post.round)).
-             join(User_mgmt, Post.user_id == User_mgmt.id).
-             filter(User_mgmt.left_on.is_(None), User_mgmt.is_page == 0).
-             group_by(Post.user_id)).order_by(db.func.max(Post.round).asc()).limit(n_users)
+    query = (
+        (
+            db.session.query(Post.user_id, db.func.max(Post.round))
+            .join(User_mgmt, Post.user_id == User_mgmt.id)
+            .filter(User_mgmt.left_on.is_(None), User_mgmt.is_page == 0)
+            .group_by(Post.user_id)
+        )
+        .order_by(db.func.max(Post.round).asc())
+        .limit(n_users)
+    )
 
     results = query.all()
 

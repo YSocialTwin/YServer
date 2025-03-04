@@ -134,7 +134,6 @@ def comment_news():
                 db.session.commit()
 
     if post is not None and "topics" in data:
-
         # compute sentiment
         sentiment = vader_sentiment(text)
 
@@ -152,7 +151,9 @@ def comment_news():
 
             interests = Interests.query.filter_by(interest=topic).first()
 
-            at = Article_topics.query.filter_by(article_id=article_id, topic_id=interests.iid).first()
+            at = Article_topics.query.filter_by(
+                article_id=article_id, topic_id=interests.iid
+            ).first()
             if at is None:
                 at = Article_topics(article_id=article_id, topic_id=interests.iid)
                 db.session.add(at)

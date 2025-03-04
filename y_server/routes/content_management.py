@@ -17,7 +17,7 @@ from y_server.modals import (
     Post_emotions,
     Post_topics,
     Post_Sentiment,
-    Interests
+    Interests,
 )
 from y_server.content_analysis import vader_sentiment, toxicity
 
@@ -62,7 +62,9 @@ def read():
         if articles:
             posts = [
                 db.session.query(Post)
-                .filter(Post.round >= visibility, Post.news_id != -1, Post.user_id in pages)
+                .filter(
+                    Post.round >= visibility, Post.news_id != -1, Post.user_id in pages
+                )
                 .order_by(desc(Post.id))
                 .limit(10)
             ]
@@ -193,7 +195,11 @@ def read():
         if additional_posts_limit != 0:
             if articles:
                 additional_posts = (
-                    Post.query.filter(Post.round >= visibility, Post.news_id != -1, Post.user_id in pages)
+                    Post.query.filter(
+                        Post.round >= visibility,
+                        Post.news_id != -1,
+                        Post.user_id in pages,
+                    )
                     .order_by(desc(Post.id))
                     .limit(additional_posts_limit)
                 )
@@ -211,7 +217,11 @@ def read():
         if articles:
             posts = [
                 (
-                    Post.query.filter(Post.round >= visibility, Post.news_id != -1, Post.user_id in pages)
+                    Post.query.filter(
+                        Post.round >= visibility,
+                        Post.news_id != -1,
+                        Post.user_id in pages,
+                    )
                     .order_by(func.random())
                     .limit(limit)
                 )
@@ -380,7 +390,7 @@ def add_post():
             compound=sentiment["compound"],
             round=tid,
             is_post=1,
-            topic_id=topic_id
+            topic_id=topic_id,
         )
         db.session.add(post_sentiment)
         db.session.commit()
@@ -487,7 +497,6 @@ def add_comment():
     # get topics associated to post.id
     post_topics = Post_topics.query.filter_by(post_id=post.thread_id).all()
     for topic in post_topics:
-
         post_sentiment = Post_Sentiment(
             post_id=new_post.id,
             user_id=user.id,
@@ -498,7 +507,7 @@ def add_comment():
             sentiment_parent=sentiment_parent,
             round=tid,
             is_comment=1,
-            topic_id=topic.topic_id
+            topic_id=topic.topic_id,
         )
         db.session.add(post_sentiment)
         db.session.commit()
@@ -615,7 +624,11 @@ def get_sentiment():
 
     for interest in interests:
         topic = Interests.query.filter_by(interest=interest).first()
-        post_sentiment = Post_Sentiment.query.filter_by(user_id=user_id, topic_id=topic.iid).order_by(desc(Post_Sentiment.id)).first()
+        post_sentiment = (
+            Post_Sentiment.query.filter_by(user_id=user_id, topic_id=topic.iid)
+            .order_by(desc(Post_Sentiment.id))
+            .first()
+        )
         if post_sentiment is not None:
             # thresholding compound
             if post_sentiment.compound > 0.05:
@@ -697,7 +710,7 @@ def add_reaction():
             sentiment_parent=sentiment,
             round=tid,
             is_reaction=1,
-            topic_id=topic_id
+            topic_id=topic_id,
         )
         db.session.add(reaction_sentiment)
         db.session.commit()

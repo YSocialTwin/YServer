@@ -194,4 +194,3 @@ class Post_Toxicity(db.Model):
     threat = db.Column(db.REAL, default=0)
     sexually_explicit = db.Column(db.REAL, default=0)
     flirtation = db.Column(db.REAL, default=0)
-
