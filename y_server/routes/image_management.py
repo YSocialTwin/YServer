@@ -52,7 +52,7 @@ def post_image():
         tweet=text,
         round=tid,
         user_id=account_id,
-        image_id=image_id,
+        image_id=image_id.id,
         comment_to=-1,
     )
 
