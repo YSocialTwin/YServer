@@ -104,27 +104,27 @@ def read():
 
         if articles:
             posts = (
-                    db.session.query(Post, func.count(Reactions.user_id).label("total"))
-                    .filter(
-                        Post.id.in_(pids),
-                        Post.news_id != -1,
-                        Post.user_id.in_(pages),
-                    )
-                    .outerjoin(Reactions)
-                    .group_by(Post.id)
-                    .order_by(desc(func.count(Reactions.user_id)), desc(Post.id))
-                    .limit(limit)
-                ).all()
+                db.session.query(Post, func.count(Reactions.user_id).label("total"))
+                .filter(
+                    Post.id.in_(pids),
+                    Post.news_id != -1,
+                    Post.user_id.in_(pages),
+                )
+                .outerjoin(Reactions)
+                .group_by(Post.id)
+                .order_by(desc(func.count(Reactions.user_id)), desc(Post.id))
+                .limit(limit)
+            ).all()
 
         else:
             posts = (
-                    db.session.query(Post, func.count(Reactions.user_id).label("total"))
-                    .filter(Post.id.in_(pids), Post.user_id != uid)
-                    .outerjoin(Reactions)
-                    .group_by(Post.id)
-                    .order_by(desc(func.count(Reactions.user_id)), desc(Post.id))
-                    .limit(limit)
-                ).all()
+                db.session.query(Post, func.count(Reactions.user_id).label("total"))
+                .filter(Post.id.in_(pids), Post.user_id != uid)
+                .outerjoin(Reactions)
+                .group_by(Post.id)
+                .order_by(desc(func.count(Reactions.user_id)), desc(Post.id))
+                .limit(limit)
+            ).all()
 
         if additional_posts_limit != 0:
             if articles:
@@ -259,29 +259,36 @@ def read():
         # get posts in random order
         if articles:
             posts = (
-                    Post.query.filter(
-                        Post.round >= visibility,
-                        Post.news_id != -1,
-                        Post.user_id.in_(pages),
-                    )
-                    .order_by(func.random())
-                    .limit(limit)
-                ).all()
+                Post.query.filter(
+                    Post.round >= visibility,
+                    Post.news_id != -1,
+                    Post.user_id.in_(pages),
+                )
+                .order_by(func.random())
+                .limit(limit)
+            ).all()
 
         else:
             posts = (
-                    Post.query.filter(Post.round >= visibility, Post.user_id != uid)
-                    .order_by(func.random())
-                    .limit(limit)
-                ).all()
+                Post.query.filter(Post.round >= visibility, Post.user_id != uid)
+                .order_by(func.random())
+                .limit(limit)
+            ).all()
 
     res = []
+
     for post_type in posts:
-        for post in post_type:
-            try:
-                res.append(post[0].id)
-            except:
-                res.append(post.id)
+        if type(post_type) == list:
+            for post in post_type:
+                try:
+                    res.append(post[0].id)
+                except:
+                    res.append(post.id)
+        else:
+            if type(post_type) == tuple:
+                res.append(post_type[0].id)
+            else:
+                res.append(post_type.id)
 
     # save recommendations
     current_round = Rounds.query.order_by(desc(Rounds.id)).first()
