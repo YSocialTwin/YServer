@@ -60,48 +60,91 @@ def read():
     if mode == "rchrono":
         # get posts in reverse chronological order
         if articles:
-            posts = [
+            posts = (
                 db.session.query(Post)
                 .filter(
-                    Post.round >= visibility, Post.news_id != -1, Post.user_id in pages
+                    Post.round >= visibility, Post.news_id != -1, Post.user_id.in_(pages)
                 )
                 .order_by(desc(Post.id))
                 .limit(10)
-            ]
+            ).all()
         else:
-            posts = [
+            posts = (
                 db.session.query(Post)
                 .filter(Post.round >= visibility, Post.user_id != uid)
                 .order_by(desc(Post.id))
                 .limit(10)
-            ]
+            ).all()
 
     elif mode == "rchrono_popularity":
+
+        # avoid cold start and get 3 additional, rchrono, posts
+        additional_posts_limit = 3
+
         # get posts ordered by likes in reverse chronological order
+        # get unique posts ids from reactions where round >= visibility
+        pids = (
+            db.session.query(Reactions.post_id)
+            .filter(Reactions.round >= visibility)
+            .distinct()
+        ).all()
+
+        pids = [x[0] for x in pids]
+
+        # if pids is empty then select the pids of 20 random posts where round >= visibility
+        if not pids:
+            pids = (
+                db.session.query(Post.id)
+                .filter(Post.round >= visibility)
+                .order_by(func.random())
+                .limit(20)
+            ).all()
+
+            pids = [x[0] for x in pids]
+
         if articles:
-            posts = [
-                (
+            posts = (
                     db.session.query(Post, func.count(Reactions.user_id).label("total"))
                     .filter(
+                        Post.id.in_(pids),
+                        Post.news_id != -1,
+                        Post.user_id.in_(pages),
+                    )
+                    .outerjoin(Reactions)
+                    .group_by(Post.id)
+                    .order_by(desc(func.count(Reactions.user_id)), desc(Post.id))
+                    .limit(limit)
+                ).all()
+
+        else:
+            posts = (
+                    db.session.query(Post, func.count(Reactions.user_id).label("total"))
+                    .filter(Post.id.in_(pids), Post.user_id != uid)
+                    .outerjoin(Reactions)
+                    .group_by(Post.id)
+                    .order_by(desc(func.count(Reactions.user_id)), desc(Post.id))
+                    .limit(limit)
+                ).all()
+
+        if additional_posts_limit != 0:
+            if articles:
+                additional_posts = (
+                    Post.query.filter(
                         Post.round >= visibility,
                         Post.news_id != -1,
-                        Post.user_id in pages,
+                        Post.user_id != uid,
                     )
-                    .join(Reactions)
-                    .group_by(Post)
-                    .order_by(desc("total"), desc(Post.id))
-                ).limit(limit)
-            ]
-        else:
-            posts = [
-                (
-                    db.session.query(Post, func.count(Reactions.user_id).label("total"))
-                    .filter(Post.round >= visibility, Post.user_id != uid)
-                    .join(Reactions)
-                    .group_by(Post)
-                    .order_by(desc("total"), desc(Post.id))
-                ).limit(limit)
-            ]
+                    .order_by(desc(Post.id))
+                    .limit(additional_posts_limit)
+                ).all()
+            else:
+                additional_posts = (
+                    Post.query.filter(Post.round >= visibility, Post.user_id != uid)
+                    .order_by(desc(Post.id))
+                    .limit(additional_posts_limit)
+                ).all()
+
+            posts = [posts, additional_posts]
 
     elif mode == "rchrono_followers":
         if fratio < 1:
@@ -121,12 +164,12 @@ def read():
                 Post.query.filter(
                     Post.round >= visibility,
                     Post.news_id != -1,
-                    Post.user_id in pages,
+                    Post.user_id.in_(pages),
                     Post.user_id.in_(follower_ids),
                 )
                 .order_by(desc(Post.id))
                 .limit(follower_posts_limit)
-            )
+            ).all()
         else:
             posts = (
                 Post.query.filter(
@@ -134,7 +177,7 @@ def read():
                 )
                 .order_by(desc(Post.id))
                 .limit(follower_posts_limit)
-            )
+            ).all()
 
         if additional_posts_limit != 0:
             if articles:
@@ -146,13 +189,13 @@ def read():
                     )
                     .order_by(desc(Post.id))
                     .limit(additional_posts_limit)
-                )
+                ).all()
             else:
                 additional_posts = (
                     Post.query.filter(Post.round >= visibility, Post.user_id != uid)
                     .order_by(desc(Post.id))
                     .limit(additional_posts_limit)
-                )
+                ).all()
 
             posts = [posts, additional_posts]
 
@@ -172,25 +215,25 @@ def read():
         if articles:
             posts = (
                 db.session.query(Post, func.count(Reactions.user_id).label("total"))
-                .join(Reactions)
+                .outerjoin(Reactions)
                 .filter(
                     Post.round >= visibility,
                     Post.news_id != -1,
-                    Post.user_id in pages,
+                    Post.user_id.in_(pages),
                 )
-                .group_by(Post)
-                .order_by(desc("total"), desc(Post.id))
+                .group_by(Post.id)
+                .order_by(desc(func.count(Reactions.user_id)), desc(Post.id))
                 .limit(follower_posts_limit)
-            )
+            ).all()
         else:
             posts = (
                 db.session.query(Post, func.count(Reactions.user_id).label("total"))
-                .join(Reactions)
+                .outerjoin(Reactions)
                 .filter(Post.round >= visibility, Post.user_id.in_(follower_ids))
-                .group_by(Post)
-                .order_by(desc("total"), desc(Post.id))
+                .group_by(Post.id)
+                .order_by(desc(func.count(Reactions.user_id)), desc(Post.id))
                 .limit(follower_posts_limit)
-            )
+            ).all()
 
         if additional_posts_limit != 0:
             if articles:
@@ -198,42 +241,39 @@ def read():
                     Post.query.filter(
                         Post.round >= visibility,
                         Post.news_id != -1,
-                        Post.user_id in pages,
+                        Post.user_id.in_(pages),
                     )
                     .order_by(desc(Post.id))
                     .limit(additional_posts_limit)
-                )
+                ).all()
             else:
                 additional_posts = (
                     Post.query.filter(Post.round >= visibility, Post.user_id != uid)
                     .order_by(desc(Post.id))
                     .limit(additional_posts_limit)
-                )
+                ).all()
 
             posts = [posts, additional_posts]
 
     else:
         # get posts in random order
         if articles:
-            posts = [
-                (
+            posts = (
                     Post.query.filter(
                         Post.round >= visibility,
                         Post.news_id != -1,
-                        Post.user_id in pages,
+                        Post.user_id.in_(pages),
                     )
                     .order_by(func.random())
                     .limit(limit)
-                )
-            ]
+                ).all()
+
         else:
-            posts = [
-                (
+            posts = (
                     Post.query.filter(Post.round >= visibility, Post.user_id != uid)
                     .order_by(func.random())
                     .limit(limit)
-                )
-            ]
+                ).all()
 
     res = []
     for post_type in posts:
@@ -269,13 +309,13 @@ def search():
     visibility = current_round.id - vround
 
     recent_user_hashtags = Hashtags.query.filter(
-        Hashtags.id
-        == db.session.query(Post_hashtags.hashtag_id).filter(
-            Post_hashtags.post_id
-            == db.session.query(Post.id).filter(
-                Post.user_id == uid, Post.round >= visibility
-            )
+        Hashtags.id == db.session.query(Post_hashtags.hashtag_id)
+        .filter(
+            Post_hashtags.post_id == db.session.query(Post.id)
+            .filter(Post.user_id == uid, Post.round >= visibility)
+            .scalar_subquery()  # Explicit scalar subquery
         )
+        .scalar_subquery()  # Explicit scalar subquery
     ).limit(10)
 
     if recent_user_hashtags is not None:
