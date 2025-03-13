@@ -91,13 +91,13 @@ def read():
 
         pids = [x[0] for x in pids]
 
-        # if pids is empty then select the pids of 20 random posts where round >= visibility
-        if not pids:
+        # if pids is empty then select the pids of 5 random posts where round >= visibility
+        if pids is None or len(pids) == 0:
             pids = (
                 db.session.query(Post.id)
                 .filter(Post.round >= visibility)
                 .order_by(func.random())
-                .limit(20)
+                .limit(5)
             ).all()
 
             pids = [x[0] for x in pids]
@@ -292,11 +292,12 @@ def read():
 
     # save recommendations
     current_round = Rounds.query.order_by(desc(Rounds.id)).first()
-    recs = Recommendations(
-        user_id=uid, post_ids="|".join([str(x) for x in res]), round=current_round.id
-    )
-    db.session.add(recs)
-    db.session.commit()
+    if len(res) > 0:
+        recs = Recommendations(
+            user_id=uid, post_ids="|".join([str(x) for x in res]), round=current_round.id
+        )
+        db.session.add(recs)
+        db.session.commit()
     return json.dumps(res)
 
 
