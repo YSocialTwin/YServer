@@ -104,16 +104,17 @@ def read():
 
         if articles:
             posts = (
-                db.session.query(Post, func.count(Reactions.user_id).label("total"))
+                db.session.query(Post, func.count(Reactions.id).label("total"))
                 .filter(
                     Post.id.in_(pids),
                     Post.news_id != -1,
                     Post.user_id.in_(pages),
                 )
-                .outerjoin(Reactions)
+                .outerjoin(Reactions, Reactions.post_id == Post.id)
                 .group_by(Post.id)
-                .order_by(desc(func.count(Reactions.user_id)), desc(Post.id))
+                .order_by(desc("total"), desc(Post.id))
                 .limit(limit)
+
             ).all()
 
         else:
@@ -375,8 +376,8 @@ def read_mention():
             Mentions.answered == 0,
         )
         .order_by(func.random())
-        .first()
-    )
+        .limit(1)
+    ).first()
 
     if mention is not None:
         mention.answered = 1
