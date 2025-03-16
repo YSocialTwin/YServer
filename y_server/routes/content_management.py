@@ -1,6 +1,14 @@
 import json
 from flask import request
 from y_server import app, db
+from y_server.utils import (
+    get_follows,
+    fetch_common_interest_posts,
+    fetch_common_user_interest_posts,
+    fetch_similar_users_posts,
+    get_posts_by_reactions,
+    get_posts_by_author,
+)
 from sqlalchemy import desc
 from sqlalchemy.sql.expression import func
 from y_server.modals import (
@@ -41,6 +49,7 @@ def read():
         fratio = float(data["followers_ratio"])
     except:
         fratio = 1
+
     articles = False
     if "article" in data:
         articles = True
@@ -57,13 +66,22 @@ def read():
     current_round = Rounds.query.order_by(desc(Rounds.id)).first()
     visibility = current_round.id - vround
 
+    if fratio < 1:
+        follower_posts_limit = int(limit * fratio)
+        additional_posts_limit = limit - follower_posts_limit
+    else:
+        follower_posts_limit = limit
+        additional_posts_limit = 0
+
     if mode == "rchrono":
         # get posts in reverse chronological order
         if articles:
             posts = (
                 db.session.query(Post)
                 .filter(
-                    Post.round >= visibility, Post.news_id != -1, Post.user_id.in_(pages)
+                    Post.round >= visibility,
+                    Post.news_id != -1,
+                    Post.user_id.in_(pages),
                 )
                 .order_by(desc(Post.id))
                 .limit(10)
@@ -77,7 +95,6 @@ def read():
             ).all()
 
     elif mode == "rchrono_popularity":
-
         # avoid cold start and get 3 additional, rchrono, posts
         additional_posts_limit = 3
 
@@ -114,7 +131,6 @@ def read():
                 .group_by(Post.id)
                 .order_by(desc("total"), desc(Post.id))
                 .limit(limit)
-
             ).all()
 
         else:
@@ -256,6 +272,80 @@ def read():
 
             posts = [posts, additional_posts]
 
+    # @todo: extends to article and use outejoin to avoid empty posts
+    elif mode == "rchrono_comments":
+        # get posts with the most comments in reverse chronological order (as longer thread)
+        query = (
+            db.session.query(Post, func.count(Post.thread_id).label("comment_count"))
+            .filter(
+                Post.round >= visibility,
+                Post.comment_to != -1,
+                Post.news_id != -1 if articles else True,
+            )
+            .group_by(Post.thread_id)
+        )
+        follower_ids = get_follows(uid)
+        query_follower = query.filter(Post.user_id.in_(follower_ids))
+
+        posts = [
+            query_follower.order_by(desc("comment_count"), desc(Post.id))
+            .limit(follower_posts_limit)
+            .all()
+        ]
+
+        if additional_posts_limit != 0:
+            query_additional = query.filter(Post.user_id.notin_(follower_ids))
+
+            additional_posts = (
+                query_additional.order_by(desc("comment_count"), desc(Post.id))
+                .limit(additional_posts_limit)
+                .all()
+            )
+
+            posts = [posts, additional_posts]
+
+    elif mode == "common_interests":
+        # get posts with common topic interests
+        posts = fetch_common_interest_posts(
+            uid=uid,
+            visibility=visibility,
+            articles=articles,
+            follower_posts_limit=follower_posts_limit,
+            additional_posts_limit=additional_posts_limit,
+        )
+
+    elif mode == "common_user_interests":
+        # get most interacted posts by users with common interests
+        posts = fetch_common_user_interest_posts(
+            uid=uid,
+            visibility=visibility,
+            articles=articles,
+            follower_posts_limit=follower_posts_limit,
+            additional_posts_limit=additional_posts_limit,
+            reactions_type=["like", "dislike"],
+        )
+
+    elif mode == "similar_users_react":
+        # get posts from similar users
+        posts = fetch_similar_users_posts(
+            uid=uid,
+            visibility=visibility,
+            articles=articles,
+            limit=limit,
+            filter_function=get_posts_by_reactions,
+            reactions_type=["like"],
+        )
+
+    elif mode == "similar_users_posts":
+        # get posts from similar users
+        posts = fetch_similar_users_posts(
+            uid=uid,
+            visibility=visibility,
+            articles=articles,
+            limit=limit,
+            filter_function=get_posts_by_author,
+        )
+
     else:
         # get posts in random order
         if articles:
@@ -295,7 +385,9 @@ def read():
     current_round = Rounds.query.order_by(desc(Rounds.id)).first()
     if len(res) > 0:
         recs = Recommendations(
-            user_id=uid, post_ids="|".join([str(x) for x in res]), round=current_round.id
+            user_id=uid,
+            post_ids="|".join([str(x) for x in res]),
+            round=current_round.id,
         )
         db.session.add(recs)
         db.session.commit()
@@ -318,9 +410,11 @@ def search():
     visibility = current_round.id - vround
 
     recent_user_hashtags = Hashtags.query.filter(
-        Hashtags.id == db.session.query(Post_hashtags.hashtag_id)
+        Hashtags.id
+        == db.session.query(Post_hashtags.hashtag_id)
         .filter(
-            Post_hashtags.post_id == db.session.query(Post.id)
+            Post_hashtags.post_id
+            == db.session.query(Post.id)
             .filter(Post.user_id == uid, Post.round >= visibility)
             .scalar_subquery()  # Explicit scalar subquery
         )
