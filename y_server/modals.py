@@ -45,6 +45,7 @@ class Post(db.Model):
     news_id = db.Column(db.String(50), db.ForeignKey("articles.id"), default=None)
     image_id = db.Column(db.Integer(), db.ForeignKey("images.id"), default=None)
     shared_from = db.Column(db.Integer, default=-1)
+    reaction_count = db.Column(db.Integer, default=0)
 
 
 class Hashtags(db.Model):

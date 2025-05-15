@@ -95,73 +95,27 @@ def read():
             ).all()
 
     elif mode == "rchrono_popularity":
-        # avoid cold start and get 3 additional, rchrono, posts
-        additional_posts_limit = 3
-
-        # get posts ordered by likes in reverse chronological order
-        # get unique posts ids from reactions where round >= visibility
-        pids = (
-            db.session.query(Reactions.post_id)
-            .filter(Reactions.round >= visibility)
-            .distinct()
-        ).all()
-
-        pids = [x[0] for x in pids]
-
-        # if pids is empty then select the pids of 5 random posts where round >= visibility
-        if pids is None or len(pids) == 0:
-            pids = (
-                db.session.query(Post.id)
-                .filter(Post.round >= visibility)
-                .order_by(func.random())
-                .limit(5)
-            ).all()
-
-            pids = [x[0] for x in pids]
-
         if articles:
             posts = (
-                db.session.query(Post, func.count(Reactions.id).label("total"))
+                db.session.query(Post)
                 .filter(
-                    Post.id.in_(pids),
+                    Post.round >= visibility,
                     Post.news_id != -1,
                     Post.user_id.in_(pages),
                 )
-                .outerjoin(Reactions, Reactions.post_id == Post.id)
-                .group_by(Post.id)
-                .order_by(desc("total"), desc(Post.id))
+                .order_by(desc(Post.id), desc(Post.reaction_count))
                 .limit(limit)
             ).all()
 
         else:
             posts = (
-                db.session.query(Post, func.count(Reactions.user_id).label("total"))
-                .filter(Post.id.in_(pids), Post.user_id != uid)
-                .outerjoin(Reactions)
-                .group_by(Post.id)
-                .order_by(desc(func.count(Reactions.user_id)), desc(Post.id))
+                db.session.query(Post)
+                .filter(Post.round >= visibility, Post.user_id != uid)
+                .order_by(desc(Post.id), desc(Post.reaction_count))
                 .limit(limit)
             ).all()
 
-        if additional_posts_limit != 0:
-            if articles:
-                additional_posts = (
-                    Post.query.filter(
-                        Post.round >= visibility,
-                        Post.news_id != -1,
-                        Post.user_id != uid,
-                    )
-                    .order_by(desc(Post.id))
-                    .limit(additional_posts_limit)
-                ).all()
-            else:
-                additional_posts = (
-                    Post.query.filter(Post.round >= visibility, Post.user_id != uid)
-                    .order_by(desc(Post.id))
-                    .limit(additional_posts_limit)
-                ).all()
-
-            posts = [posts, additional_posts]
+        posts = [posts, []]
 
     elif mode == "rchrono_followers":
         if fratio < 1:
@@ -231,24 +185,20 @@ def read():
         # get posts from followers ordered by likes and reverse chronologically
         if articles:
             posts = (
-                db.session.query(Post, func.count(Reactions.user_id).label("total"))
-                .outerjoin(Reactions)
+                db.session.query(Post)
                 .filter(
                     Post.round >= visibility,
                     Post.news_id != -1,
                     Post.user_id.in_(pages),
                 )
-                .group_by(Post.id)
-                .order_by(desc(func.count(Reactions.user_id)), desc(Post.id))
+                .order(desc(Post.id), desc(Post.reaction_count))
                 .limit(follower_posts_limit)
             ).all()
         else:
             posts = (
-                db.session.query(Post, func.count(Reactions.user_id).label("total"))
-                .outerjoin(Reactions)
+                db.session.query(Post)
                 .filter(Post.round >= visibility, Post.user_id.in_(follower_ids))
-                .group_by(Post.id)
-                .order_by(desc(func.count(Reactions.user_id)), desc(Post.id))
+                .order_by(desc(Post.id), desc(Post.reaction_count))
                 .limit(follower_posts_limit)
             ).all()
 
@@ -260,13 +210,16 @@ def read():
                         Post.news_id != -1,
                         Post.user_id.in_(pages),
                     )
-                    .order_by(desc(Post.id))
+                    .order_by(
+                        desc(Post.id),
+                        desc(Post.reaction_count),
+                    )
                     .limit(additional_posts_limit)
                 ).all()
             else:
                 additional_posts = (
                     Post.query.filter(Post.round >= visibility, Post.user_id != uid)
-                    .order_by(desc(Post.id))
+                    .order_by(desc(Post.id), desc(Post.reaction_count))
                     .limit(additional_posts_limit)
                 ).all()
 
@@ -276,7 +229,9 @@ def read():
     elif mode == "rchrono_comments":
         # get posts with the most comments in reverse chronological order (as longer thread)
         query = (
-            db.session.query(Post, func.count(Post.thread_id).label("comment_count"))
+            db.session.query(
+                Post
+            )  # , func.count(Post.thread_id).label("comment_count"))
             .filter(
                 Post.round >= visibility,
                 Post.comment_to != -1,
@@ -288,7 +243,8 @@ def read():
         query_follower = query.filter(Post.user_id.in_(follower_ids))
 
         posts = [
-            query_follower.order_by(desc("comment_count"), desc(Post.id))
+            # query_follower.order_by(desc("comment_count"), desc(Post.id))
+            query_follower.order_by(desc(Post.reaction_count), desc(Post.id))
             .limit(follower_posts_limit)
             .all()
         ]
@@ -297,7 +253,8 @@ def read():
             query_additional = query.filter(Post.user_id.notin_(follower_ids))
 
             additional_posts = (
-                query_additional.order_by(desc("comment_count"), desc(Post.id))
+                # query_additional.order_by(desc("comment_count"), desc(Post.id))
+                query_follower.order_by(desc(Post.reaction_count), desc(Post.id))
                 .limit(additional_posts_limit)
                 .all()
             )
@@ -858,6 +815,12 @@ def add_reaction():
         db.session.add(reaction_sentiment)
         db.session.commit()
 
+    # increment the post's reaction count
+    post = Post.query.filter_by(id=post_id).first()
+    if post is not None:
+        post.reaction_count += 1
+        db.session.commit()
+
     return json.dumps({"status": 200})
 
 
@@ -891,5 +854,8 @@ def get_thread_root():
     post_id = data["post_id"]
 
     post = Post.query.filter_by(id=post_id).first()
+
+    if post is None:
+        return json.dumps({"status": 404})
 
     return json.dumps(post.thread_id)

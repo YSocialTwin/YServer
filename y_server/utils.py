@@ -241,7 +241,6 @@ def get_posts_by_author(
     articles,
     limit,
     user_ids,
-    reactions_type: str | list = ["like", "dislike"],
 ):
     """
     Fetch posts made by specified users.
