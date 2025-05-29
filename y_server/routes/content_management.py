@@ -225,7 +225,6 @@ def read():
 
             posts = [posts, additional_posts]
 
-    # @todo: extends to article and use outejoin to avoid empty posts
     elif mode == "rchrono_comments":
         # get posts with the most comments in reverse chronological order (as longer thread)
         query = (

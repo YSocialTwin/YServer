@@ -21,6 +21,22 @@ from y_server.modals import (
     Images,
     Article_topics,
 )
+import logging, os
+from pythonjsonlogger import jsonlogger
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+# Create handler
+logHandler = logging.StreamHandler()
+
+# Define JSON log format
+formatter = jsonlogger.JsonFormatter(
+    fmt='%(asctime)s %(levelname)s %(name)s %(message)s %(pathname)s %(lineno)d',
+    datefmt='%Y-%m-%dT%H:%M:%S'
+)
+
+logHandler.setFormatter(formatter)
 
 
 @app.route("/change_db", methods=["POST"])
@@ -35,6 +51,12 @@ def change_db():
     data = json.loads(request.get_data())
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:////{data['path']}"
 
+    # Set up logging
+    db_path = data['path'].split("y_web")[1].split("database_server.db")[0]
+    log_dir = f"y_web{os.sep}{db_path}"
+    log_path = os.path.join(log_dir, "_server.log")
+    logHandler = logging.FileHandler(log_path)
+    logger.addHandler(logHandler)
     db.init_app(app)
     return {"status": 200}
 

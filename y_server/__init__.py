@@ -1,8 +1,12 @@
-from flask import Flask
+from flask import Flask, request, g
 from flask_sqlalchemy import SQLAlchemy
 import json
 import shutil
 import os
+import logging, time
+
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.WARNING)
 
 try:
     # read the experiment configuration
@@ -52,5 +56,27 @@ except:  # Y Web subprocess
     }
 
     db = SQLAlchemy(app)
+
+    # Log the request duration
+    @app.before_request
+    def start_timer():
+        g.start_time = time.time()
+
+
+    @app.after_request
+    def log_request(response):
+        if hasattr(g, 'start_time'):
+            duration = time.time() - g.start_time
+            log = {
+                "remote_addr": request.remote_addr,
+                "method": request.method,
+                "path": request.path,
+                "status_code": response.status_code,
+                "duration": round(duration, 4),
+                "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            }
+
+            logging.info(log)
+        return response
 
 from y_server.routes import *
