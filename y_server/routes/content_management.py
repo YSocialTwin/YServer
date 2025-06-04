@@ -233,7 +233,7 @@ def read():
             )  # , func.count(Post.thread_id).label("comment_count"))
             .filter(
                 Post.round >= visibility,
-                Post.comment_to != -1,
+                # Post.comment_to != -1,
                 Post.news_id != -1 if articles else True,
             )
             .group_by(Post.thread_id)
@@ -249,8 +249,7 @@ def read():
         ]
 
         if additional_posts_limit != 0:
-            query_additional = query.filter(Post.user_id.notin_(follower_ids))
-
+           # query_additional = query.filter(Post.user_id.notin_(follower_ids))
             additional_posts = (
                 # query_additional.order_by(desc("comment_count"), desc(Post.id))
                 query_follower.order_by(desc(Post.reaction_count), desc(Post.id))
@@ -328,14 +327,18 @@ def read():
         if type(post_type) == list:
             for post in post_type:
                 try:
-                    res.append(post[0].id)
+                    if len(post) > 0 and post[0] is not None:
+                        res.append(post[0].id)
                 except:
-                    res.append(post.id)
+                    if post is not None:
+                        res.append(post.id)
         else:
             if type(post_type) == tuple:
-                res.append(post_type[0].id)
+                if len(post_type) > 0 and post_type[0] is not None:
+                    res.append(post_type[0].id)
             else:
-                res.append(post_type.id)
+                if post_type is not None:
+                    res.append(post_type.id)
 
     # save recommendations
     current_round = Rounds.query.order_by(desc(Rounds.id)).first()
