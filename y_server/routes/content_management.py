@@ -678,6 +678,9 @@ def post_thread():
     post_id = data["post_id"]
 
     post = Post.query.filter_by(id=post_id).first()
+    if post is None:
+        return json.dumps({"status": 404, "error": "Post not found"})
+
     thread_id = Post.query.filter_by(thread_id=post.thread_id)
 
     res = []
