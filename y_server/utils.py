@@ -66,7 +66,8 @@ def fetch_common_interest_posts(
 
     # Helper to create queries
     def create_query(user_filter, topic_filter, lit):
-        return base_query.filter(user_filter, topic_filter).limit(lit)
+        res = base_query.filter(user_filter, topic_filter).limit(lit).all()
+        return res
 
     posts = []
 
@@ -76,7 +77,7 @@ def fetch_common_interest_posts(
             Post.user_id.in_(follower_ids),
             Post_topics.topic_id.in_(user_interests),
             follower_posts_limit,
-        ).all()
+        )
     )
 
     # Additional posts with common interests
@@ -86,7 +87,7 @@ def fetch_common_interest_posts(
                 Post.user_id.notin_(follower_ids),
                 Post_topics.topic_id.in_(user_interests),
                 additional_posts_limit,
-            ).all()
+            )
         )
 
     return posts
@@ -126,6 +127,7 @@ def fetch_common_user_interest_posts(
     # Separate common followers and other users
 
     follower_ids = get_follows(uid)
+
     common_follower_ids = [
         row.user_id
         for row in db.session.query(common_users.c.user_id)
@@ -138,11 +140,11 @@ def fetch_common_user_interest_posts(
         .filter(~common_users.c.user_id.in_(common_follower_ids))
         .all()
     ]
-
     # Fetch posts for each group
     posts_followers = get_posts_by_reactions(
         visibility, articles, follower_posts_limit, common_follower_ids, reactions_type
     )
+
     posts_additional = get_posts_by_reactions(
         visibility, articles, additional_posts_limit, other_user_ids, reactions_type
     )
@@ -169,10 +171,8 @@ def fetch_similar_users_posts(
     """
     # Fetch similar users
     similar_users = __get_similar_users(uid, limit)
-    # print(similar_users, flush=True)
 
     # fetch posts based on the filter function
-    posts = []
     posts = filter_function(
         visibility=visibility,
         articles=articles,
@@ -293,7 +293,19 @@ def get_posts_by_reactions(
         .group_by(Post.id)
         .order_by(desc("total"), desc(Post.id))
         .limit(limit)
-    )
+    ).all()
+
+    # If no posts found, fetch posts based on visibility and articles
+    if len(posts) == 0:
+        posts = (
+            db.session.query(Post)
+            .filter(
+                Post.round >= visibility,
+                Post.news_id != -1 if articles else True,
+            )
+            .group_by(Post.id)
+            .limit(limit)
+        ).all()
 
     return posts
 

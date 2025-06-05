@@ -50,6 +50,7 @@ def read():
     except:
         fratio = 1
 
+    # if no user id is provided, return an empty list
     articles = False
     if "article" in data:
         articles = True
