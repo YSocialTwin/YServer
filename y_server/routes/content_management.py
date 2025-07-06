@@ -9,7 +9,7 @@ from y_server.utils import (
     get_posts_by_reactions,
     get_posts_by_author,
 )
-from sqlalchemy import desc
+from sqlalchemy import desc, select
 from sqlalchemy.sql.expression import func
 from y_server.modals import (
     Hashtags,
@@ -419,10 +419,11 @@ def read_mention():
     uid = int(data["uid"])
     vround = int(data["visibility_rounds"])
 
-    # visibility
+    # Calcola la visibilità
     current_round = Rounds.query.order_by(desc(Rounds.id)).first()
     visibility = current_round.id - vround
 
+    # Trova una mention non ancora letta per l'utente
     mention = (
         Mentions.query.filter(
             Mentions.user_id == uid,
@@ -431,12 +432,28 @@ def read_mention():
         )
         .order_by(func.random())
         .limit(1)
-    ).first()
+        .first()
+    )
 
     if mention is not None:
+        # Segna come letta
         mention.answered = 1
         db.session.commit()
-        return json.dumps([mention.post_id])
+
+        hashtags = (
+            db.session.query(Hashtags)
+            .filter(
+                Hashtags.id.in_(
+                    select(Post_hashtags.hashtag_id).filter(Post_hashtags.post_id == mention.post_id)
+                )
+            )
+            .all()
+        )
+
+        return json.dumps({
+            "post_id": mention.post_id,
+            "hashtags": [h.hashtag for h in hashtags]
+        })
 
     else:
         return json.dumps({"status": 404})

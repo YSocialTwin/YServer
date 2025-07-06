@@ -99,7 +99,7 @@ def fetch_common_user_interest_posts(
     articles,
     follower_posts_limit,
     additional_posts_limit,
-    reactions_type: str | list = ["like", "dislike"],
+    reactions_type,
 ):
     """
     Fetch posts reacted by users with common interests.
@@ -158,7 +158,7 @@ def fetch_similar_users_posts(
     articles,
     limit,
     filter_function,
-    reactions_type: str | list = ["like", "dislike"],
+    reactions_type,
 ):
     """
     Fetch post related to similar agents to the target user based on specified features.
@@ -241,7 +241,7 @@ def get_posts_by_author(
     articles,
     limit,
     user_ids,
-    reactions_type: str | list = ["like", "dislike"],
+    reactions_type,
 ):
     """
     Fetch posts made by specified users.
@@ -266,7 +266,7 @@ def get_posts_by_reactions(
     articles,
     limit,
     user_ids,
-    reactions_type: str | list = ["like", "dislike"],
+    reactions_type,
 ):
     """
     Fetch posts reacted by specified users.

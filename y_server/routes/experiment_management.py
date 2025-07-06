@@ -39,6 +39,18 @@ formatter = jsonlogger.JsonFormatter(
 logHandler.setFormatter(formatter)
 
 
+def rebind_db(new_uri):
+    from sqlalchemy import create_engine
+    from flask import current_app
+
+    engine = create_engine(new_uri, connect_args={"check_same_thread": False})
+
+    with current_app.app_context():
+        db.session.remove()
+        db.engine.dispose()  # ✅ safe now
+        db.session.configure(bind=engine)
+
+
 @app.route("/change_db", methods=["POST"])
 def change_db():
     """
@@ -49,10 +61,23 @@ def change_db():
     """
     # get the data from the request
     data = json.loads(request.get_data())
-    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:////{data['path']}"
 
-    # Set up logging
-    db_path = data['path'].split("y_web")[1].split("database_server.db")[0]
+    # select the database type
+    uri = data["path"]
+
+    if "postgresql" in uri:
+        app.config["SQLALCHEMY_DATABASE_URI"] = uri
+        db_path = "experiments" +os.sep + data['path'].split("/")[-1].replace("experiments_", "") #.split("y_web")[1].split("experiments_")[1]
+        rebind_db(uri)
+    else:
+        app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:////{data['path']}"
+        # Manually add check_same_thread=False
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "connect_args": {"check_same_thread": False}
+        }
+        # Set up logging
+        db_path = data['path'].split("y_web")[1].split("database_server.db")[0]
+
     log_dir = f"y_web{os.sep}{db_path}"
     log_path = os.path.join(log_dir, "_server.log")
     logHandler = logging.FileHandler(log_path)

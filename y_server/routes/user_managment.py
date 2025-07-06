@@ -354,7 +354,7 @@ def get_user_interests():
             User_interest.round_id >= base_rounds,
             User_interest.round_id <= round_id,
         )
-        .group_by(User_interest.interest_id)
+        .group_by(User_interest.interest_id, Interests.interest)
         .order_by(db.desc(db.func.count(User_interest.interest_id)))
         .limit(n_interests)
         .all()

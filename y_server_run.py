@@ -7,10 +7,10 @@ def start_server(config):
     Start the app
     """
     from y_server import app
-    import nltk
+    #import nltk
 
-    nltk.download("vader_lexicon")
-
+    #nltk.download("vader_lexicon")
+    print(config)
     debug = False
     app.config["perspective_api"] = config["perspective_api"]
     app.run(debug=debug, port=int(config["port"]), host=config["host"])
