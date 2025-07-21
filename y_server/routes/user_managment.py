@@ -31,9 +31,12 @@ def get_user():
     """
     data = json.loads(request.get_data())
     username = data["username"]
-    email = data["email"]
+    # email = data["email"]
 
-    user = User_mgmt.query.filter_by(username=username, email=email).first()
+    user = User_mgmt.query.filter_by(username=username).first()
+
+    if user is None:
+        return json.dumps({"error": "User not found", "status": 404, "username": username})
 
     return json.dumps(
         {
@@ -102,7 +105,7 @@ def register():
     else:
         is_page = 0
 
-    user = User_mgmt.query.filter_by(username=data["name"], email=data["email"]).first()
+    user = User_mgmt.query.filter_by(username=data["name"]).first()
 
     if user is None:
         user = User_mgmt(
@@ -130,13 +133,16 @@ def register():
             daily_activity_level=daily_activity_level,
             profession=profession,
         )
-        db.session.add(user)
-        try:
-            db.session.commit()
-        except:
-            return json.dumps({"status": 404})
 
-    return json.dumps({"status": 200})
+        db.session.add(user)
+        db.session.commit()
+
+        print("\nRegistered user:", user.username, user.email, user.id)
+        return json.dumps({"status": 200, "id": user.id, "username": user.username})
+
+    else:
+        print("\nUser already exists:", user.username, user.email, user.id)
+        return json.dumps({"status": 200, "id": user.id, "username": user.username})
 
 
 @app.route("/churn", methods=["POST"])

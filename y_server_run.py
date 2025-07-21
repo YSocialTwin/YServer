@@ -6,10 +6,12 @@ def start_server(config):
     """
     Start the app
     """
+    print("Starting YServer...", config)
     from y_server import app
-    #import nltk
 
-    #nltk.download("vader_lexicon")
+    # import nltk
+    # nltk.download("vader_lexicon")
+
     print(config)
     debug = False
     app.config["perspective_api"] = config["perspective_api"]
