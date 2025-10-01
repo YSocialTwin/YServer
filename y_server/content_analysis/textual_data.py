@@ -1,15 +1,54 @@
+"""
+Textual data analysis module.
+
+This module provides functions for analyzing textual content, including
+sentiment analysis using VADER and toxicity detection using Perspective API.
+"""
+
 from nltk.sentiment import SentimentIntensityAnalyzer
 from perspective import PerspectiveAPI
 from y_server.modals import Post_Toxicity
 
 
 def vader_sentiment(text):
+    """
+    Perform sentiment analysis on text using VADER (Valence Aware Dictionary and sEntiment Reasoner).
+    
+    Args:
+        text (str): The text to analyze for sentiment.
+        
+    Returns:
+        dict: A dictionary containing sentiment scores with keys:
+            - 'neg': Negative sentiment score
+            - 'neu': Neutral sentiment score
+            - 'pos': Positive sentiment score
+            - 'compound': Compound sentiment score (-1 to 1)
+    """
     sia = SentimentIntensityAnalyzer()
     sentiment = sia.polarity_scores(text)
     return sentiment
 
 
 def toxicity(text, api_key, post_id, db):
+    """
+    Analyze text for toxicity using the Perspective API.
+    
+    This function evaluates various aspects of toxicity including general toxicity,
+    severe toxicity, identity attacks, insults, profanity, threats, sexually explicit
+    content, and flirtation. Results are stored in the database.
+    
+    Args:
+        text (str): The text content to analyze.
+        api_key (str): Perspective API key. If None, toxicity analysis is skipped.
+        post_id (int): The ID of the post being analyzed.
+        db: Database session object for storing toxicity scores.
+        
+    Returns:
+        None: Results are stored directly in the database.
+        
+    Note:
+        If the API call fails or api_key is None, the function returns without error.
+    """
     if api_key is not None:
         try:
             p = PerspectiveAPI(api_key)
