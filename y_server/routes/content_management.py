@@ -1,3 +1,12 @@
+"""
+Content management routes.
+
+This module provides REST API endpoints for managing content including posts, comments,
+recommendations, and content retrieval. Implements various recommendation algorithms
+based on interests, user similarity, and follower relationships. Handles post creation,
+deletion, reactions, and sentiment/toxicity analysis.
+"""
+
 import json
 from flask import request
 from y_server import app, db
@@ -33,9 +42,28 @@ from y_server.content_analysis import vader_sentiment, toxicity
 @app.route("/read", methods=["POST"])
 def read():
     """
-    Return a list of candidate posts for the user as filtered by the content recommendation system.
-
-    :return: a json object with the post ids
+    Retrieve recommended posts for a user based on various filtering strategies.
+    
+    Implements multiple recommendation modes including:
+    - common_interest: Posts matching user's topic interests
+    - common_user_interest: Posts reacted to by users with similar interests  
+    - similar_users_reactions: Posts reacted to by demographically similar users
+    - similar_users_author: Posts authored by demographically similar users
+    - default: Posts from followed users
+    
+    Supports filtering by political leaning for article posts and configurable
+    follower/non-follower ratios.
+    
+    Expects JSON data with:
+        - limit (int): Maximum number of posts to return
+        - mode (str): Recommendation algorithm to use
+        - visibility_rounds (int): How far back to look for posts
+        - uid (int, optional): User ID for personalized recommendations
+        - followers_ratio (float, optional): Ratio of follower to non-follower posts
+        - article (bool, optional): Whether to include article posts
+        
+    Returns:
+        str: JSON response with list of recommended post IDs.
     """
     data = json.loads(request.get_data())
     limit = data["limit"]

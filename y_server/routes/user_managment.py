@@ -1,3 +1,12 @@
+"""
+User management routes.
+
+This module provides REST API endpoints for managing user accounts and profiles,
+including user registration, retrieval, updates, user interests management, churn
+tracking, and timeline generation. Handles user authentication data, personality
+traits, demographics, and activity tracking.
+"""
+
 import json
 from flask import request
 from y_server import app, db
@@ -8,9 +17,13 @@ from y_server.modals import Post, User_mgmt, Reactions, User_interest, Interests
 @app.route("/get_user_id", methods=["GET", "POST"])
 def get_user_id():
     """
-    Get the user id.
-
-    :return: a json object with the user id
+    Retrieve a user's ID by username.
+    
+    Expects JSON data with:
+        - username (str): The username to look up
+        
+    Returns:
+        str: JSON response with user id, or null if user not found.
     """
     data = json.loads(request.get_data())
     username = data["username"]
@@ -25,9 +38,16 @@ def get_user_id():
 @app.route("/get_user", methods=["POST"])
 def get_user():
     """
-    Get user information.
-
-    :return: a json object with the user information
+    Retrieve comprehensive user profile information.
+    
+    Returns full user profile including demographics, personality traits (Big Five),
+    recommendation system preferences, and activity settings.
+    
+    Expects JSON data with:
+        - username (str): The username to look up
+        
+    Returns:
+        str: JSON response with complete user profile data, or error status 404.
     """
     data = json.loads(request.get_data())
     username = data["username"]
