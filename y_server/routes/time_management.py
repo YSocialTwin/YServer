@@ -1,3 +1,10 @@
+"""
+Time management routes.
+
+This module provides REST API endpoints for managing simulation time in the YSocial
+platform, including getting and updating the current time (day and hour) of the simulation.
+"""
+
 import json
 from flask import request
 from y_server import app, db
