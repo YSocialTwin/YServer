@@ -1,3 +1,10 @@
+"""
+Image management routes.
+
+This module provides REST API endpoints for managing image posts and comments,
+including image storage, sentiment analysis, toxicity detection, and emotion/hashtag tagging.
+"""
+
 import json
 from flask import request
 from y_server import app, db
@@ -17,9 +24,23 @@ from y_server.content_analysis import vader_sentiment, toxicity
 @app.route("/comment_image", methods=["POST"])
 def post_image():
     """
-    Comment on an image.
-
-    :return:
+    Create a post commenting on an image.
+    
+    Stores the image if it doesn't exist, creates a post with the comment,
+    performs sentiment and toxicity analysis, and associates emotions and hashtags.
+    
+    Expects JSON data with:
+        - user_id (int): ID of the user posting the comment
+        - text (str): Comment text
+        - emotions (list[str]): List of emotion tags
+        - hashtags (list[str]): List of hashtag strings
+        - tid (int): Round/time identifier
+        - image_url (str): URL of the image
+        - image_description (str): Description of the image
+        - article_id (int, optional): Associated article ID if applicable
+        
+    Returns:
+        str: JSON response with status code 200 on success.
     """
     data = json.loads(request.get_data())
     account_id = int(data["user_id"])
