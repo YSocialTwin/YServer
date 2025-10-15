@@ -63,6 +63,8 @@ def get_user():
             "nationality": user.nationality,
             "toxicity": user.toxicity,
             "is_page": user.is_page,
+            "activity_profile": user.activity_profile if user.is_page == 0 else "Always On",
+            "profession": user.profession if user.is_page == 0 else "",
         }
     )
 
@@ -97,6 +99,7 @@ def register():
     nationality = data["nationality"]
     toxicity = data["toxicity"]
     daily_activity_level = data["daily_activity_level"]
+    activity_profile = data["activity_profile"]
 
     profession = data["profession"]
 
@@ -132,6 +135,7 @@ def register():
             is_page=is_page,
             daily_activity_level=daily_activity_level,
             profession=profession,
+            activity_profile=activity_profile,
         )
 
         db.session.add(user)
