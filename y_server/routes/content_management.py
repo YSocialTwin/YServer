@@ -1,5 +1,5 @@
 import json
-from flask import request
+from flask import request, current_app
 from y_server import app, db
 from y_server.utils import (
     get_follows,
@@ -489,41 +489,48 @@ def add_post():
     db.session.add(post)
     db.session.commit()
 
-    sentiment = vader_sentiment(text)
-
-    toxicity(text, app.config["perspective_api"], post.id, db)
-
     post.thread_id = post.id
     db.session.commit()
 
-    for topic_id in topics:
-        tp = Post_topics(post_id=post.id, topic_id=topic_id)
-        db.session.add(tp)
-        db.session.commit()
+    # allow to disable sentiment & toxicity analysis
+    if current_app.config["perspective_api"] is not None:
+        toxicity(text, app.config["perspective_api"], post.id, db)
 
-        post_sentiment = Post_Sentiment(
-            post_id=post.id,
-            user_id=user.id,
-            pos=sentiment["pos"],
-            neg=sentiment["neg"],
-            neu=sentiment["neu"],
-            compound=sentiment["compound"],
-            round=tid,
-            is_post=1,
-            topic_id=topic_id,
-        )
-        db.session.add(post_sentiment)
-        db.session.commit()
-
-    for emotion in emotions:
-        if len(emotion) < 1:
-            continue
-
-        em = Emotions.query.filter_by(emotion=emotion).first()
-        if em is not None:
-            post_emotion = Post_emotions(post_id=post.id, emotion_id=em.id)
-            db.session.add(post_emotion)
+    if current_app.config["sentiment_annotation"]:
+        sentiment = vader_sentiment(text)
+        for topic_id in topics:
+            tp = Post_topics(post_id=post.id, topic_id=topic_id)
+            db.session.add(tp)
             db.session.commit()
+
+            post_sentiment = Post_Sentiment(
+                post_id=post.id,
+                user_id=user.id,
+                pos=sentiment["pos"],
+                neg=sentiment["neg"],
+                neu=sentiment["neu"],
+                compound=sentiment["compound"],
+                round=tid,
+                is_post=1,
+                topic_id=topic_id,
+            )
+            db.session.add(post_sentiment)
+            db.session.commit()
+
+    ######
+
+    # allow disabling emotion analysis
+    if current_app.config["emotion_annotation"]:
+        for emotion in emotions:
+            if len(emotion) < 1:
+                continue
+
+            em = Emotions.query.filter_by(emotion=emotion).first()
+            if em is not None:
+                post_emotion = Post_emotions(post_id=post.id, emotion_id=em.id)
+                db.session.add(post_emotion)
+                db.session.commit()
+    ############
 
     for tag in hastags:
         if len(tag) < 4:
@@ -595,24 +602,27 @@ def add_comment():
 
     db.session.add(new_post)
     db.session.commit()
-
+    #########
     # get sentiment of the post is responding to
-    sentiment_parent = Post_Sentiment.query.filter_by(post_id=post_id).first()
-    if sentiment_parent is not None:
-        sentiment_parent = sentiment_parent.compound
-        # thresholding
-        if sentiment_parent > 0.05:
-            sentiment_parent = "pos"
-        elif sentiment_parent < -0.05:
-            sentiment_parent = "neg"
+
+    if current_app.config["sentiment_annotation"]:
+        sentiment_parent = Post_Sentiment.query.filter_by(post_id=post_id).first()
+        if sentiment_parent is not None:
+            sentiment_parent = sentiment_parent.compound
+            # thresholding
+            if sentiment_parent > 0.05:
+                sentiment_parent = "pos"
+            elif sentiment_parent < -0.05:
+                sentiment_parent = "neg"
+            else:
+                sentiment_parent = "neu"
         else:
-            sentiment_parent = "neu"
-    else:
-        sentiment_parent = ""
+            sentiment_parent = ""
 
-    sentiment = vader_sentiment(text)
+        sentiment = vader_sentiment(text)
 
-    toxicity(text, app.config["perspective_api"], new_post.id, db)
+    if current_app.config["perspective_api"] is not None:
+        toxicity(text, app.config["perspective_api"], new_post.id, db)
 
     # get topics associated to post.id
     post_topics = Post_topics.query.filter_by(post_id=post.thread_id).all()
@@ -632,15 +642,21 @@ def add_comment():
         db.session.add(post_sentiment)
         db.session.commit()
 
-    for emotion in emotions:
-        if len(emotion) < 1:
-            continue
+    #########
 
-        em = Emotions.query.filter_by(emotion=emotion).first()
-        if em is not None:
-            post_emotion = Post_emotions(post_id=new_post.id, emotion_id=em.id)
-            db.session.add(post_emotion)
-            db.session.commit()
+    # allow disabling emotion analysis
+    if current_app.config["emotion_annotation"]:
+        for emotion in emotions:
+            if len(emotion) < 1:
+                continue
+
+            em = Emotions.query.filter_by(emotion=emotion).first()
+            if em is not None:
+                post_emotion = Post_emotions(post_id=new_post.id, emotion_id=em.id)
+                db.session.add(post_emotion)
+                db.session.commit()
+
+    ############
 
     for tag in hastags:
         if len(tag) < 1:
@@ -809,34 +825,38 @@ def add_reaction():
     except:
         pass
 
-    # get compound sentiment of post
-    post_sentiment = Post_Sentiment.query.filter_by(post_id=int(post_id)).all()
-    for topic_sentiment in post_sentiment:
-        topic_id = topic_sentiment.topic_id
-        compound = topic_sentiment.compound
-        # thresholding compound
-        if compound > 0.05:
-            sentiment = "pos"
-        elif compound < -0.05:
-            sentiment = "neg"
-        else:
-            sentiment = "neu"
+    # allow disabling sentiment analysis for reactions
+    if current_app.config["sentiment_annotation"]:
+        # get compound sentiment of post
+        post_sentiment = Post_Sentiment.query.filter_by(post_id=int(post_id)).all()
+        for topic_sentiment in post_sentiment:
+            topic_id = topic_sentiment.topic_id
+            compound = topic_sentiment.compound
+            # thresholding compound
+            if compound > 0.05:
+                sentiment = "pos"
+            elif compound < -0.05:
+                sentiment = "neg"
+            else:
+                sentiment = "neu"
 
-        # create reaction sentiment
-        reaction_sentiment = Post_Sentiment(
-            post_id=post_id,
-            user_id=user.id,
-            pos=0 if rtype == "dislike" else 1,
-            neg=0 if rtype == "like" else 1,
-            neu=0,
-            compound=1 if rtype == "like" else -1,
-            sentiment_parent=sentiment,
-            round=tid,
-            is_reaction=1,
-            topic_id=topic_id,
-        )
-        db.session.add(reaction_sentiment)
-        db.session.commit()
+            # create reaction sentiment
+            reaction_sentiment = Post_Sentiment(
+                post_id=post_id,
+                user_id=user.id,
+                pos=0 if rtype == "dislike" else 1,
+                neg=0 if rtype == "like" else 1,
+                neu=0,
+                compound=1 if rtype == "like" else -1,
+                sentiment_parent=sentiment,
+                round=tid,
+                is_reaction=1,
+                topic_id=topic_id,
+            )
+            db.session.add(reaction_sentiment)
+            db.session.commit()
+
+    #########
 
     # increment the post's reaction count
     post = Post.query.filter_by(id=post_id).first()

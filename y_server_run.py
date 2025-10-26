@@ -11,10 +11,10 @@ def start_server(config):
 
     # import nltk
     # nltk.download("vader_lexicon")
-
-    print(config)
     debug = False
     app.config["perspective_api"] = config["perspective_api"]
+    app.config["sentiment_annotation"] = config["sentiment_annotation"]
+    app.config["emotion_annotation"] = config["emotion_annotation"]
     app.run(debug=debug, port=int(config["port"]), host=config["host"])
 
 
