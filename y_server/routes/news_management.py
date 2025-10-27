@@ -1,3 +1,11 @@
+"""
+News management routes.
+
+This module provides REST API endpoints for managing news articles and related posts,
+including commenting on articles, retrieving articles, and sharing article posts.
+Integrates with content analysis for sentiment and toxicity detection.
+"""
+
 import json
 from flask import request
 from y_server import app, db
@@ -23,9 +31,33 @@ from y_server.content_analysis import vader_sentiment, toxicity
 @app.route("/news", methods=["POST"])
 def comment_news():
     """
-    Comment on a news article.
-
-    :return: a json object with the status of the comment
+    Create a comment post on a news article.
+    
+    Stores the news article and associated website if they don't exist, creates a post
+    with the comment, performs sentiment and toxicity analysis, and associates emotions,
+    hashtags, mentions, and topics.
+    
+    Expects JSON data with:
+        - user_id (int): ID of the user posting the comment
+        - tweet (str): Comment text (can be empty to just save the article)
+        - emotions (list[str]): List of emotion tags
+        - hashtags (list[str]): List of hashtag strings
+        - mentions (list[str]): List of username mentions
+        - tid (int): Round/time identifier
+        - title (str): Article title
+        - summary (str): Article summary
+        - link (str): Article URL
+        - publisher (str): Publisher name
+        - rss (str): RSS feed URL
+        - leaning (str): Political leaning of the source
+        - country (str): Country of origin
+        - language (str): Language code
+        - category (str): Article category
+        - fetched_on (int): Timestamp when article was fetched
+        - topics (list[str], optional): List of topic strings
+        
+    Returns:
+        str: JSON response with status 200 and article_id on success.
     """
     data = json.loads(request.get_data())
     account_id = data["user_id"]
@@ -181,9 +213,13 @@ def comment_news():
 @app.route("/get_article_by_title", methods=["POST", "GET"])
 def article_by_title():
     """
-    Get the news article by title.
-
-    :return: a json object with the article
+    Retrieve a news article by its title.
+    
+    Expects JSON data with:
+        - title (str): The article title to search for
+        
+    Returns:
+        str: JSON response with article_id if found, or status 404 if not found.
     """
     data = json.loads(request.get_data())
     title = data["title"]
@@ -202,9 +238,13 @@ def article_by_title():
 )
 def get_article():
     """
-    Get the news article.
-
-    :return: a json object with the article
+    Retrieve a news article associated with a post.
+    
+    Expects JSON data with:
+        - post_id (int): The post ID to retrieve the article from
+        
+    Returns:
+        str: JSON response with article summary and title if found, or status 404.
     """
     data = json.loads(request.get_data())
     post_id = data["post_id"]
@@ -225,8 +265,22 @@ def get_article():
 def share():
     """
     Share a post containing a news article.
-
-    :return: a json object with the status of the share
+    
+    Creates a new post that shares an existing article post, with optional
+    additional commentary. Performs sentiment and toxicity analysis on the share text
+    and copies topic associations from the original post.
+    
+    Expects JSON data with:
+        - user_id (int): ID of the user sharing the post
+        - post_id (int): ID of the original post to share
+        - text (str): Share commentary text
+        - emotions (list[str]): List of emotion tags
+        - hashtags (list[str]): List of hashtag strings
+        - mentions (list[str]): List of username mentions
+        - tid (int): Round/time identifier
+        
+    Returns:
+        str: JSON response with status 200 on success.
     """
     data = json.loads(request.get_data())
     account_id = data["user_id"]

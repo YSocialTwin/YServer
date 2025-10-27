@@ -1,3 +1,20 @@
+"""
+Utility functions for content recommendation and user similarity analysis.
+
+This module provides helper functions for fetching and filtering posts based on various
+criteria including user interests, follower relationships, user similarity, and content
+reactions. These utilities support the recommendation system and content discovery features
+of the YSocial platform.
+
+Functions:
+    get_follows: Get the followers of a user
+    fetch_common_interest_posts: Fetch posts based on common interests
+    fetch_common_user_interest_posts: Fetch posts reacted by users with common interests
+    fetch_similar_users_posts: Fetch posts from similar users
+    get_posts_by_author: Fetch posts by specified authors
+    get_posts_by_reactions: Fetch posts with reactions from specified users
+"""
+
 from sqlalchemy import func, desc, case
 from y_server.modals import (
     db,
@@ -12,10 +29,16 @@ from y_server.modals import (
 
 def get_follows(uid):
     """
-    Get the followers of a user.
-
-    :param uid: the user id
-    :return: a list of followers
+    Get the followers of a user based on follow relationships.
+    
+    Retrieves users who are currently following the specified user by analyzing
+    follow/unfollow actions (counting modulo 2 to determine current state).
+    
+    Args:
+        uid (int): The user ID whose followers to retrieve.
+        
+    Returns:
+        list[int]: List of user IDs who are currently following the specified user.
     """
     # Get the latest round for each follower-user relationship
     # res = Follow_status.query.filter_by(user_id=uid).all()
@@ -37,14 +60,21 @@ def fetch_common_interest_posts(
     uid, visibility, articles, follower_posts_limit, additional_posts_limit
 ):
     """
-    Fetch posts based on common interests with followers and others.
-
-    :param uid: the user id
-    :param visibility: the visibility threshold
-    :param articles: whether to include articles
-    :param follower_posts_limit: the number of posts from followers
-    :param additional_posts_limit: the number of additional posts
-    :return: the posts query result
+    Fetch posts based on common topic interests with the user.
+    
+    Retrieves posts that match the user's interests, prioritizing posts from followers
+    and then from other users. Posts are ranked by the number of matching topics.
+    
+    Args:
+        uid (int): The user ID for whom to fetch posts.
+        visibility (int): Minimum round number for post visibility (filters old posts).
+        articles (bool): Whether to include article-based posts.
+        follower_posts_limit (int): Maximum number of posts from followers to return.
+        additional_posts_limit (int): Maximum number of posts from non-followers to return.
+        
+    Returns:
+        list: List of query results containing posts sorted by topic match count.
+              Returns two groups: [follower_posts, additional_posts]
     """
     user_interests = (
         db.session.query(User_interest.interest_id).filter_by(user_id=uid).distinct()
@@ -102,12 +132,21 @@ def fetch_common_user_interest_posts(
     reactions_type,
 ):
     """
-    Fetch posts reacted by users with common interests.
-
-    :param uid: the user id
-    :param visibility: the visibility threshold
-    :param articles: whether to include articles
-    :return: the posts query result
+    Fetch posts reacted to by users who share common interests with the target user.
+    
+    Identifies users with overlapping interests and retrieves posts they have reacted to,
+    prioritizing posts from followers over others.
+    
+    Args:
+        uid (int): The user ID for whom to fetch posts.
+        visibility (int): Minimum round number for post visibility.
+        articles (bool): Whether to include article-based posts.
+        follower_posts_limit (int): Maximum posts from followers with common interests.
+        additional_posts_limit (int): Maximum posts from other users with common interests.
+        reactions_type (str or list): Type(s) of reactions to consider (e.g., 'like').
+        
+    Returns:
+        list: List containing [posts_from_followers, posts_from_others]
     """
 
     # get users with common topic interests
@@ -161,13 +200,22 @@ def fetch_similar_users_posts(
     reactions_type,
 ):
     """
-    Fetch post related to similar agents to the target user based on specified features.
-
-    :param uid: Target user ID
-    :param visibility: Visibility threshold for posts
-    :param articles: Whether to include articles
-    :param limit: Number of posts to fetch
-    :return: Query result with posts by similar users
+    Fetch posts related to users similar to the target user.
+    
+    Identifies users similar to the target user based on demographic and personality
+    features, then fetches posts using the provided filter function.
+    
+    Args:
+        uid (int): Target user ID for finding similar users.
+        visibility (int): Minimum round number for post visibility.
+        articles (bool): Whether to include article-based posts.
+        limit (int): Maximum number of posts to fetch.
+        filter_function (callable): Function to apply for filtering posts
+                                   (e.g., get_posts_by_author, get_posts_by_reactions).
+        reactions_type (str or list): Type(s) of reactions to consider.
+        
+    Returns:
+        list: List containing query results with posts by similar users.
     """
     # Fetch similar users
     similar_users = __get_similar_users(uid, limit)
@@ -186,11 +234,21 @@ def fetch_similar_users_posts(
 
 def __get_similar_users(uid, limit=10):
     """
-    Fetch users similar to the given user ID based on specified features.
-
-    :param uid: Target user ID
-    :param limit: Number of similar users to fetch
-    :return: Query result with similar users
+    Identify users similar to the target user based on multiple features.
+    
+    Calculates similarity scores based on categorical matches (political leaning,
+    language, education, gender, toxicity, Big Five personality traits) and
+    numeric similarity (age). Returns users ordered by similarity score.
+    
+    Args:
+        uid (int): Target user ID to find similar users for.
+        limit (int, optional): Maximum number of similar users to return. Defaults to 10.
+        
+    Returns:
+        list[int]: List of user IDs most similar to the target user.
+        
+    Raises:
+        ValueError: If the target user does not exist in the database.
     """
     # Fetch target user's features
     target_user = db.session.query(User_mgmt).filter_by(id=uid).first()
@@ -244,13 +302,17 @@ def get_posts_by_author(
     reactions_type,
 ):
     """
-    Fetch posts made by specified users.
-
-    :param visibility: the visibility threshold
-    :param articles: whether to include articles
-    :param limit: the number of posts to fetch
-    :param user_ids: the user ids
-    :return: the posts query result
+    Fetch posts authored by specified users.
+    
+    Args:
+        visibility (int): Minimum round number for post visibility.
+        articles (bool): Whether to include article-based posts.
+        limit (int): Maximum number of posts to return.
+        user_ids (list[int]): List of user IDs whose posts to retrieve.
+        reactions_type (str or list): Unused parameter (kept for API compatibility).
+        
+    Returns:
+        Query: SQLAlchemy query result containing matching posts.
     """
     posts = Post.query.filter(
         Post.user_id.in_(user_ids),
@@ -269,14 +331,20 @@ def get_posts_by_reactions(
     reactions_type,
 ):
     """
-    Fetch posts reacted by specified users.
-
-    :param visibility: the visibility threshold
-    :param articles: whether to include articles
-    :param limit: the number of posts to fetch
-    :param user_ids: the user ids
-    :param reactions_type: the type of reactions
-    :return: the posts query result
+    Fetch posts that have been reacted to by specified users.
+    
+    Retrieves posts based on user reactions, sorted by reaction count and post ID.
+    Falls back to general post visibility if no reacted posts are found.
+    
+    Args:
+        visibility (int): Minimum round number for post visibility.
+        articles (bool): Whether to include article-based posts.
+        limit (int): Maximum number of posts to return.
+        user_ids (list[int]): List of user IDs whose reactions to consider.
+        reactions_type (str or list[str]): Type(s) of reactions to filter by (e.g., 'like').
+        
+    Returns:
+        list: List of Post objects or (Post, count) tuples sorted by reaction count.
     """
     if isinstance(reactions_type, str):
         reactions_type = [reactions_type]
@@ -312,13 +380,16 @@ def get_posts_by_reactions(
 
 def __get_posts_by_comments(visibility, articles, limit, user_ids):
     """
-    Fetch posts most commented by specified users.
-
-    :param visibility: the visibility threshold
-    :param articles: whether to include articles
-    :param limit: the number of posts to fetch
-    :param user_ids: the user ids
-    :return: the posts query result
+    Fetch posts with the most comments, optionally filtered by user IDs.
+    
+    Args:
+        visibility (int): Minimum round number for post visibility.
+        articles (bool): Whether to include article-based posts.
+        limit (int): Maximum number of posts to return.
+        user_ids (list[int] or None): Optional list of user IDs to filter by.
+        
+    Returns:
+        Query: SQLAlchemy query result containing posts sorted by comment count.
     """
     # get posts with the most comments
     posts = (

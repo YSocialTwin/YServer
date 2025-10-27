@@ -1,3 +1,11 @@
+"""
+Interaction management routes.
+
+This module provides REST API endpoints for managing user interactions including
+follow/unfollow relationships, reactions (likes) to posts, and retrieving follower
+and reaction statistics.
+"""
+
 from flask import request
 from sqlalchemy.sql.expression import func
 import json
@@ -15,9 +23,19 @@ from y_server.modals import (
 )
 def add_follow():
     """
-    Add a follow/unfollow relationship.
-
-    :return: a json object with the status of the follow
+    Add or remove a follow relationship between users.
+    
+    Validates that users cannot follow themselves and prevents duplicate
+    follow/unfollow actions.
+    
+    Expects JSON data with:
+        - user_id (int): ID of the user performing the action
+        - target (int): ID of the user to follow/unfollow
+        - action (str): Either 'follow' or 'unfollow'
+        - tid (int): Round/time identifier
+        
+    Returns:
+        str: JSON response with status 200.
     """
     data = json.loads(request.get_data())
     user_id = data["user_id"]

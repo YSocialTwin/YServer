@@ -1,3 +1,12 @@
+"""
+Routes initialization module.
+
+This module imports and registers all route handlers for the YSocial server,
+including time management, user management, content management, interaction management,
+and experiment management routes. It also dynamically loads additional modules
+specified in the experiment configuration file.
+"""
+
 import os
 from .time_management import *
 from .user_managment import *

@@ -1,3 +1,20 @@
+"""
+YSocial Server initialization module.
+
+This module initializes the Flask application and SQLAlchemy database connection for
+the YSocial microblogging digital twin platform. It handles configuration loading,
+database setup, and request logging middleware.
+
+The module supports two modes:
+    1. Experiment mode: Uses configuration from config_files/exp_config.json
+    2. Y Web subprocess mode: Falls back to a dummy database configuration
+
+Attributes:
+    app: Flask application instance
+    db: SQLAlchemy database instance
+    logger: Werkzeug logger instance
+"""
+
 from flask import Flask, request, g
 from flask_sqlalchemy import SQLAlchemy
 import json
@@ -60,11 +77,24 @@ except:  # Y Web subprocess
     # Log the request duration
     @app.before_request
     def start_timer():
+        """Record the start time of each request for duration logging."""
         g.start_time = time.time()
 
 
     @app.after_request
     def log_request(response):
+        """
+        Log request information after each request is processed.
+        
+        Logs the remote address, HTTP method, path, status code, duration,
+        and timestamp for each request.
+        
+        Args:
+            response: Flask response object
+            
+        Returns:
+            Flask response object (unchanged)
+        """
         if hasattr(g, 'start_time'):
             duration = time.time() - g.start_time
             log = {
