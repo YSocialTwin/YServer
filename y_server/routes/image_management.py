@@ -1,17 +1,17 @@
 import json
+
 from flask import request
 from y_server import app, db
+from y_server.content_analysis import toxicity, vader_sentiment
 from y_server.modals import (
+    Emotions,
+    Hashtags,
     Images,
     Post,
-    Emotions,
     Post_emotions,
-    Hashtags,
     Post_hashtags,
     Post_Sentiment,
 )
-
-from y_server.content_analysis import vader_sentiment, toxicity
 
 
 @app.route("/comment_image", methods=["POST"])

@@ -1,28 +1,30 @@
-from flask import request
 import json
+import logging
+import os
+
+from flask import request
+from pythonjsonlogger import jsonlogger
 from y_server import app, db
 from y_server.modals import (
-    User_mgmt,
-    Post,
-    Reactions,
+    Article_topics,
+    Articles,
     Follow,
     Hashtags,
-    Post_hashtags,
-    Mentions,
-    Post_emotions,
-    Rounds,
-    Recommendations,
-    Websites,
-    Articles,
-    Voting,
-    Interests,
-    Post_topics,
-    User_interest,
     Images,
-    Article_topics,
+    Interests,
+    Mentions,
+    Post,
+    Post_emotions,
+    Post_hashtags,
+    Post_topics,
+    Reactions,
+    Recommendations,
+    Rounds,
+    User_interest,
+    User_mgmt,
+    Voting,
+    Websites,
 )
-import logging, os
-from pythonjsonlogger import jsonlogger
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -40,8 +42,8 @@ logHandler.setFormatter(formatter)
 
 
 def rebind_db(new_uri):
-    from sqlalchemy import create_engine
     from flask import current_app
+    from sqlalchemy import create_engine
 
     engine = create_engine(new_uri, connect_args={"check_same_thread": False})
 

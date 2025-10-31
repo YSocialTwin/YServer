@@ -1,9 +1,10 @@
 import os
+
+from .content_management import *
+from .experiment_management import *
+from .interaction_management import *
 from .time_management import *
 from .user_managment import *
-from .content_management import *
-from .interaction_management import *
-from .experiment_management import *
 
 try:
     config = json.load(open(f"config_files{os.sep}exp_config.json"))

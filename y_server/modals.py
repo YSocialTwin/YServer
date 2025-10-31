@@ -1,5 +1,5 @@
-from y_server import db
 from flask_login import UserMixin
+from y_server import db
 
 
 class User_mgmt(UserMixin, db.Model):

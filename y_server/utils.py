@@ -1,12 +1,12 @@
-from sqlalchemy import func, desc, case
+from sqlalchemy import case, desc, func
 from y_server.modals import (
-    db,
+    Follow,
     Post,
     Post_topics,
-    User_interest,
-    Follow,
     Reactions,
+    User_interest,
     User_mgmt,
+    db,
 )
 
 

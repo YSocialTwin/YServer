@@ -1,23 +1,23 @@
 import json
+
 from flask import request
 from y_server import app, db
+from y_server.content_analysis import toxicity, vader_sentiment
 from y_server.modals import (
-    Post,
-    User_mgmt,
-    Emotions,
-    Post_emotions,
-    Hashtags,
-    Post_hashtags,
-    Mentions,
-    Articles,
-    Websites,
-    Interests,
     Article_topics,
-    Post_topics,
+    Articles,
+    Emotions,
+    Hashtags,
+    Interests,
+    Mentions,
+    Post,
+    Post_emotions,
+    Post_hashtags,
     Post_Sentiment,
+    Post_topics,
+    User_mgmt,
+    Websites,
 )
-
-from y_server.content_analysis import vader_sentiment, toxicity
 
 
 @app.route("/news", methods=["POST"])

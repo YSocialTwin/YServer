@@ -1,33 +1,34 @@
 import json
-from flask import request, current_app
+
+from flask import current_app, request
+from sqlalchemy import desc, select
+from sqlalchemy.sql.expression import func
 from y_server import app, db
+from y_server.content_analysis import toxicity, vader_sentiment
+from y_server.modals import (
+    Emotions,
+    Follow,
+    Hashtags,
+    Interests,
+    Mentions,
+    Post,
+    Post_emotions,
+    Post_hashtags,
+    Post_Sentiment,
+    Post_topics,
+    Reactions,
+    Recommendations,
+    Rounds,
+    User_mgmt,
+)
 from y_server.utils import (
-    get_follows,
     fetch_common_interest_posts,
     fetch_common_user_interest_posts,
     fetch_similar_users_posts,
-    get_posts_by_reactions,
+    get_follows,
     get_posts_by_author,
+    get_posts_by_reactions,
 )
-from sqlalchemy import desc, select
-from sqlalchemy.sql.expression import func
-from y_server.modals import (
-    Hashtags,
-    Post_hashtags,
-    Rounds,
-    Post,
-    Recommendations,
-    Follow,
-    Reactions,
-    Mentions,
-    User_mgmt,
-    Emotions,
-    Post_emotions,
-    Post_topics,
-    Post_Sentiment,
-    Interests,
-)
-from y_server.content_analysis import vader_sentiment, toxicity
 
 
 @app.route("/read", methods=["POST"])

@@ -1,9 +1,11 @@
-from flask import Flask, request, g
-from flask_sqlalchemy import SQLAlchemy
 import json
-import shutil
+import logging
 import os
-import logging, time
+import shutil
+import time
+
+from flask import Flask, g, request
+from flask_sqlalchemy import SQLAlchemy
 
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.WARNING)

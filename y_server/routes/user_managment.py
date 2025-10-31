@@ -1,8 +1,9 @@
 import json
+
 from flask import request
-from y_server import app, db
 from sqlalchemy import desc
-from y_server.modals import Post, User_mgmt, Reactions, User_interest, Interests, Rounds
+from y_server import app, db
+from y_server.modals import Interests, Post, Reactions, Rounds, User_interest, User_mgmt
 
 
 @app.route("/get_user_id", methods=["GET", "POST"])

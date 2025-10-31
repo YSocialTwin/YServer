@@ -1,7 +1,8 @@
 import json
+
 from flask import request
-from y_server import app, db
 from sqlalchemy import desc
+from y_server import app, db
 from y_server.modals import (
     Rounds,
 )
