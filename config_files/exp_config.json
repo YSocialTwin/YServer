@@ -5,5 +5,7 @@
   "debug": "True",
   "reset_db": "True",
   "modules": ["news", "voting", "image"],
-  "perspective_api": null
+  "perspective_api": null,
+  "sentiment_annotation": false,
+  "emotion_annotation": false
 }

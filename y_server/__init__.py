@@ -6,6 +6,7 @@ import time
 
 from flask import Flask, g, request
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import desc
 
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.WARNING)
@@ -36,6 +37,42 @@ try:
     ] = f"sqlite:///../experiments/{config['name']}.db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     db = SQLAlchemy(app)
+
+    # Log the request duration
+    @app.before_request
+    def start_timer():
+        g.start_time = time.time()
+
+
+    @app.after_request
+    def log_request(response):
+        if hasattr(g, 'start_time'):
+            # Import here to avoid circular import (modals.py imports db from y_server)
+            from y_server.modals import Rounds
+            
+            duration = time.time() - g.start_time
+            log = {
+                "remote_addr": request.remote_addr,
+                "method": request.method,
+                "path": request.path,
+                "status_code": response.status_code,
+                "duration": round(duration, 4),
+                "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            }
+            
+            # Add current round information from the database
+            try:
+                current_round = Rounds.query.order_by(desc(Rounds.id)).first()
+                if current_round:
+                    log["tid"] = current_round.id
+                    log["day"] = current_round.day
+                    log["hour"] = current_round.hour
+            except Exception:
+                # If there's an error querying the database, continue without round info
+                pass
+
+            logging.info(json.dumps(log))
+        return response
 
 except:  # Y Web subprocess
     # base path
@@ -68,6 +105,9 @@ except:  # Y Web subprocess
     @app.after_request
     def log_request(response):
         if hasattr(g, 'start_time'):
+            # Import here to avoid circular import (modals.py imports db from y_server)
+            from y_server.modals import Rounds
+            
             duration = time.time() - g.start_time
             log = {
                 "remote_addr": request.remote_addr,
@@ -77,8 +117,19 @@ except:  # Y Web subprocess
                 "duration": round(duration, 4),
                 "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
             }
+            
+            # Add current round information from the database
+            try:
+                current_round = Rounds.query.order_by(desc(Rounds.id)).first()
+                if current_round:
+                    log["tid"] = current_round.id
+                    log["day"] = current_round.day
+                    log["hour"] = current_round.hour
+            except Exception:
+                # If there's an error querying the database, continue without round info
+                pass
 
-            logging.info(log)
+            logging.info(json.dumps(log))
         return response
 
 from y_server.routes import *
