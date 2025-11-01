@@ -47,6 +47,7 @@ try:
     @app.after_request
     def log_request(response):
         if hasattr(g, 'start_time'):
+            # Import here to avoid circular import (modals.py imports db from y_server)
             from y_server.modals import Rounds
             
             duration = time.time() - g.start_time
@@ -104,6 +105,7 @@ except:  # Y Web subprocess
     @app.after_request
     def log_request(response):
         if hasattr(g, 'start_time'):
+            # Import here to avoid circular import (modals.py imports db from y_server)
             from y_server.modals import Rounds
             
             duration = time.time() - g.start_time
