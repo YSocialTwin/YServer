@@ -6,6 +6,7 @@ import time
 
 from flask import Flask, g, request
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import desc
 
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.WARNING)
@@ -47,7 +48,6 @@ try:
     def log_request(response):
         if hasattr(g, 'start_time'):
             from y_server.modals import Rounds
-            from sqlalchemy import desc
             
             duration = time.time() - g.start_time
             log = {
@@ -66,7 +66,7 @@ try:
                     log["tid"] = current_round.id
                     log["day"] = current_round.day
                     log["hour"] = current_round.hour
-            except:
+            except Exception:
                 # If there's an error querying the database, continue without round info
                 pass
 
@@ -105,7 +105,6 @@ except:  # Y Web subprocess
     def log_request(response):
         if hasattr(g, 'start_time'):
             from y_server.modals import Rounds
-            from sqlalchemy import desc
             
             duration = time.time() - g.start_time
             log = {
@@ -124,7 +123,7 @@ except:  # Y Web subprocess
                     log["tid"] = current_round.id
                     log["day"] = current_round.day
                     log["hour"] = current_round.hour
-            except:
+            except Exception:
                 # If there's an error querying the database, continue without round info
                 pass
 
