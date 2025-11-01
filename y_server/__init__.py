@@ -71,7 +71,7 @@ try:
                 # If there's an error querying the database, continue without round info
                 pass
 
-            logging.info(log)
+            logging.info(json.dumps(log))
         return response
 
 except:  # Y Web subprocess
@@ -129,7 +129,7 @@ except:  # Y Web subprocess
                 # If there's an error querying the database, continue without round info
                 pass
 
-            logging.info(log)
+            logging.info(json.dumps(log))
         return response
 
 from y_server.routes import *
