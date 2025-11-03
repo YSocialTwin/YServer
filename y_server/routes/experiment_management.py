@@ -80,10 +80,18 @@ def change_db():
         # Set up logging
         db_path = data['path'].split("y_web")[1].split("database_server.db")[0]
 
+    # Set up file logging
     log_dir = f"y_web{os.sep}{db_path}"
     log_path = os.path.join(log_dir, "_server.log")
-    logHandler = logging.FileHandler(log_path)
-    logger.addHandler(logHandler)
+    
+    # Create log directory if it doesn't exist
+    os.makedirs(log_dir, exist_ok=True)
+    
+    # Create file handler with JSON formatter
+    fileHandler = logging.FileHandler(log_path)
+    fileHandler.setFormatter(formatter)
+    logger.addHandler(fileHandler)
+    
     db.init_app(app)
     return {"status": 200}
 
