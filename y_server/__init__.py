@@ -51,7 +51,7 @@ try:
             from y_server.modals import Rounds
             
             duration = time.time() - g.start_time
-            log = {
+            log_data = {
                 "remote_addr": request.remote_addr,
                 "method": request.method,
                 "path": request.path,
@@ -64,14 +64,15 @@ try:
             try:
                 current_round = Rounds.query.order_by(desc(Rounds.id)).first()
                 if current_round:
-                    log["tid"] = current_round.id
-                    log["day"] = current_round.day
-                    log["hour"] = current_round.hour
+                    log_data["tid"] = current_round.id
+                    log_data["day"] = current_round.day
+                    log_data["hour"] = current_round.hour
             except Exception:
                 # If there's an error querying the database, continue without round info
                 pass
 
-            logging.info(json.dumps(log))
+            # Pass log data as extra dict so fields appear at top level in JSON output
+            logging.info("request", extra=log_data)
         return response
 
 except:  # Y Web subprocess
@@ -109,7 +110,7 @@ except:  # Y Web subprocess
             from y_server.modals import Rounds
             
             duration = time.time() - g.start_time
-            log = {
+            log_data = {
                 "remote_addr": request.remote_addr,
                 "method": request.method,
                 "path": request.path,
@@ -122,14 +123,15 @@ except:  # Y Web subprocess
             try:
                 current_round = Rounds.query.order_by(desc(Rounds.id)).first()
                 if current_round:
-                    log["tid"] = current_round.id
-                    log["day"] = current_round.day
-                    log["hour"] = current_round.hour
+                    log_data["tid"] = current_round.id
+                    log_data["day"] = current_round.day
+                    log_data["hour"] = current_round.hour
             except Exception:
                 # If there's an error querying the database, continue without round info
                 pass
 
-            logging.info(json.dumps(log))
+            # Pass log data as extra dict so fields appear at top level in JSON output
+            logging.info("request", extra=log_data)
         return response
 
 from y_server.routes import *

@@ -30,8 +30,9 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 # Define JSON log format
+# Include custom fields from the request logger (remote_addr, method, path, etc.)
 formatter = jsonlogger.JsonFormatter(
-    fmt='%(asctime)s %(levelname)s %(name)s %(message)s %(pathname)s %(lineno)d',
+    fmt='%(remote_addr)s %(method)s %(path)s %(status_code)s %(duration)s %(time)s %(tid)s %(day)s %(hour)s',
     datefmt='%Y-%m-%dT%H:%M:%S'
 )
 
