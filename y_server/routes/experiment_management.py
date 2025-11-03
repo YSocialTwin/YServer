@@ -29,16 +29,11 @@ from y_server.modals import (
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# Create handler
-logHandler = logging.StreamHandler()
-
 # Define JSON log format
 formatter = jsonlogger.JsonFormatter(
     fmt='%(asctime)s %(levelname)s %(name)s %(message)s %(pathname)s %(lineno)d',
     datefmt='%Y-%m-%dT%H:%M:%S'
 )
-
-logHandler.setFormatter(formatter)
 
 
 def rebind_db(new_uri):
@@ -86,6 +81,9 @@ def change_db():
     
     # Create log directory if it doesn't exist
     os.makedirs(log_dir, exist_ok=True)
+    
+    # Remove all existing handlers to avoid duplicate logging
+    logger.handlers.clear()
     
     # Create file handler with JSON formatter
     fileHandler = logging.FileHandler(log_path)
