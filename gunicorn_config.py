@@ -5,15 +5,21 @@ This file provides default configuration for running YServer with Gunicorn.
 You can override these settings by passing command-line arguments to gunicorn.
 
 Usage:
+    # Default config (config_files/exp_config.json):
     gunicorn -c gunicorn_config.py wsgi:app
     
     # With custom config file via environment variable:
     YSERVER_CONFIG=/path/to/config.json gunicorn -c gunicorn_config.py wsgi:app
     
-    # From Python (e.g., with Popen):
+    # From Python with Popen (each subprocess has its own environment):
     env = os.environ.copy()
     env['YSERVER_CONFIG'] = '/path/to/config.json'
     subprocess.Popen(['gunicorn', '-c', 'gunicorn_config.py', 'wsgi:app'], env=env)
+
+Note on running multiple instances:
+    When starting multiple Gunicorn processes, each should have its own YSERVER_CONFIG
+    environment variable set in the subprocess environment. Each process will have its
+    own Python interpreter and won't interfere with other instances.
 """
 import json
 import os

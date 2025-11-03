@@ -63,13 +63,13 @@ python y_server_run.py
 For production environments, use Gunicorn instead of the built-in Flask development server:
 
 ```bash
-# Basic usage
+# Basic usage (uses config_files/exp_config.json)
 gunicorn wsgi:app
 
-# With custom configuration file
+# With gunicorn configuration file
 gunicorn -c gunicorn_config.py wsgi:app
 
-# With custom experiment configuration file (via environment variable)
+# With custom experiment configuration file
 YSERVER_CONFIG=/path/to/your/config.json gunicorn -c gunicorn_config.py wsgi:app
 
 # With command-line options (4 workers, binding to all interfaces on port 5010)
@@ -79,7 +79,26 @@ gunicorn -w 4 -b 0.0.0.0:5010 wsgi:app
 gunicorn -w 4 -b 0.0.0.0:5010 --timeout 120 --access-logfile - --error-logfile - wsgi:app
 ```
 
-The `gunicorn_config.py` file provides sensible defaults and reads configuration from `config_files/exp_config.json` by default. You can override the config file path by setting the `YSERVER_CONFIG` environment variable.
+**Running Multiple Instances:**
+
+When running multiple YServer instances on different ports simultaneously, start each in a separate subprocess with its own `YSERVER_CONFIG` environment variable:
+
+```python
+import subprocess
+import os
+
+# Start first instance on port 5010
+env1 = os.environ.copy()
+env1['YSERVER_CONFIG'] = '/path/to/config1.json'
+proc1 = subprocess.Popen(['gunicorn', '-c', 'gunicorn_config.py', 'wsgi:app'], env=env1)
+
+# Start second instance on port 5020
+env2 = os.environ.copy()
+env2['YSERVER_CONFIG'] = '/path/to/config2.json'
+proc2 = subprocess.Popen(['gunicorn', '-c', 'gunicorn_config.py', 'wsgi:app'], env=env2)
+```
+
+Each Gunicorn process runs in its own Python interpreter with its own environment, ensuring configurations don't conflict.
 
 #### Modules
 - **News**: This module allows the server to access online news sources leveraging RSS feeds.

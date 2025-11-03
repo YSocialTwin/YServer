@@ -5,11 +5,25 @@ This module provides the WSGI application object for production deployment
 with servers like Gunicorn.
 
 Usage:
+    # Default config (config_files/exp_config.json):
     gunicorn wsgi:app
-    gunicorn -w 4 -b 0.0.0.0:5010 wsgi:app
     
-    # With custom config file:
-    YSERVER_CONFIG=/path/to/config.json gunicorn -c gunicorn_config.py wsgi:app
+    # With custom config file via environment variable:
+    YSERVER_CONFIG=/path/to/config.json gunicorn wsgi:app
+    
+Note for running multiple instances:
+    Each Gunicorn process should be started in a separate subprocess with its own
+    YSERVER_CONFIG environment variable. Since each process has its own Python
+    interpreter and imports, they won't interfere with each other.
+    
+    Example:
+        env1 = os.environ.copy()
+        env1['YSERVER_CONFIG'] = '/path/to/config1.json'
+        proc1 = subprocess.Popen(['gunicorn', 'wsgi:app', '-b', '127.0.0.1:5010'], env=env1)
+        
+        env2 = os.environ.copy()
+        env2['YSERVER_CONFIG'] = '/path/to/config2.json'
+        proc2 = subprocess.Popen(['gunicorn', 'wsgi:app', '-b', '127.0.0.1:5020'], env=env2)
 """
 import json
 import os
