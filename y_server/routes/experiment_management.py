@@ -80,9 +80,6 @@ def change_db():
         log_dir = uri.split("database_server.db")[0]
         log_path = os.path.join(f"{os.sep}{log_dir}", "_server.log")
         
-        # Debug output
-        print(f"Setting up logging: log_dir='{log_dir}', log_path='{log_path}'")
-        
         # Create log directory if it doesn't exist
         os.makedirs(log_dir, exist_ok=True)
         
@@ -90,12 +87,14 @@ def change_db():
         logger.handlers.clear()
         
         # Create file handler with JSON formatter
+        # Only log messages that are already JSON formatted (from the request logger)
         fileHandler = logging.FileHandler(log_path, mode='a')
         fileHandler.setFormatter(formatter)
+        fileHandler.setLevel(logging.INFO)
         logger.addHandler(fileHandler)
         
-        # Log a test message to verify logging is working
-        logger.info(f"Log file initialized at {log_path}")
+        # Disable propagation to prevent logging to parent handlers
+        logger.propagate = False
         
         # Ensure the log is flushed to disk
         fileHandler.flush()
