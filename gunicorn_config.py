@@ -12,7 +12,7 @@ import os
 import multiprocessing
 
 # Read configuration from exp_config.json
-config_file = f"config_files{os.sep}exp_config.json"
+config_file = os.path.join('config_files', 'exp_config.json')
 if os.path.exists(config_file):
     with open(config_file, 'r') as f:
         exp_config = json.load(f)
@@ -27,8 +27,8 @@ else:
 bind = f"{exp_config.get('host', '0.0.0.0')}:{exp_config.get('port', 5010)}"
 
 # Worker processes
-# Recommended: (2 x $num_cores) + 1
-workers = multiprocessing.cpu_count() * 2 + 1
+# Recommended: (2 x $num_cores) + 1, with a maximum of 8 to avoid resource contention
+workers = min(multiprocessing.cpu_count() * 2 + 1, 8)
 
 # Worker class
 # Use 'sync' for CPU-bound tasks, 'gevent' or 'eventlet' for I/O-bound tasks
