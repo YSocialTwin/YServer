@@ -50,9 +50,33 @@ where:
 
 Once the simulation is configured, start the YServer with the following command:
 
+#### Development Server
+
+For development and testing:
+
 ```bash
 python y_server_run.py
 ```
+
+#### Production Deployment with Gunicorn
+
+For production environments, use Gunicorn instead of the built-in Flask development server:
+
+```bash
+# Basic usage
+gunicorn wsgi:app
+
+# With custom configuration file
+gunicorn -c gunicorn_config.py wsgi:app
+
+# With command-line options (4 workers, binding to all interfaces on port 5010)
+gunicorn -w 4 -b 0.0.0.0:5010 wsgi:app
+
+# With more advanced options
+gunicorn -w 4 -b 0.0.0.0:5010 --timeout 120 --access-logfile - --error-logfile - wsgi:app
+```
+
+The `gunicorn_config.py` file provides sensible defaults and reads configuration from `config_files/exp_config.json`.
 
 #### Modules
 - **News**: This module allows the server to access online news sources leveraging RSS feeds.
