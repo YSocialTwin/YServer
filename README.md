@@ -69,6 +69,9 @@ gunicorn wsgi:app
 # With custom configuration file
 gunicorn -c gunicorn_config.py wsgi:app
 
+# With custom experiment configuration file (via environment variable)
+YSERVER_CONFIG=/path/to/your/config.json gunicorn -c gunicorn_config.py wsgi:app
+
 # With command-line options (4 workers, binding to all interfaces on port 5010)
 gunicorn -w 4 -b 0.0.0.0:5010 wsgi:app
 
@@ -76,7 +79,7 @@ gunicorn -w 4 -b 0.0.0.0:5010 wsgi:app
 gunicorn -w 4 -b 0.0.0.0:5010 --timeout 120 --access-logfile - --error-logfile - wsgi:app
 ```
 
-The `gunicorn_config.py` file provides sensible defaults and reads configuration from `config_files/exp_config.json`.
+The `gunicorn_config.py` file provides sensible defaults and reads configuration from `config_files/exp_config.json` by default. You can override the config file path by setting the `YSERVER_CONFIG` environment variable.
 
 #### Modules
 - **News**: This module allows the server to access online news sources leveraging RSS feeds.

@@ -6,13 +6,21 @@ You can override these settings by passing command-line arguments to gunicorn.
 
 Usage:
     gunicorn -c gunicorn_config.py wsgi:app
+    
+    # With custom config file via environment variable:
+    YSERVER_CONFIG=/path/to/config.json gunicorn -c gunicorn_config.py wsgi:app
+    
+    # From Python (e.g., with Popen):
+    env = os.environ.copy()
+    env['YSERVER_CONFIG'] = '/path/to/config.json'
+    subprocess.Popen(['gunicorn', '-c', 'gunicorn_config.py', 'wsgi:app'], env=env)
 """
 import json
 import os
 import multiprocessing
 
-# Read configuration from exp_config.json
-config_file = os.path.join('config_files', 'exp_config.json')
+# Read configuration from exp_config.json or custom path via environment variable
+config_file = os.environ.get('YSERVER_CONFIG', os.path.join('config_files', 'exp_config.json'))
 if os.path.exists(config_file):
     with open(config_file, 'r') as f:
         exp_config = json.load(f)
