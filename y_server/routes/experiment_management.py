@@ -75,20 +75,13 @@ def change_db():
             app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
                 "connect_args": {"check_same_thread": False}
             }
-            # Set up logging - extract path between y_web and database_server.db
-            if "y_web" in data['path'] and "database_server.db" in data['path']:
-                db_path = data['path'].split("y_web")[1].split("database_server.db")[0]
-            else:
-                # Fallback: extract experiment name from path
-                print(f"Warning: Path format unexpected: {data['path']}", file=sys.stderr)
-                db_path = "experiments" + os.sep + os.path.basename(os.path.dirname(data['path'])) + os.sep
 
         # Set up file logging
-        log_dir = f"y_web{os.sep}{db_path}".rstrip(os.sep)
-        log_path = os.path.join(log_dir, "_server.log")
+        log_dir = uri.split("database_server.db")[0]
+        log_path = os.path.join(f"{os.sep}{log_dir}", "_server.log")
         
         # Debug output
-        print(f"Setting up logging: log_dir='{log_dir}', log_path='{log_path}'", file=sys.stderr)
+        print(f"Setting up logging: log_dir='{log_dir}', log_path='{log_path}'")
         
         # Create log directory if it doesn't exist
         os.makedirs(log_dir, exist_ok=True)
