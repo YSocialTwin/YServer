@@ -30,11 +30,9 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 # Define JSON log format
-# Include custom fields from the request logger (remote_addr, method, path, etc.)
-formatter = jsonlogger.JsonFormatter(
-    fmt='%(remote_addr)s %(method)s %(path)s %(status_code)s %(duration)s %(time)s %(tid)s %(day)s %(hour)s',
-    datefmt='%Y-%m-%dT%H:%M:%S'
-)
+# The JsonFormatter will include any fields that are present in the LogRecord
+# Request logs pass custom fields via 'extra' parameter which will be included automatically
+formatter = jsonlogger.JsonFormatter()
 
 
 def rebind_db(new_uri):
