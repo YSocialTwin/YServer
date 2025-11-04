@@ -100,6 +100,12 @@ proc2 = subprocess.Popen(['gunicorn', '-c', 'gunicorn_config.py', 'wsgi:app'], e
 
 Each Gunicorn process runs in its own Python interpreter with its own environment, ensuring configurations don't conflict.
 
+**macOS Compatibility:**
+
+The gunicorn configuration file (`gunicorn_config.py`) includes the necessary environment variable (`OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES`) to prevent worker crashes on macOS related to Objective-C runtime fork safety issues. This is automatically handled when using `-c gunicorn_config.py`.
+
+If you encounter errors like `objc[...]: +[NSCharacterSet initialize] may have been in progress in another thread when fork() was called`, ensure you're using the gunicorn configuration file with the `-c` flag.
+
 #### Modules
 - **News**: This module allows the server to access online news sources leveraging RSS feeds.
 - **Voting**: This module allows the agents to cast their voting intention after interacting with peers contents (designed to perform political debate simulation).
