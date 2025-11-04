@@ -4,6 +4,7 @@ import os
 
 from flask import request
 from pythonjsonlogger import jsonlogger
+from sqlalchemy.pool import NullPool
 from y_server import app, db
 from y_server.modals import (
     Article_topics,
@@ -71,9 +72,14 @@ def change_db():
             rebind_db(uri)
         else:
             app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:////{data['path']}"
-            # Manually add check_same_thread=False
+            # SQLite configuration for Gunicorn compatibility
+            # Use NullPool to disable connection pooling (SQLite doesn't handle pooling well)
             app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-                "connect_args": {"check_same_thread": False}
+                "poolclass": NullPool,
+                "connect_args": {
+                    "check_same_thread": False,
+                    "timeout": 30  # Increase timeout for busy databases
+                }
             }
 
         # Set up file logging
