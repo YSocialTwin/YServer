@@ -106,7 +106,16 @@ except:  # Y Web subprocess
     app.config["SECRET_KEY"] = "4YrzfpQ4kGXjuP6w"
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///../experiments/dummy.db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
+    
+    # SQLite-specific configuration for Gunicorn compatibility
+    # Use NullPool to disable connection pooling (SQLite doesn't handle pooling well)
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "poolclass": NullPool,
+        "connect_args": {
+            "check_same_thread": False,
+            "timeout": 30  # Increase timeout for busy databases
+        }
+    }
 
     # db = SQLAlchemy()
 
