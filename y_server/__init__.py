@@ -7,6 +7,7 @@ import time
 from flask import Flask, g, request
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import desc
+from sqlalchemy.pool import NullPool
 
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.WARNING)
@@ -36,6 +37,17 @@ try:
         "SQLALCHEMY_DATABASE_URI"
     ] = f"sqlite:///../experiments/{config['name']}.db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    
+    # SQLite configuration for Gunicorn compatibility
+    # Use NullPool to disable connection pooling (SQLite doesn't handle pooling well)
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "poolclass": NullPool,
+        "connect_args": {
+            "check_same_thread": False,
+            "timeout": 30  # Increase timeout for busy databases
+        }
+    }
+    
     db = SQLAlchemy(app)
 
     # Log the request duration
