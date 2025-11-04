@@ -1,0 +1,11 @@
+{
+  "name": "example",
+  "host": "0.0.0.0",
+  "port": 5010,
+  "reset_db": "False",
+  "modules": ["news", "voting"],
+  "perspective_api": null,
+  "sentiment_annotation": false,
+  "emotion_annotation": false,
+  "database_uri": "sqlite:////absolute/path/to/your/database.db"
+}
