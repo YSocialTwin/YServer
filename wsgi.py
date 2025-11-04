@@ -32,6 +32,7 @@ from y_server import app
 
 # Read configuration and set Flask app config values
 # This ensures the same config values are set as in start_server()
+# Note: Database URI is already configured in y_server/__init__.py based on YSERVER_CONFIG
 config_file = os.environ.get('YSERVER_CONFIG', os.path.join('config_files', 'exp_config.json'))
 if os.path.exists(config_file):
     with open(config_file, 'r') as f:

@@ -41,12 +41,39 @@ Set the server preferences modifying the file `config_files/exp_config.json`:
   "modules": ["news", "voting"]
 }
 ```
-where:
-- `name` is the name of the experiment (will be used to name the simulation database - which will be created under the folder `experiments`);
-- `host` is the IP address of the server;
-- `port` is the port of the server;
-- `reset_db` is a flag to reset the database at each server start;
-- `modules` is a list of additional modules to be loaded by the server (e.g., news, voting). Please note that the YClient must be configured to use the same modules.
+
+For more control over the database, you can optionally specify a `database_uri`:
+
+```json
+{
+  "name": "local_test",
+  "host": "0.0.0.0",
+  "port": 5010,
+  "reset_db": "True",
+  "modules": ["news", "voting"],
+  "database_uri": "sqlite:////absolute/path/to/database.db"
+}
+```
+
+Or for PostgreSQL:
+
+```json
+{
+  "name": "local_test",
+  "host": "0.0.0.0",
+  "port": 5010,
+  "modules": ["news", "voting"],
+  "database_uri": "postgresql://user:password@localhost/dbname"
+}
+```
+
+Configuration parameters:
+- `name` - Name of the experiment (used for default SQLite database path under `experiments/` folder if `database_uri` is not specified)
+- `host` - IP address of the server
+- `port` - Port number for the server
+- `reset_db` - (Optional) Flag to reset/recreate the database at server start (default: "False")
+- `modules` - List of additional modules to load (e.g., news, voting). YClient must use the same modules
+- `database_uri` - (Optional) Full database URI. If specified, overrides the default SQLite path. Supports SQLite and PostgreSQL
 
 Once the simulation is configured, start the YServer with the following command:
 
@@ -81,11 +108,25 @@ gunicorn -w 4 -b 0.0.0.0:5010 --timeout 120 --access-logfile - --error-logfile -
 
 **Running Multiple Instances:**
 
-When running multiple YServer instances on different ports simultaneously, start each in a separate subprocess with its own `YSERVER_CONFIG` environment variable:
+When running multiple YServer instances on different ports simultaneously, start each in a separate subprocess with its own `YSERVER_CONFIG` environment variable. **Important:** Specify the `database_uri` in each config file to set the database at startup and avoid calling `change_db` after workers are created, which can cause stability issues.
 
 ```python
 import subprocess
 import os
+
+# Config file 1 (config1.json):
+# {
+#   "host": "0.0.0.0",
+#   "port": 5010,
+#   "database_uri": "sqlite:////path/to/db1.db"
+# }
+
+# Config file 2 (config2.json):
+# {
+#   "host": "0.0.0.0", 
+#   "port": 5020,
+#   "database_uri": "sqlite:////path/to/db2.db"
+# }
 
 # Start first instance on port 5010
 env1 = os.environ.copy()
@@ -98,7 +139,7 @@ env2['YSERVER_CONFIG'] = '/path/to/config2.json'
 proc2 = subprocess.Popen(['gunicorn', '-c', 'gunicorn_config.py', 'wsgi:app'], env=env2)
 ```
 
-Each Gunicorn process runs in its own Python interpreter with its own environment, ensuring configurations don't conflict.
+Each Gunicorn process runs in its own Python interpreter with its own environment, ensuring configurations don't conflict. By setting `database_uri` in the config file, the database is configured at application startup before workers are forked, avoiding the need for runtime `change_db` calls.
 
 **macOS Compatibility:**
 

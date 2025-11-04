@@ -15,32 +15,54 @@ db = SQLAlchemy()
 
 try:
     # read the experiment configuration
-    config = json.load(open(f"config_files{os.sep}exp_config.json"))
+    # Support YSERVER_CONFIG environment variable to allow custom config paths
+    config_file = os.environ.get('YSERVER_CONFIG', f"config_files{os.sep}exp_config.json")
+    config = json.load(open(config_file))
 
     # create the experiments folder
     if not os.path.exists(f".{os.sep}experiments"):
         os.mkdir(f".{os.sep}experiments")
 
-    if (
-        not os.path.exists(f"experiments{os.sep}{config['name']}.db")
-        or config["reset_db"] == "True"
-    ):
-        # copy the clean database to the experiments folder
-        shutil.copyfile(
-            f"data_schema{os.sep}database_clean_server.db",
-            f"experiments{os.sep}{config['name']}.db",
-        )
+    # Determine database URI
+    # Priority: 1) database_uri from config, 2) default SQLite based on name
+    if "database_uri" in config and config["database_uri"]:
+        db_uri = config["database_uri"]
+        # For SQLite URIs, ensure the database file exists
+        if db_uri.startswith("sqlite"):
+            # Extract path from sqlite:/// URI
+            db_path = db_uri.replace("sqlite:///", "").replace("sqlite://", "")
+            if not os.path.exists(db_path) or config.get("reset_db") == "True":
+                # Create directory if needed
+                db_dir = os.path.dirname(db_path)
+                if db_dir and not os.path.exists(db_dir):
+                    os.makedirs(db_dir, exist_ok=True)
+                # Copy clean database
+                shutil.copyfile(
+                    f"data_schema{os.sep}database_clean_server.db",
+                    db_path,
+                )
+    else:
+        # Default: use name-based SQLite database
+        db_path = f"experiments{os.sep}{config['name']}.db"
+        if (
+            not os.path.exists(db_path)
+            or config.get("reset_db") == "True"
+        ):
+            # copy the clean database to the experiments folder
+            shutil.copyfile(
+                f"data_schema{os.sep}database_clean_server.db",
+                db_path,
+            )
+        db_uri = f"sqlite:///../experiments/{config['name']}.db"
 
     app = Flask(__name__)
     app.config["SECRET_KEY"] = "4YrzfpQ4kGXjuP6w"
-    app.config[
-        "SQLALCHEMY_DATABASE_URI"
-    ] = f"sqlite:///../experiments/{config['name']}.db"
+    app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     
+    # Configure engine options based on database type
     # SQLite-specific configuration for Gunicorn compatibility
     # Only apply NullPool for SQLite (PostgreSQL uses default connection pooling)
-    db_uri = app.config["SQLALCHEMY_DATABASE_URI"]
     if db_uri.startswith("sqlite"):
         # Use NullPool to disable connection pooling (SQLite doesn't handle pooling well)
         app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
@@ -50,6 +72,9 @@ try:
                 "timeout": 30  # Increase timeout for busy databases
             }
         }
+    else:
+        # PostgreSQL and other databases: use default connection pooling
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {}
     
     db = SQLAlchemy(app)
 
