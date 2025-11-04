@@ -71,6 +71,11 @@ def change_db():
             app.config["SQLALCHEMY_DATABASE_URI"] = uri
             db_path = "experiments" +os.sep + data['path'].split("/")[-1].replace("experiments_", "")
             rebind_db(uri)
+            log_dir = db_path
+            cwd = os.path.abspath(os.getcwd()).split("external")[0]
+            cwd = os.path.join(cwd, "y_web")
+            log_dir = os.path.join(cwd, log_dir)
+            rebind_db(uri)
         else:
             app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:////{data['path']}"
             app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -80,9 +85,10 @@ def change_db():
                 "connect_args": {"check_same_thread": False}
             }
 
+            log_dir = uri.split("database_server.db")[0]
+
 
         # Set up file logging
-        log_dir = uri.split("database_server.db")[0]
         log_path = os.path.join(f"{os.sep}{log_dir}", "_server.log")
         
         # Create log directory if it doesn't exist

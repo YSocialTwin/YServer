@@ -65,6 +65,9 @@ access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"
 errorlog = '-'  # Log to stderr
 loglevel = 'info'
 
+accesslog = "access.log"
+errorlog = "error.log"
+
 # Capture application output
 capture_output = True
 
