@@ -61,10 +61,11 @@ try:
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     
     # Configure engine options based on database type
-    # SQLite-specific configuration for Gunicorn compatibility
-    # Only apply NullPool for SQLite (PostgreSQL uses default connection pooling)
+    # Use NullPool for both SQLite and PostgreSQL for Gunicorn compatibility
+    # NullPool ensures each request gets a fresh connection, avoiding connection pool issues
+    # with multiple gunicorn workers
     if db_uri.startswith("sqlite"):
-        # Use NullPool to disable connection pooling (SQLite doesn't handle pooling well)
+        # SQLite-specific configuration
         app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
             "poolclass": NullPool,
             "connect_args": {
@@ -73,8 +74,11 @@ try:
             }
         }
     else:
-        # PostgreSQL and other databases: use default connection pooling
-        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {}
+        # PostgreSQL and other databases: use NullPool to avoid connection pool issues
+        # with multiple gunicorn workers (each worker would maintain its own pool)
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "poolclass": NullPool,
+        }
     
     db = SQLAlchemy(app)
     

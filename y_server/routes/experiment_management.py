@@ -41,14 +41,15 @@ def rebind_db(new_uri):
     from flask import current_app
     from sqlalchemy import create_engine
 
-    # Only pass check_same_thread for SQLite
+    # Use NullPool for both SQLite and PostgreSQL to avoid connection pool issues
+    # with multiple gunicorn workers
     if new_uri.startswith("sqlite"):
         engine = create_engine(new_uri, 
                              poolclass=NullPool,
                              connect_args={"check_same_thread": False, "timeout": 30})
     else:
-        # PostgreSQL and other databases use default connection pooling
-        engine = create_engine(new_uri)
+        # PostgreSQL and other databases: use NullPool to avoid connection pool issues
+        engine = create_engine(new_uri, poolclass=NullPool)
 
     with current_app.app_context():
         db.session.remove()
@@ -77,9 +78,10 @@ def change_db():
         if "postgresql" in uri:
             app.config["SQLALCHEMY_DATABASE_URI"] = uri
             app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-            # PostgreSQL uses default connection pooling (don't use NullPool)
-            # Set to empty dict instead of deleting to avoid KeyError in Flask-SQLAlchemy
-            app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {}
+            # PostgreSQL: use NullPool to avoid connection pool issues with gunicorn workers
+            app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+                "poolclass": NullPool,
+            }
             db_path = "experiments" + os.sep + data['path'].split("/")[-1].replace("experiments_", "")
             rebind_db(uri)
             log_dir = db_path
