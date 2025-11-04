@@ -78,9 +78,8 @@ def change_db():
             app.config["SQLALCHEMY_DATABASE_URI"] = uri
             app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
             # PostgreSQL uses default connection pooling (don't use NullPool)
-            # Remove any SQLite-specific engine options
-            if "SQLALCHEMY_ENGINE_OPTIONS" in app.config:
-                del app.config["SQLALCHEMY_ENGINE_OPTIONS"]
+            # Set to empty dict instead of deleting to avoid KeyError in Flask-SQLAlchemy
+            app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {}
             db_path = "experiments" + os.sep + data['path'].split("/")[-1].replace("experiments_", "")
             rebind_db(uri)
             log_dir = db_path
