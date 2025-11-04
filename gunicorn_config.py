@@ -60,8 +60,8 @@ worker_class = 'sync'
 
 # Maximum requests a worker will process before restarting
 # Helps prevent memory leaks
-max_requests = 1000
-max_requests_jitter = 50
+#max_requests = 1000
+#max_requests_jitter = 50
 
 # Timeout for requests (in seconds)
 timeout = 120

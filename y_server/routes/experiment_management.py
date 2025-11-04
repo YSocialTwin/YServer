@@ -86,7 +86,6 @@ def change_db():
             cwd = os.path.abspath(os.getcwd()).split("external")[0]
             cwd = os.path.join(cwd, "y_web")
             log_dir = os.path.join(cwd, log_dir)
-            rebind_db(uri)
         else:
             app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:////{data['path']}"
             app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False

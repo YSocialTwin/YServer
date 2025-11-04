@@ -89,8 +89,11 @@ try:
         log_dir = os.path.dirname(db_path) if os.path.dirname(db_path) else "experiments"
     else:
         # For PostgreSQL or other databases, use a default log location
-        log_dir = "experiments"
-    
+        base = os.getcwd().split("external")[0]
+        uiid = config["database_uri"].split("experiments_")[1]
+        log_dir = f"{base}{os.sep}y_web{os.sep}experiments{os.sep}{uiid}"
+
+
     log_path = os.path.join(log_dir, "_server.log")
     
     # Create log directory if it doesn't exist
