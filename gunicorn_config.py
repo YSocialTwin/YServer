@@ -42,7 +42,7 @@ bind = f"{exp_config.get('host', '0.0.0.0')}:{exp_config.get('port', 5010)}"
 
 # Worker processes
 # Recommended: (2 x $num_cores) + 1, with a maximum of 8 to avoid resource contention
-workers = min(multiprocessing.cpu_count() * 2 + 1, 8)
+workers = 1 # min(multiprocessing.cpu_count() * 2 + 1, 8)
 
 # Worker class
 # Use 'sync' for CPU-bound tasks, 'gevent' or 'eventlet' for I/O-bound tasks

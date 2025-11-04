@@ -533,38 +533,40 @@ def add_post():
                 db.session.commit()
     ############
 
-    for tag in hastags:
-        if len(tag) < 4:
-            continue
+    if hastags is not None:
+        for tag in hastags:
+            if len(tag) < 4:
+                continue
 
-        ht = Hashtags.query.filter_by(hashtag=tag).first()
-        if ht is None:
-            ht = Hashtags(hashtag=tag)
-            db.session.add(ht)
-            db.session.commit()
             ht = Hashtags.query.filter_by(hashtag=tag).first()
+            if ht is None:
+                ht = Hashtags(hashtag=tag)
+                db.session.add(ht)
+                db.session.commit()
+                ht = Hashtags.query.filter_by(hashtag=tag).first()
 
-        post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
-        db.session.add(post_tag)
-        db.session.commit()
-
-    for mention in mentions:
-        if len(mention) < 1:
-            continue
-
-        us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
-
-        # existing user and not self
-        if us is not None and us.id != user.id:
-            mn = Mentions(user_id=us.id, post_id=post.id, round=tid)
-            db.session.add(mn)
+            post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
+            db.session.add(post_tag)
             db.session.commit()
-        else:
-            text = text.replace(mention, "")
 
-            # update post
-            post.tweet = text.lstrip().rstrip()
-            db.session.commit()
+    if mentions is not None:
+        for mention in mentions:
+            if len(mention) < 1:
+                continue
+
+            us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
+
+            # existing user and not self
+            if us is not None and us.id != user.id:
+                mn = Mentions(user_id=us.id, post_id=post.id, round=tid)
+                db.session.add(mn)
+                db.session.commit()
+            else:
+                text = text.replace(mention, "")
+
+                # update post
+                post.tweet = text.lstrip().rstrip()
+                db.session.commit()
 
     return json.dumps({"status": 200})
 
@@ -659,42 +661,44 @@ def add_comment():
 
     ############
 
-    for tag in hastags:
-        if len(tag) < 1:
-            continue
+    if hastags is not None:
+        for tag in hastags:
+            if len(tag) < 1:
+                continue
 
-        ht = Hashtags.query.filter_by(hashtag=tag).first()
-        if ht is None:
-            ht = Hashtags(hashtag=tag)
-            db.session.add(ht)
-            db.session.commit()
             ht = Hashtags.query.filter_by(hashtag=tag).first()
+            if ht is None:
+                ht = Hashtags(hashtag=tag)
+                db.session.add(ht)
+                db.session.commit()
+                ht = Hashtags.query.filter_by(hashtag=tag).first()
 
-        post_tag = Post_hashtags(post_id=new_post.id, hashtag_id=ht.id)
-        db.session.add(post_tag)
-        db.session.commit()
-
-    for mention in mentions:
-        if len(mention) < 1:
-            continue
-
-        us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
-        if us is not None:
-            mn = Mentions(user_id=us.id, post_id=new_post.id, round=tid)
-            db.session.add(mn)
+            post_tag = Post_hashtags(post_id=new_post.id, hashtag_id=ht.id)
+            db.session.add(post_tag)
             db.session.commit()
-        else:
-            text = text.replace(mention, "")
 
-            # update post
-            post.tweet = text.lstrip().rstrip()
+    if mentions is not None:
+        for mention in mentions:
+            if len(mention) < 1:
+                continue
 
-            # more than one word
-            if len(post.tweet.split(" ")) > 1:
+            us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
+            if us is not None:
+                mn = Mentions(user_id=us.id, post_id=new_post.id, round=tid)
+                db.session.add(mn)
                 db.session.commit()
             else:
-                db.session.delete(post)
-                db.session.commit()
+                text = text.replace(mention, "")
+
+                # update post
+                post.tweet = text.lstrip().rstrip()
+
+                # more than one word
+                if len(post.tweet.split(" ")) > 1:
+                    db.session.commit()
+                else:
+                    db.session.delete(post)
+                    db.session.commit()
 
     return json.dumps({"status": 200})
 
