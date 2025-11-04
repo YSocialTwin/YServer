@@ -20,6 +20,12 @@ Note on running multiple instances:
     When starting multiple Gunicorn processes, each should have its own YSERVER_CONFIG
     environment variable set in the subprocess environment. Each process will have its
     own Python interpreter and won't interfere with other instances.
+
+Note on macOS:
+    This configuration includes OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES to prevent
+    crashes when using preload_app=True on macOS. This is necessary because some
+    dependencies (e.g., perspective) may initialize Objective-C classes before fork(),
+    which causes the NSCharacterSet initialization error.
 """
 import json
 import os
@@ -76,6 +82,13 @@ proc_name = 'yserver'
 
 # Preload application for better performance
 preload_app = True
+
+# Environment variables for workers
+# Fix for macOS fork() safety issue with Objective-C runtime
+# See: https://github.com/ansible/ansible/issues/32499
+raw_env = [
+    'OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES',
+]
 
 # Server mechanics
 daemon = False
