@@ -102,9 +102,14 @@ Each Gunicorn process runs in its own Python interpreter with its own environmen
 
 **macOS Compatibility:**
 
-The gunicorn configuration file (`gunicorn_config.py`) includes the necessary environment variable (`OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES`) to prevent worker crashes on macOS related to Objective-C runtime fork safety issues. This is automatically handled when using `-c gunicorn_config.py`.
+The gunicorn configuration file (`gunicorn_config.py`) automatically detects macOS and disables `preload_app` to prevent fork safety crashes with CoreFoundation, Objective-C runtime, and other macOS frameworks. These frameworks cannot be safely used after `fork()` without `exec()`, which would cause SIGSEGV errors.
 
-If you encounter errors like `objc[...]: +[NSCharacterSet initialize] may have been in progress in another thread when fork() was called`, ensure you're using the gunicorn configuration file with the `-c` flag.
+When using `-c gunicorn_config.py`, the server will:
+- Automatically disable `preload_app` on macOS (slightly slower startup, but stable)
+- Set `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` as an additional safeguard
+- Work normally on Linux/Unix with `preload_app` enabled for better performance
+
+If you encounter fork-related errors on macOS, ensure you're using the gunicorn configuration file with the `-c` flag.
 
 #### Modules
 - **News**: This module allows the server to access online news sources leveraging RSS feeds.
