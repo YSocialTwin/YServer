@@ -41,11 +41,18 @@ def rebind_db(new_uri):
     from flask import current_app
     from sqlalchemy import create_engine
 
-    engine = create_engine(new_uri, connect_args={"check_same_thread": False})
+    # Only pass check_same_thread for SQLite
+    if new_uri.startswith("sqlite"):
+        engine = create_engine(new_uri, 
+                             poolclass=NullPool,
+                             connect_args={"check_same_thread": False, "timeout": 30})
+    else:
+        # PostgreSQL and other databases use default connection pooling
+        engine = create_engine(new_uri)
 
     with current_app.app_context():
         db.session.remove()
-        db.engine.dispose()  # ✅ safe now
+        db.engine.dispose()
         db.session.configure(bind=engine)
 
 
@@ -69,15 +76,23 @@ def change_db():
 
         if "postgresql" in uri:
             app.config["SQLALCHEMY_DATABASE_URI"] = uri
-            db_path = "experiments" +os.sep + data['path'].split("/")[-1].replace("experiments_", "")
+            app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+            # PostgreSQL uses default connection pooling (don't use NullPool)
+            # Remove any SQLite-specific engine options
+            if "SQLALCHEMY_ENGINE_OPTIONS" in app.config:
+                del app.config["SQLALCHEMY_ENGINE_OPTIONS"]
+            db_path = "experiments" + os.sep + data['path'].split("/")[-1].replace("experiments_", "")
             rebind_db(uri)
         else:
             app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:////{data['path']}"
             app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-            # Manually add check_same_thread=False
+            # SQLite-specific: use NullPool and check_same_thread=False
             app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
                 "poolclass": NullPool,
-                "connect_args": {"check_same_thread": False}
+                "connect_args": {
+                    "check_same_thread": False,
+                    "timeout": 30
+                }
             }
 
 

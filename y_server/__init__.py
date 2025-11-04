@@ -38,15 +38,18 @@ try:
     ] = f"sqlite:///../experiments/{config['name']}.db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     
-    # SQLite configuration for Gunicorn compatibility
-    # Use NullPool to disable connection pooling (SQLite doesn't handle pooling well)
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "poolclass": NullPool,
-        "connect_args": {
-            "check_same_thread": False,
-            "timeout": 30  # Increase timeout for busy databases
+    # SQLite-specific configuration for Gunicorn compatibility
+    # Only apply NullPool for SQLite (PostgreSQL uses default connection pooling)
+    db_uri = app.config["SQLALCHEMY_DATABASE_URI"]
+    if db_uri.startswith("sqlite"):
+        # Use NullPool to disable connection pooling (SQLite doesn't handle pooling well)
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "poolclass": NullPool,
+            "connect_args": {
+                "check_same_thread": False,
+                "timeout": 30  # Increase timeout for busy databases
+            }
         }
-    }
     
     db = SQLAlchemy(app)
 
