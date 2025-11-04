@@ -56,14 +56,15 @@ def change_db():
     :return: the status of the change
     """
     import sys
+    import traceback
     
-    # get the data from the request
-    data = json.loads(request.get_data())
-
-    # select the database type
-    uri = data["path"]
-
     try:
+        # get the data from the request
+        data = json.loads(request.get_data())
+
+        # select the database type
+        uri = data["path"]
+
         if "postgresql" in uri:
             app.config["SQLALCHEMY_DATABASE_URI"] = uri
             db_path = "experiments" +os.sep + data['path'].split("/")[-1].replace("experiments_", "")
@@ -86,7 +87,6 @@ def change_db():
         logger.handlers.clear()
         
         # Create file handler with JSON formatter
-        # Only log messages that are already JSON formatted (from the request logger)
         fileHandler = logging.FileHandler(log_path, mode='a')
         fileHandler.setFormatter(formatter)
         fileHandler.setLevel(logging.INFO)
@@ -98,16 +98,22 @@ def change_db():
         # Ensure the log is flushed to disk
         fileHandler.flush()
         
-        print(f"Logging successfully configured. File: {log_path}", file=sys.stderr)
+        # Log success to application logger (will appear in Gunicorn error log)
+        app.logger.info(f"Database configuration successful. URI: {uri}, Log: {log_path}")
+        
+        db.init_app(app)
+        return {"status": 200}
         
     except Exception as e:
-        # If logging setup fails, log the error to stderr but don't fail the request
-        import traceback
-        print(f"ERROR in change_db logging setup: {e}", file=sys.stderr)
-        traceback.print_exc(file=sys.stderr)
-    
-    db.init_app(app)
-    return {"status": 200}
+        # Log the full error with traceback to application logger (visible in Gunicorn logs)
+        error_msg = f"ERROR in change_db: {str(e)}\n{traceback.format_exc()}"
+        app.logger.error(error_msg)
+        
+        # Also print to stderr as fallback
+        print(error_msg, file=sys.stderr)
+        
+        # Return error response with details
+        return {"status": 500, "error": str(e), "traceback": traceback.format_exc()}, 500
 
 
 @app.route("/shutdown", methods=["POST"])
