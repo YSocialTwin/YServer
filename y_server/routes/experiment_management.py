@@ -2,6 +2,8 @@ import json
 import logging
 import os
 
+from sqlalchemy.pool import NullPool
+
 from flask import request
 from pythonjsonlogger import jsonlogger
 from y_server import app, db
@@ -71,10 +73,13 @@ def change_db():
             rebind_db(uri)
         else:
             app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:////{data['path']}"
+            app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
             # Manually add check_same_thread=False
             app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+                "poolclass": NullPool,
                 "connect_args": {"check_same_thread": False}
             }
+
 
         # Set up file logging
         log_dir = uri.split("database_server.db")[0]
