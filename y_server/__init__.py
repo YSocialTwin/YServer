@@ -77,6 +77,52 @@ try:
         app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {}
     
     db = SQLAlchemy(app)
+    
+    # Set up file logging to _server.log
+    # Determine log directory based on database URI
+    if db_uri.startswith("sqlite"):
+        # Extract path from sqlite URI and get directory
+        db_path = db_uri.replace("sqlite:///", "").replace("sqlite://", "")
+        # Remove leading slashes for relative paths
+        if db_path.startswith("../"):
+            db_path = db_path[3:]
+        log_dir = os.path.dirname(db_path) if os.path.dirname(db_path) else "experiments"
+    else:
+        # For PostgreSQL or other databases, use a default log location
+        log_dir = "experiments"
+    
+    log_path = os.path.join(log_dir, "_server.log")
+    
+    # Create log directory if it doesn't exist
+    os.makedirs(log_dir, exist_ok=True)
+    
+    # Set up JSON logging
+    from pythonjsonlogger import jsonlogger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    
+    # Remove all existing handlers to avoid duplicate logging
+    root_logger.handlers.clear()
+    
+    # Create file handler with JSON formatter
+    formatter = jsonlogger.JsonFormatter()
+    file_handler = logging.FileHandler(log_path, mode='a')
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(logging.INFO)
+    root_logger.addHandler(file_handler)
+    
+    # Disable propagation to prevent logging to parent handlers
+    root_logger.propagate = False
+    
+    # Ensure the log is flushed to disk
+    file_handler.flush()
+    
+    # Log startup information
+    logging.info("YServer started", extra={
+        "database_uri": db_uri,
+        "log_path": log_path,
+        "config_file": config_file
+    })
 
     # Log the request duration
     @app.before_request
@@ -145,6 +191,37 @@ except:  # Y Web subprocess
     # db = SQLAlchemy()
 
     db.init_app(app)
+    
+    # Set up file logging to _server.log for Y Web subprocess
+    log_dir = f"{BASE_DIR}experiments"
+    log_path = os.path.join(log_dir, "_server.log")
+    
+    # Set up JSON logging
+    from pythonjsonlogger import jsonlogger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    
+    # Remove all existing handlers to avoid duplicate logging
+    root_logger.handlers.clear()
+    
+    # Create file handler with JSON formatter
+    formatter = jsonlogger.JsonFormatter()
+    file_handler = logging.FileHandler(log_path, mode='a')
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(logging.INFO)
+    root_logger.addHandler(file_handler)
+    
+    # Disable propagation to prevent logging to parent handlers
+    root_logger.propagate = False
+    
+    # Ensure the log is flushed to disk
+    file_handler.flush()
+    
+    # Log startup information
+    logging.info("YServer started (Y Web subprocess)", extra={
+        "database_uri": app.config["SQLALCHEMY_DATABASE_URI"],
+        "log_path": log_path
+    })
 
     # Log the request duration
     @app.before_request
