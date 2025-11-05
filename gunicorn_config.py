@@ -52,19 +52,21 @@ bind = f"{exp_config.get('host', '0.0.0.0')}:{exp_config.get('port', 5010)}"
 # Worker processes
 # Recommended: (2 x $num_cores) + 1, with a maximum of 8 to avoid resource contention
 workers = 1 #min(multiprocessing.cpu_count() * 2 + 1, 8)
-#threads = 1
+threads = 1
 
 # Worker class
 # Use 'sync' for CPU-bound tasks, 'gevent' or 'eventlet' for I/O-bound tasks
-worker_class = 'gevent'
+# Note: Using 'sync' worker with PostgreSQL and NullPool for reliability
+worker_class = 'sync'
 
 # Maximum requests a worker will process before restarting
-# Helps prevent memory leaks
-#max_requests = 1000
-#max_requests_jitter = 50
+# Helps prevent memory leaks and ensures clean worker restarts
+max_requests = 1000
+max_requests_jitter = 50
 
 # Timeout for requests (in seconds)
-#timeout = 120
+# Increased for potentially long-running database operations
+timeout = 120
 
 # Access log
 accesslog = '-'  # Log to stdout

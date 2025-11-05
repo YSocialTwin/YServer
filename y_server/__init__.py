@@ -130,6 +130,12 @@ try:
         "log_path": log_path,
         "config_file": config_file
     })
+    
+    # Clean up database sessions after each request
+    # Essential when using NullPool to ensure connections are properly closed
+    @app.teardown_appcontext
+    def shutdown_session(exception=None):
+        db.session.remove()
 
     # Log the request duration
     @app.before_request
@@ -229,6 +235,12 @@ except:  # Y Web subprocess
         "database_uri": app.config["SQLALCHEMY_DATABASE_URI"],
         "log_path": log_path
     })
+    
+    # Clean up database sessions after each request
+    # Essential when using NullPool to ensure connections are properly closed
+    @app.teardown_appcontext
+    def shutdown_session(exception=None):
+        db.session.remove()
 
     # Log the request duration
     @app.before_request
