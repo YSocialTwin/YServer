@@ -2,6 +2,8 @@ import json
 import logging
 import os
 
+from sqlalchemy.pool import NullPool
+
 from flask import request
 from pythonjsonlogger import jsonlogger
 from y_server import app, db
@@ -29,27 +31,29 @@ from y_server.modals import (
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# Create handler
-logHandler = logging.StreamHandler()
-
 # Define JSON log format
-formatter = jsonlogger.JsonFormatter(
-    fmt='%(asctime)s %(levelname)s %(name)s %(message)s %(pathname)s %(lineno)d',
-    datefmt='%Y-%m-%dT%H:%M:%S'
-)
-
-logHandler.setFormatter(formatter)
+# The JsonFormatter will include any fields that are present in the LogRecord
+# Request logs pass custom fields via 'extra' parameter which will be included automatically
+formatter = jsonlogger.JsonFormatter()
 
 
 def rebind_db(new_uri):
     from flask import current_app
     from sqlalchemy import create_engine
 
-    engine = create_engine(new_uri, connect_args={"check_same_thread": False})
+    # Use NullPool for both SQLite and PostgreSQL to avoid connection pool issues
+    # with multiple gunicorn workers
+    if new_uri.startswith("sqlite"):
+        engine = create_engine(new_uri, 
+                             poolclass=NullPool,
+                             connect_args={"check_same_thread": False, "timeout": 30})
+    else:
+        # PostgreSQL and other databases: use NullPool to avoid connection pool issues
+        engine = create_engine(new_uri, poolclass=NullPool)
 
     with current_app.app_context():
         db.session.remove()
-        db.engine.dispose()  # ✅ safe now
+        db.engine.dispose()
         db.session.configure(bind=engine)
 
 
@@ -61,31 +65,81 @@ def change_db():
     :param db_name: the name of the database
     :return: the status of the change
     """
-    # get the data from the request
-    data = json.loads(request.get_data())
+    import sys
+    import traceback
+    
+    try:
+        # get the data from the request
+        data = json.loads(request.get_data())
 
-    # select the database type
-    uri = data["path"]
+        # select the database type
+        uri = data["path"]
 
-    if "postgresql" in uri:
-        app.config["SQLALCHEMY_DATABASE_URI"] = uri
-        db_path = "experiments" +os.sep + data['path'].split("/")[-1].replace("experiments_", "") #.split("y_web")[1].split("experiments_")[1]
-        rebind_db(uri)
-    else:
-        app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:////{data['path']}"
-        # Manually add check_same_thread=False
-        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-            "connect_args": {"check_same_thread": False}
-        }
-        # Set up logging
-        db_path = data['path'].split("y_web")[1].split("database_server.db")[0]
+        if "postgresql" in uri:
+            app.config["SQLALCHEMY_DATABASE_URI"] = uri
+            app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+            # PostgreSQL: use NullPool to avoid connection pool issues with gunicorn workers
+            app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+                "poolclass": NullPool,
+            }
+            db_path = "experiments" + os.sep + data['path'].split("/")[-1].replace("experiments_", "")
+            rebind_db(uri)
+            log_dir = db_path
+            cwd = os.path.abspath(os.getcwd()).split("external")[0]
+            cwd = os.path.join(cwd, "y_web")
+            log_dir = os.path.join(cwd, log_dir)
+        else:
+            app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:////{data['path']}"
+            app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+            # SQLite-specific: use NullPool and check_same_thread=False
+            app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+                "poolclass": NullPool,
+                "connect_args": {
+                    "check_same_thread": False,
+                    "timeout": 30
+                }
+            }
 
-    log_dir = f"y_web{os.sep}{db_path}"
-    log_path = os.path.join(log_dir, "_server.log")
-    logHandler = logging.FileHandler(log_path)
-    logger.addHandler(logHandler)
-    db.init_app(app)
-    return {"status": 200}
+            log_dir = uri.split("database_server.db")[0]
+
+
+        # Set up file logging
+        log_path = os.path.join(f"{os.sep}{log_dir}", "_server.log")
+        
+        # Create log directory if it doesn't exist
+        os.makedirs(log_dir, exist_ok=True)
+        
+        # Remove all existing handlers to avoid duplicate logging
+        logger.handlers.clear()
+        
+        # Create file handler with JSON formatter
+        fileHandler = logging.FileHandler(log_path, mode='a')
+        fileHandler.setFormatter(formatter)
+        fileHandler.setLevel(logging.INFO)
+        logger.addHandler(fileHandler)
+        
+        # Disable propagation to prevent logging to parent handlers
+        logger.propagate = False
+        
+        # Ensure the log is flushed to disk
+        fileHandler.flush()
+        
+        # Log success to application logger (will appear in Gunicorn error log)
+        app.logger.info(f"Database configuration successful. URI: {uri}, Log: {log_path}")
+        
+        db.init_app(app)
+        return {"status": 200}
+        
+    except Exception as e:
+        # Log the full error with traceback to application logger (visible in Gunicorn logs)
+        error_msg = f"ERROR in change_db: {str(e)}\n{traceback.format_exc()}"
+        app.logger.error(error_msg)
+        
+        # Also print to stderr as fallback
+        print(error_msg, file=sys.stderr)
+        
+        # Return error response with details
+        return {"status": 500, "error": str(e), "traceback": traceback.format_exc()}, 500
 
 
 @app.route("/shutdown", methods=["POST"])

@@ -7,6 +7,7 @@ import time
 from flask import Flask, g, request
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import desc
+from sqlalchemy.pool import NullPool
 
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.WARNING)
@@ -14,29 +15,127 @@ db = SQLAlchemy()
 
 try:
     # read the experiment configuration
-    config = json.load(open(f"config_files{os.sep}exp_config.json"))
+    # Support YSERVER_CONFIG environment variable to allow custom config paths
+    config_file = os.environ.get('YSERVER_CONFIG', f"config_files{os.sep}exp_config.json")
+    config = json.load(open(config_file))
 
     # create the experiments folder
     if not os.path.exists(f".{os.sep}experiments"):
         os.mkdir(f".{os.sep}experiments")
 
-    if (
-        not os.path.exists(f"experiments{os.sep}{config['name']}.db")
-        or config["reset_db"] == "True"
-    ):
-        # copy the clean database to the experiments folder
-        shutil.copyfile(
-            f"data_schema{os.sep}database_clean_server.db",
-            f"experiments{os.sep}{config['name']}.db",
-        )
+    # Determine database URI
+    # Priority: 1) database_uri from config, 2) default SQLite based on name
+    if "database_uri" in config and config["database_uri"]:
+        db_uri = config["database_uri"]
+        # For SQLite URIs, ensure the database file exists
+        if db_uri.startswith("sqlite"):
+            # Extract path from sqlite:/// URI
+            db_path = db_uri.replace("sqlite:///", "").replace("sqlite://", "")
+            if not os.path.exists(db_path) or config.get("reset_db") == "True":
+                # Create directory if needed
+                db_dir = os.path.dirname(db_path)
+                if db_dir and not os.path.exists(db_dir):
+                    os.makedirs(db_dir, exist_ok=True)
+                # Copy clean database
+                shutil.copyfile(
+                    f"data_schema{os.sep}database_clean_server.db",
+                    db_path,
+                )
+    else:
+        # Default: use name-based SQLite database
+        db_path = f"experiments{os.sep}{config['name']}.db"
+        if (
+            not os.path.exists(db_path)
+            or config.get("reset_db") == "True"
+        ):
+            # copy the clean database to the experiments folder
+            shutil.copyfile(
+                f"data_schema{os.sep}database_clean_server.db",
+                db_path,
+            )
+        db_uri = f"sqlite:///../experiments/{config['name']}.db"
 
     app = Flask(__name__)
     app.config["SECRET_KEY"] = "4YrzfpQ4kGXjuP6w"
-    app.config[
-        "SQLALCHEMY_DATABASE_URI"
-    ] = f"sqlite:///../experiments/{config['name']}.db"
+    app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    
+    # Configure engine options based on database type
+    # Use NullPool for both SQLite and PostgreSQL for Gunicorn compatibility
+    # NullPool ensures each request gets a fresh connection, avoiding connection pool issues
+    # with multiple gunicorn workers
+    if db_uri.startswith("sqlite"):
+        # SQLite-specific configuration
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "poolclass": NullPool,
+            "connect_args": {
+                "check_same_thread": False,
+                "timeout": 30  # Increase timeout for busy databases
+            }
+        }
+    else:
+        # PostgreSQL and other databases: use NullPool to avoid connection pool issues
+        # with multiple gunicorn workers (each worker would maintain its own pool)
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "poolclass": NullPool,
+        }
+    
     db = SQLAlchemy(app)
+    
+    # Set up file logging to _server.log
+    # Determine log directory based on database URI
+    if db_uri.startswith("sqlite"):
+        # Extract path from sqlite URI and get directory
+        db_path = db_uri.replace("sqlite:///", "").replace("sqlite://", "")
+        # Remove leading slashes for relative paths
+        if db_path.startswith("../"):
+            db_path = db_path[3:]
+        log_dir = os.path.dirname(db_path) if os.path.dirname(db_path) else "experiments"
+    else:
+        # For PostgreSQL or other databases, use a default log location
+        base = os.getcwd().split("external")[0]
+        uiid = config["database_uri"].split("experiments_")[1]
+        log_dir = f"{base}{os.sep}y_web{os.sep}experiments{os.sep}{uiid}"
+
+
+    log_path = os.path.join(log_dir, "_server.log")
+    
+    # Create log directory if it doesn't exist
+    os.makedirs(log_dir, exist_ok=True)
+    
+    # Set up JSON logging
+    from pythonjsonlogger import jsonlogger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    
+    # Remove all existing handlers to avoid duplicate logging
+    root_logger.handlers.clear()
+    
+    # Create file handler with JSON formatter
+    formatter = jsonlogger.JsonFormatter()
+    file_handler = logging.FileHandler(log_path, mode='a')
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(logging.INFO)
+    root_logger.addHandler(file_handler)
+    
+    # Disable propagation to prevent logging to parent handlers
+    root_logger.propagate = False
+    
+    # Ensure the log is flushed to disk
+    file_handler.flush()
+    
+    # Log startup information
+    logging.info("YServer started", extra={
+        "database_uri": db_uri,
+        "log_path": log_path,
+        "config_file": config_file
+    })
+    
+    # Clean up database sessions after each request
+    # Essential when using NullPool to ensure connections are properly closed
+    @app.teardown_appcontext
+    def shutdown_session(exception=None):
+        db.session.remove()
 
     # Log the request duration
     @app.before_request
@@ -51,7 +150,7 @@ try:
             from y_server.modals import Rounds
             
             duration = time.time() - g.start_time
-            log = {
+            log_data = {
                 "remote_addr": request.remote_addr,
                 "method": request.method,
                 "path": request.path,
@@ -64,14 +163,15 @@ try:
             try:
                 current_round = Rounds.query.order_by(desc(Rounds.id)).first()
                 if current_round:
-                    log["tid"] = current_round.id
-                    log["day"] = current_round.day
-                    log["hour"] = current_round.hour
+                    log_data["tid"] = current_round.id
+                    log_data["day"] = current_round.day
+                    log_data["hour"] = current_round.hour
             except Exception:
                 # If there's an error querying the database, continue without round info
                 pass
 
-            logging.info(json.dumps(log))
+            # Pass log data as extra dict so fields appear at top level in JSON output
+            logging.info("request", extra=log_data)
         return response
 
 except:  # Y Web subprocess
@@ -90,11 +190,57 @@ except:  # Y Web subprocess
     app.config["SECRET_KEY"] = "4YrzfpQ4kGXjuP6w"
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///../experiments/dummy.db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
+    
+    # SQLite-specific configuration for Gunicorn compatibility
+    # Use NullPool to disable connection pooling (SQLite doesn't handle pooling well)
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "poolclass": NullPool,
+        "connect_args": {
+            "check_same_thread": False,
+            "timeout": 30  # Increase timeout for busy databases
+        }
+    }
 
     # db = SQLAlchemy()
 
     db.init_app(app)
+    
+    # Set up file logging to _server.log for Y Web subprocess
+    log_dir = f"{BASE_DIR}experiments"
+    log_path = os.path.join(log_dir, "_server.log")
+    
+    # Set up JSON logging
+    from pythonjsonlogger import jsonlogger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    
+    # Remove all existing handlers to avoid duplicate logging
+    root_logger.handlers.clear()
+    
+    # Create file handler with JSON formatter
+    formatter = jsonlogger.JsonFormatter()
+    file_handler = logging.FileHandler(log_path, mode='a')
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(logging.INFO)
+    root_logger.addHandler(file_handler)
+    
+    # Disable propagation to prevent logging to parent handlers
+    root_logger.propagate = False
+    
+    # Ensure the log is flushed to disk
+    file_handler.flush()
+    
+    # Log startup information
+    logging.info("YServer started (Y Web subprocess)", extra={
+        "database_uri": app.config["SQLALCHEMY_DATABASE_URI"],
+        "log_path": log_path
+    })
+    
+    # Clean up database sessions after each request
+    # Essential when using NullPool to ensure connections are properly closed
+    @app.teardown_appcontext
+    def shutdown_session(exception=None):
+        db.session.remove()
 
     # Log the request duration
     @app.before_request
@@ -109,7 +255,7 @@ except:  # Y Web subprocess
             from y_server.modals import Rounds
             
             duration = time.time() - g.start_time
-            log = {
+            log_data = {
                 "remote_addr": request.remote_addr,
                 "method": request.method,
                 "path": request.path,
@@ -122,14 +268,15 @@ except:  # Y Web subprocess
             try:
                 current_round = Rounds.query.order_by(desc(Rounds.id)).first()
                 if current_round:
-                    log["tid"] = current_round.id
-                    log["day"] = current_round.day
-                    log["hour"] = current_round.hour
+                    log_data["tid"] = current_round.id
+                    log_data["day"] = current_round.day
+                    log_data["hour"] = current_round.hour
             except Exception:
                 # If there's an error querying the database, continue without round info
                 pass
 
-            logging.info(json.dumps(log))
+            # Pass log data as extra dict so fields appear at top level in JSON output
+            logging.info("request", extra=log_data)
         return response
 
 from y_server.routes import *

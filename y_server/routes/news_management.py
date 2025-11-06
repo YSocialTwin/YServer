@@ -108,30 +108,32 @@ def comment_news():
                 db.session.add(post_emotion)
                 db.session.commit()
 
-        for tag in hastags:
-            if len(tag) < 4:
-                continue
+        if hastags is not None:
+            for tag in hastags:
+                if len(tag) < 4:
+                    continue
 
-            ht = Hashtags.query.filter_by(hashtag=tag).first()
-            if ht is None:
-                ht = Hashtags(hashtag=tag)
-                db.session.add(ht)
-                db.session.commit()
                 ht = Hashtags.query.filter_by(hashtag=tag).first()
+                if ht is None:
+                    ht = Hashtags(hashtag=tag)
+                    db.session.add(ht)
+                    db.session.commit()
+                    ht = Hashtags.query.filter_by(hashtag=tag).first()
 
-            post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
-            db.session.add(post_tag)
-            db.session.commit()
-
-        for mention in mentions:
-            if len(mention) < 1:
-                continue
-
-            us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
-            if us is not None:
-                mention = Mentions(user_id=us.id, post_id=post.id, round=tid)
-                db.session.add(mention)
+                post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
+                db.session.add(post_tag)
                 db.session.commit()
+
+        if mentions is not None:
+            for mention in mentions:
+                if len(mention) < 1:
+                    continue
+
+                us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
+                if us is not None:
+                    mention = Mentions(user_id=us.id, post_id=post.id, round=tid)
+                    db.session.add(mention)
+                    db.session.commit()
 
     if post is not None and "topics" in data:
         # compute sentiment
@@ -299,29 +301,31 @@ def share():
             db.session.add(post_emotion)
             db.session.commit()
 
-    for tag in hastags:
-        if len(tag) < 1:
-            continue
+    if hastags is not None:
+        for tag in hastags:
+            if len(tag) < 1:
+                continue
 
-        ht = Hashtags.query.filter_by(hashtag=tag).first()
-        if ht is None:
-            ht = Hashtags(hashtag=tag)
-            db.session.add(ht)
-            db.session.commit()
             ht = Hashtags.query.filter_by(hashtag=tag).first()
+            if ht is None:
+                ht = Hashtags(hashtag=tag)
+                db.session.add(ht)
+                db.session.commit()
+                ht = Hashtags.query.filter_by(hashtag=tag).first()
 
-        post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
-        db.session.add(post_tag)
-        db.session.commit()
-
-    for mention in mentions:
-        if len(mention) < 1:
-            continue
-
-        us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
-        if us is not None:
-            mention = Mentions(user_id=us.id, post_id=post.id, round=tid)
-            db.session.add(mention)
+            post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
+            db.session.add(post_tag)
             db.session.commit()
+
+    if mentions is not None:
+        for mention in mentions:
+            if len(mention) < 1:
+                continue
+
+            us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
+            if us is not None:
+                mention = Mentions(user_id=us.id, post_id=post.id, round=tid)
+                db.session.add(mention)
+                db.session.commit()
 
     return json.dumps({"status": 200})

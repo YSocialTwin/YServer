@@ -90,19 +90,20 @@ def post_image():
             db.session.add(post_emotion)
             db.session.commit()
 
-    for tag in hashtags:
-        if len(tag) < 1:
-            continue
+    if hashtags is not None:
+        for tag in hashtags:
+            if len(tag) < 1:
+                continue
 
-        ht = Hashtags.query.filter_by(hashtag=tag).first()
-        if ht is None:
-            ht = Hashtags(hashtag=tag)
-            db.session.add(ht)
-            db.session.commit()
             ht = Hashtags.query.filter_by(hashtag=tag).first()
+            if ht is None:
+                ht = Hashtags(hashtag=tag)
+                db.session.add(ht)
+                db.session.commit()
+                ht = Hashtags.query.filter_by(hashtag=tag).first()
 
-        post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
-        db.session.add(post_tag)
-        db.session.commit()
+            post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
+            db.session.add(post_tag)
+            db.session.commit()
 
     return json.dumps({"status": 200})
