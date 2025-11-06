@@ -20,10 +20,19 @@ Note on running multiple instances:
     When starting multiple Gunicorn processes, each should have its own YSERVER_CONFIG
     environment variable set in the subprocess environment. Each process will have its
     own Python interpreter and won't interfere with other instances.
+
+Note on macOS:
+    On macOS (Darwin), preload_app is automatically disabled to prevent fork safety
+    issues with CoreFoundation, Objective-C runtime, and other macOS frameworks.
+    These frameworks cannot be safely used after fork() without exec(), which causes
+    SIGSEGV crashes. While this reduces startup performance slightly, it ensures
+    stability on macOS. The OBJC_DISABLE_INITIALIZE_FORK_SAFETY environment variable
+    is also set as an additional safeguard.
 """
 import json
 import os
 import multiprocessing
+import sys
 
 # Read configuration from exp_config.json or custom path via environment variable
 config_file = os.environ.get('YSERVER_CONFIG', os.path.join('config_files', 'exp_config.json'))
@@ -42,19 +51,21 @@ bind = f"{exp_config.get('host', '0.0.0.0')}:{exp_config.get('port', 5010)}"
 
 # Worker processes
 # Recommended: (2 x $num_cores) + 1, with a maximum of 8 to avoid resource contention
-workers = 1 # min(multiprocessing.cpu_count() * 2 + 1, 8)
+workers = 1 #min(multiprocessing.cpu_count() * 2 + 1, 8)
 threads = 1
 
 # Worker class
 # Use 'sync' for CPU-bound tasks, 'gevent' or 'eventlet' for I/O-bound tasks
+# Note: Using 'sync' worker with PostgreSQL and NullPool for reliability
 worker_class = 'sync'
 
 # Maximum requests a worker will process before restarting
-# Helps prevent memory leaks
+# Helps prevent memory leaks and ensures clean worker restarts
 max_requests = 1000
 max_requests_jitter = 50
 
 # Timeout for requests (in seconds)
+# Increased for potentially long-running database operations
 timeout = 120
 
 # Access log
@@ -75,7 +86,17 @@ capture_output = True
 proc_name = 'yserver'
 
 # Preload application for better performance
-preload_app = True
+# Disable on macOS due to CoreFoundation/Objective-C fork safety issues
+preload_app = sys.platform != 'darwin'
+
+# Environment variables for workers
+# Fix for macOS fork() safety issue with Objective-C runtime
+# Note: Even with these environment variables, macOS may still have issues with
+# preload_app=True due to CoreFoundation and other frameworks, so we disable it on macOS
+# See: https://github.com/ansible/ansible/issues/32499
+raw_env = [
+    'OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES',
+]
 
 # Server mechanics
 daemon = False
