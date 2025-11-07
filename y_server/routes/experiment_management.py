@@ -82,7 +82,8 @@ def change_db():
             app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
                 "poolclass": NullPool,
             }
-            db_path = "experiments" + os.sep + data['path'].split("/")[-1].replace("experiments_", "")
+            # PostgreSQL URIs always use forward slashes, regardless of OS
+            db_path = os.path.join("experiments", data['path'].split("/")[-1].replace("experiments_", ""))
             rebind_db(uri)
             log_dir = db_path
             cwd = os.path.abspath(os.getcwd()).split("external")[0]
@@ -102,10 +103,18 @@ def change_db():
 
             log_dir = uri.split("database_server.db")[0]
 
-
         # Set up file logging
-        log_path = os.path.join(f"{os.sep}{log_dir}", "_server.log")
-        
+        # If path is already absolute, use it as-is
+        if os.path.isabs(log_dir):
+            log_path = os.path.join(log_dir, "_server.log")
+        else:
+            # If path is relative, but meant to be root-relative on Unix
+            if os.name != "nt":  # POSIX
+                log_path = os.path.join(f"{os.sep}{log_dir}", "_server.log")
+            else:  # Windows: use system drive root
+                drive = os.environ.get("SystemDrive", "C:")
+                log_path = os.path.join(drive + os.sep, log_dir, "_server.log")
+
         # Create log directory if it doesn't exist
         os.makedirs(log_dir, exist_ok=True)
         
