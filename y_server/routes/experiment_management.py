@@ -114,9 +114,6 @@ def change_db():
             else:  # Windows: use system drive root
                 drive = os.environ.get("SystemDrive", "C:")
                 log_path = os.path.join(drive + os.sep, log_dir, "_server.log")
-
-        # Create log directory if it doesn't exist
-        os.makedirs(log_dir, exist_ok=True)
         
         # Remove all existing handlers to avoid duplicate logging
         logger.handlers.clear()
