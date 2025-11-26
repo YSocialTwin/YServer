@@ -142,11 +142,9 @@ def register():
         db.session.add(user)
         db.session.commit()
 
-        print("\nRegistered user:", user.username, user.email, user.id)
         return json.dumps({"status": 200, "id": user.id, "username": user.username})
 
     else:
-        print("\nUser already exists:", user.username, user.email, user.id)
         return json.dumps({"status": 200, "id": user.id, "username": user.username})
 
 

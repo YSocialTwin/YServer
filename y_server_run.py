@@ -6,7 +6,7 @@ def start_server(config):
     """
     Start the app
     """
-    print("Starting YServer...", config)
+    print(config)
     from y_server import app
 
     # import nltk
