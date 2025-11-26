@@ -149,6 +149,23 @@ try:
             except Exception:
                 pass
 
+    # Global error handler to catch all unhandled exceptions
+    # This prevents the server from crashing and returns a proper error response
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        # Rollback any failed transaction
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        
+        # Log the error
+        logging.error(f"Unhandled exception: {str(e)}", exc_info=True)
+        
+        # Return a JSON error response
+        import json
+        return json.dumps({"error": str(e), "status": 500}), 500
+
     # Log the request duration
     @app.before_request
     def start_timer():
@@ -265,6 +282,23 @@ except:  # Y Web subprocess
                 db.session.rollback()
             except Exception:
                 pass
+
+    # Global error handler to catch all unhandled exceptions
+    # This prevents the server from crashing and returns a proper error response
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        # Rollback any failed transaction
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        
+        # Log the error
+        logging.error(f"Unhandled exception: {str(e)}", exc_info=True)
+        
+        # Return a JSON error response
+        import json
+        return json.dumps({"error": str(e), "status": 500}), 500
 
     # Log the request duration
     @app.before_request
