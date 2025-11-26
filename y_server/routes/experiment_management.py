@@ -95,6 +95,7 @@ def change_db():
             # SQLite-specific: use NullPool and check_same_thread=False
             app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
                 "poolclass": NullPool,
+                "pool_pre_ping": True,
                 "connect_args": {
                     "check_same_thread": False,
                     "timeout": 30
