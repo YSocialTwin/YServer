@@ -2,6 +2,7 @@ import json
 import logging
 import os
 
+from sqlalchemy import text
 from sqlalchemy.pool import NullPool
 
 from flask import request
@@ -150,6 +151,22 @@ def change_db():
         
         # Return error response with details
         return {"status": 500, "error": str(e), "traceback": traceback.format_exc()}, 500
+
+
+@app.route("/status", methods=["GET"])
+def get_status():
+    """
+    Get the status of the server.
+
+    :return: the status of the server
+    """
+    # test db connection
+    try:
+        db.session.execute(text("SELECT 1"))
+    except Exception as e:
+        return {"status": 500, "message": f"Database connection error: {str(e)}"}, 500
+
+    return {"status": 200, "message": "Server is running."}
 
 
 @app.route("/shutdown", methods=["POST"])

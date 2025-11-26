@@ -193,7 +193,7 @@ def read():
                     Post.news_id != -1,
                     Post.user_id.in_(pages),
                 )
-                .order(desc(Post.id), desc(Post.reaction_count))
+                .order_by(desc(Post.id), desc(Post.reaction_count))
                 .limit(follower_posts_limit)
             ).all()
         else:
@@ -301,6 +301,7 @@ def read():
             articles=articles,
             limit=limit,
             filter_function=get_posts_by_author,
+            reactions_type=["like"],
         )
 
     else:
@@ -406,7 +407,7 @@ def search():
 
         return json.dumps(res)
 
-    json.dumps({"status": 404})
+    return json.dumps({"status": 404})
 
 
 @app.route("/read_mentions", methods=["POST"])
@@ -624,26 +625,26 @@ def add_comment():
 
         sentiment = vader_sentiment(text)
 
+        # get topics associated to post.id
+        post_topics = Post_topics.query.filter_by(post_id=post.thread_id).all()
+        for topic in post_topics:
+            post_sentiment = Post_Sentiment(
+                post_id=new_post.id,
+                user_id=user.id,
+                pos=sentiment["pos"],
+                neg=sentiment["neg"],
+                neu=sentiment["neu"],
+                compound=sentiment["compound"],
+                sentiment_parent=sentiment_parent,
+                round=tid,
+                is_comment=1,
+                topic_id=topic.topic_id,
+            )
+            db.session.add(post_sentiment)
+            db.session.commit()
+
     if current_app.config["perspective_api"] is not None:
         toxicity(text, app.config["perspective_api"], new_post.id, db)
-
-    # get topics associated to post.id
-    post_topics = Post_topics.query.filter_by(post_id=post.thread_id).all()
-    for topic in post_topics:
-        post_sentiment = Post_Sentiment(
-            post_id=new_post.id,
-            user_id=user.id,
-            pos=sentiment["pos"],
-            neg=sentiment["neg"],
-            neu=sentiment["neu"],
-            compound=sentiment["compound"],
-            sentiment_parent=sentiment_parent,
-            round=tid,
-            is_comment=1,
-            topic_id=topic.topic_id,
-        )
-        db.session.add(post_sentiment)
-        db.session.commit()
 
     #########
 
