@@ -85,7 +85,7 @@ try:
     # Enable WAL mode for SQLite to reduce database locks
     # WAL mode allows concurrent reads while writing and significantly reduces lock contention
     if db_uri.startswith("sqlite"):
-        from sqlalchemy import event, text
+        from sqlalchemy import event
         
         @event.listens_for(db.engine, "connect")
         def set_sqlite_pragma(dbapi_connection, connection_record):
@@ -152,35 +152,6 @@ try:
     @app.teardown_appcontext
     def shutdown_session(exception=None):
         db.session.remove()
-
-    # Teardown request handler to rollback uncommitted transactions on error
-    # This ensures database access is safe and reliable by rolling back any
-    # uncommitted transactions when an exception occurs during request handling
-    @app.teardown_request
-    def teardown_request_handler(exception=None):
-        if exception is not None:
-            # Rollback any uncommitted changes if an exception occurred
-            try:
-                db.session.rollback()
-            except Exception:
-                pass
-
-    # Global error handler to catch all unhandled exceptions
-    # This prevents the server from crashing and returns a proper error response
-    @app.errorhandler(Exception)
-    def handle_exception(e):
-        # Rollback any failed transaction
-        try:
-            db.session.rollback()
-        except Exception:
-            pass
-        
-        # Log the error
-        logging.error(f"Unhandled exception: {str(e)}", exc_info=True)
-        
-        # Return a JSON error response
-        import json
-        return json.dumps({"error": str(e), "status": 500}), 500
 
     # Log the request duration
     @app.before_request
@@ -301,35 +272,6 @@ except:  # Y Web subprocess
     @app.teardown_appcontext
     def shutdown_session(exception=None):
         db.session.remove()
-
-    # Teardown request handler to rollback uncommitted transactions on error
-    # This ensures database access is safe and reliable by rolling back any
-    # uncommitted transactions when an exception occurs during request handling
-    @app.teardown_request
-    def teardown_request_handler(exception=None):
-        if exception is not None:
-            # Rollback any uncommitted changes if an exception occurred
-            try:
-                db.session.rollback()
-            except Exception:
-                pass
-
-    # Global error handler to catch all unhandled exceptions
-    # This prevents the server from crashing and returns a proper error response
-    @app.errorhandler(Exception)
-    def handle_exception(e):
-        # Rollback any failed transaction
-        try:
-            db.session.rollback()
-        except Exception:
-            pass
-        
-        # Log the error
-        logging.error(f"Unhandled exception: {str(e)}", exc_info=True)
-        
-        # Return a JSON error response
-        import json
-        return json.dumps({"error": str(e), "status": 500}), 500
 
     # Log the request duration
     @app.before_request
