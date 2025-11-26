@@ -151,6 +151,23 @@ def change_db():
         return {"status": 500, "error": str(e), "traceback": traceback.format_exc()}, 500
 
 
+@app.route("/status", methods=["GET"])
+def status():
+    """
+    Check the server health status.
+
+    :return: a json object with the server status
+    """
+    try:
+        # Verify database connection is working
+        from y_server.modals import Rounds
+        from sqlalchemy import desc
+        Rounds.query.order_by(desc(Rounds.id)).first()
+        return {"status": "ok", "database": "connected"}
+    except Exception as e:
+        return {"status": "error", "database": "disconnected", "error": str(e)}, 500
+
+
 @app.route("/shutdown", methods=["POST"])
 def shutdown_server():
     """
