@@ -86,23 +86,7 @@ try:
         }
     
     db = SQLAlchemy(app)
-    
-    # Enable WAL mode for SQLite to reduce database locks
-    # WAL mode allows concurrent reads while writing and significantly reduces lock contention
-    if db_uri.startswith("sqlite"):
-        from sqlalchemy import event
-        
-        @event.listens_for(db.engine, "connect")
-        def set_sqlite_pragma(dbapi_connection, connection_record):
-            cursor = dbapi_connection.cursor()
-            # Enable WAL mode for better concurrent access
-            cursor.execute("PRAGMA journal_mode=WAL")
-            # Set busy timeout to wait for locks instead of failing immediately (in milliseconds)
-            cursor.execute("PRAGMA busy_timeout=30000")
-            # Enable foreign keys
-            cursor.execute("PRAGMA foreign_keys=ON")
-            cursor.close()
-    
+
     # Set up file logging to _server.log
     # Determine log directory based on database URI
     if db_uri.startswith("sqlite"):
@@ -287,17 +271,6 @@ except:  # Y Web subprocess
     # db = SQLAlchemy()
 
     db.init_app(app)
-    
-    # Enable WAL mode for SQLite to reduce database locks
-    from sqlalchemy import event
-    
-    @event.listens_for(db.engine, "connect")
-    def set_sqlite_pragma(dbapi_connection, connection_record):
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA busy_timeout=30000")
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
     
     # Set up file logging to _server.log for Y Web subprocess
     log_dir = f"{BASE_DIR}experiments"
