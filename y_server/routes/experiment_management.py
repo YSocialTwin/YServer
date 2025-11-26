@@ -91,7 +91,9 @@ def change_db():
             cwd = os.path.join(cwd, "y_web")
             log_dir = os.path.join(cwd, log_dir)
         else:
-            app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:////{data['path']}"
+            # Build SQLite URI
+            sqlite_uri = f"sqlite:////{data['path']}"
+            app.config["SQLALCHEMY_DATABASE_URI"] = sqlite_uri
             app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
             # SQLite-specific: use NullPool and check_same_thread=False
             app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
@@ -102,6 +104,9 @@ def change_db():
                     "timeout": 30
                 }
             }
+            # Use rebind_db to switch database without calling init_app
+            # (init_app cannot be called after the first request has been handled)
+            rebind_db(sqlite_uri)
 
             log_dir = uri.split("database_server.db")[0]
 
@@ -138,7 +143,6 @@ def change_db():
         # Log success to application logger (will appear in Gunicorn error log)
         app.logger.info(f"Database configuration successful. URI: {uri}, Log: {log_path}")
         
-        db.init_app(app)
         return {"status": 200}
         
     except Exception as e:
