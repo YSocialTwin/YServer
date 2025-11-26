@@ -128,8 +128,15 @@ def change_db():
         # Remove all existing handlers to avoid duplicate logging
         logger.handlers.clear()
         
-        # Create file handler with JSON formatter
-        fileHandler = logging.FileHandler(log_path, mode='a')
+        # Create rotating file handler with JSON formatter to prevent log file growth
+        # Large log files can cause I/O blocking and contribute to performance issues
+        from logging.handlers import RotatingFileHandler
+        fileHandler = RotatingFileHandler(
+            log_path, 
+            mode='a', 
+            maxBytes=10*1024*1024,  # 10MB
+            backupCount=5
+        )
         fileHandler.setFormatter(formatter)
         fileHandler.setLevel(logging.INFO)
         logger.addHandler(fileHandler)

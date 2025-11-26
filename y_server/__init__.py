@@ -108,17 +108,26 @@ try:
     # Create log directory if it doesn't exist
     os.makedirs(log_dir, exist_ok=True)
     
-    # Set up JSON logging
+    # Set up JSON logging with rotation to prevent log file from growing indefinitely
+    # Large log files can cause I/O blocking and contribute to performance issues
     from pythonjsonlogger import jsonlogger
+    from logging.handlers import RotatingFileHandler
+    
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG)  # Set to DEBUG for more detailed logging
     
     # Remove all existing handlers to avoid duplicate logging
     root_logger.handlers.clear()
     
-    # Create file handler with JSON formatter
+    # Create rotating file handler with JSON formatter
+    # Max 10MB per file, keep 5 backup files (total max ~60MB of logs)
     formatter = jsonlogger.JsonFormatter()
-    file_handler = logging.FileHandler(log_path, mode='a')
+    file_handler = RotatingFileHandler(
+        log_path, 
+        mode='a', 
+        maxBytes=10*1024*1024,  # 10MB
+        backupCount=5
+    )
     file_handler.setFormatter(formatter)
     file_handler.setLevel(logging.DEBUG)  # Set to DEBUG for more detailed logging
     root_logger.addHandler(file_handler)
@@ -272,21 +281,30 @@ except:  # Y Web subprocess
 
     db.init_app(app)
     
-    # Set up file logging to _server.log for Y Web subprocess
+    # Set up file logging to _server.log for Y Web subprocess with rotation
+    # Large log files can cause I/O blocking and contribute to performance issues
     log_dir = f"{BASE_DIR}experiments"
     log_path = os.path.join(log_dir, "_server.log")
     
-    # Set up JSON logging
+    # Set up JSON logging with rotation
     from pythonjsonlogger import jsonlogger
+    from logging.handlers import RotatingFileHandler
+    
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG)  # Set to DEBUG for more detailed logging
     
     # Remove all existing handlers to avoid duplicate logging
     root_logger.handlers.clear()
     
-    # Create file handler with JSON formatter
+    # Create rotating file handler with JSON formatter
+    # Max 10MB per file, keep 5 backup files (total max ~60MB of logs)
     formatter = jsonlogger.JsonFormatter()
-    file_handler = logging.FileHandler(log_path, mode='a')
+    file_handler = RotatingFileHandler(
+        log_path, 
+        mode='a', 
+        maxBytes=10*1024*1024,  # 10MB
+        backupCount=5
+    )
     file_handler.setFormatter(formatter)
     file_handler.setLevel(logging.DEBUG)  # Set to DEBUG for more detailed logging
     root_logger.addHandler(file_handler)
