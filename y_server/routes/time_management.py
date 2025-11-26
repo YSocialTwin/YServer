@@ -1,4 +1,5 @@
 import json
+import logging
 import time as pytime
 from functools import wraps
 
@@ -11,13 +12,33 @@ from y_server.modals import (
 )
 
 
-def retry_on_db_lock(max_retries=3, delay=0.5):
+def force_release_sqlite_lock():
+    """
+    Force release SQLite database lock by closing all connections and disposing the engine.
+    This is a last resort when retries fail and the database remains locked.
+    """
+    try:
+        # Remove the current session
+        db.session.remove()
+        # Dispose the engine to close all connections in the pool
+        db.engine.dispose()
+        logging.warning("Force released SQLite database lock by disposing engine connections")
+        return True
+    except Exception as e:
+        logging.error(f"Failed to force release SQLite lock: {str(e)}")
+        return False
+
+
+def retry_on_db_lock(max_retries=3, delay=0.5, force_release_on_failure=True):
     """
     Decorator to retry database operations when SQLite database is locked.
     This handles the "database is locked" error by waiting and retrying.
+    If all retries fail and force_release_on_failure is True, it will force
+    release the lock by disposing all connections and retry once more.
     
     :param max_retries: Maximum number of retry attempts
     :param delay: Delay between retries in seconds
+    :param force_release_on_failure: If True, force release lock after all retries fail
     """
     def decorator(func):
         @wraps(func)
@@ -35,12 +56,28 @@ def retry_on_db_lock(max_retries=3, delay=0.5):
                                 db.session.rollback()
                             except Exception:
                                 pass
-                            # Wait before retrying
-                            pytime.sleep(delay * (attempt + 1))  # Exponential backoff
+                            # Wait before retrying with exponential backoff
+                            pytime.sleep(delay * (attempt + 1))
                             continue
-                    raise
+                    else:
+                        raise
                 except Exception:
                     raise
+            
+            # If we've exhausted all retries and still have a lock error
+            if last_exception and force_release_on_failure:
+                logging.warning(f"All {max_retries} retries failed due to database lock. Attempting force release...")
+                # Force release the lock
+                if force_release_sqlite_lock():
+                    # Wait a moment for the lock to be fully released
+                    pytime.sleep(0.5)
+                    # Try one final time after force release
+                    try:
+                        return func(*args, **kwargs)
+                    except Exception as final_e:
+                        logging.error(f"Operation failed even after force lock release: {str(final_e)}")
+                        raise final_e
+            
             # If we've exhausted all retries, raise the last exception
             if last_exception:
                 raise last_exception
@@ -55,7 +92,7 @@ def current_time():
 
     :return: a json object with the current time
     """
-    @retry_on_db_lock(max_retries=3, delay=0.5)
+    @retry_on_db_lock(max_retries=3, delay=0.5, force_release_on_failure=True)
     def _get_current_time():
         cround = Rounds.query.order_by(desc(Rounds.id)).first()
         if cround is None:
@@ -84,7 +121,7 @@ def update_time():
 
     :return: a json object with the updated time
     """
-    @retry_on_db_lock(max_retries=3, delay=0.5)
+    @retry_on_db_lock(max_retries=3, delay=0.5, force_release_on_failure=True)
     def _update_time(day, hour):
         cround = Rounds.query.filter_by(day=day, hour=hour).first()
         if cround is None:
