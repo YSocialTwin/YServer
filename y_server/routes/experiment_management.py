@@ -2,6 +2,7 @@ import json
 import logging
 import os
 
+from sqlalchemy import text
 from sqlalchemy.pool import NullPool
 
 from flask import request
@@ -160,9 +161,9 @@ def get_status():
     """
     # test db connection
     try:
-        db.session.execute("SELECT 1")
+        db.session.execute(text("SELECT 1"))
     except Exception as e:
-        return {"status": 500, "message": f"Database connection error: {str(e)}"}
+        return {"status": 500, "message": f"Database connection error: {str(e)}"}, 500
 
     return {"status": 200, "message": "Server is running."}
 
