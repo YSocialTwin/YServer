@@ -3,6 +3,7 @@ import logging
 import os
 import shutil
 import time
+import threading
 
 from flask import Flask, g, request
 from flask_sqlalchemy import SQLAlchemy
@@ -12,6 +13,10 @@ from sqlalchemy.pool import NullPool
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.WARNING)
 db = SQLAlchemy()
+
+# Track active requests for debugging hangs
+_active_requests = {}
+_request_lock = threading.Lock()
 
 try:
     # read the experiment configuration
@@ -82,6 +87,22 @@ try:
     
     db = SQLAlchemy(app)
     
+    # Enable WAL mode for SQLite to reduce database locks
+    # WAL mode allows concurrent reads while writing and significantly reduces lock contention
+    if db_uri.startswith("sqlite"):
+        from sqlalchemy import event
+        
+        @event.listens_for(db.engine, "connect")
+        def set_sqlite_pragma(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            # Enable WAL mode for better concurrent access
+            cursor.execute("PRAGMA journal_mode=WAL")
+            # Set busy timeout to wait for locks instead of failing immediately (in milliseconds)
+            cursor.execute("PRAGMA busy_timeout=30000")
+            # Enable foreign keys
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+    
     # Set up file logging to _server.log
     # Determine log directory based on database URI
     if db_uri.startswith("sqlite"):
@@ -106,7 +127,7 @@ try:
     # Set up JSON logging
     from pythonjsonlogger import jsonlogger
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
+    root_logger.setLevel(logging.DEBUG)  # Set to DEBUG for more detailed logging
     
     # Remove all existing handlers to avoid duplicate logging
     root_logger.handlers.clear()
@@ -115,7 +136,7 @@ try:
     formatter = jsonlogger.JsonFormatter()
     file_handler = logging.FileHandler(log_path, mode='a')
     file_handler.setFormatter(formatter)
-    file_handler.setLevel(logging.INFO)
+    file_handler.setLevel(logging.DEBUG)  # Set to DEBUG for more detailed logging
     root_logger.addHandler(file_handler)
     
     # Disable propagation to prevent logging to parent handlers
@@ -128,20 +149,46 @@ try:
     logging.info("YServer started", extra={
         "database_uri": db_uri,
         "log_path": log_path,
-        "config_file": config_file
+        "config_file": config_file,
+        "pid": os.getpid(),
+        "thread_id": threading.current_thread().ident
     })
     
     # Clean up database sessions after each request
     # Essential when using NullPool to ensure connections are properly closed
     @app.teardown_appcontext
     def shutdown_session(exception=None):
+        if exception:
+            logging.warning("teardown_appcontext with exception", extra={
+                "exception": str(exception),
+                "path": request.path if request else "unknown"
+            })
         db.session.remove()
 
-    # Log the request duration
+    # Enhanced before_request logging to track active requests
     @app.before_request
     def start_timer():
         g.start_time = time.time()
-
+        g.request_id = f"{time.time()}-{threading.current_thread().ident}"
+        
+        # Track this request
+        with _request_lock:
+            _active_requests[g.request_id] = {
+                "path": request.path,
+                "method": request.method,
+                "start_time": g.start_time,
+                "thread_id": threading.current_thread().ident
+            }
+        
+        # Log request start with detailed info
+        logging.debug("request_start", extra={
+            "request_id": g.request_id,
+            "path": request.path,
+            "method": request.method,
+            "thread_id": threading.current_thread().ident,
+            "active_requests": len(_active_requests),
+            "content_length": request.content_length
+        })
 
     @app.after_request
     def log_request(response):
@@ -150,14 +197,28 @@ try:
             from y_server.modals import Rounds
             
             duration = time.time() - g.start_time
+            
+            # Remove from active requests tracking
+            request_id = getattr(g, 'request_id', None)
+            if request_id:
+                with _request_lock:
+                    _active_requests.pop(request_id, None)
+            
             log_data = {
+                "request_id": request_id,
                 "remote_addr": request.remote_addr,
                 "method": request.method,
                 "path": request.path,
                 "status_code": response.status_code,
                 "duration": round(duration, 4),
-                "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+                "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+                "thread_id": threading.current_thread().ident,
+                "active_requests_remaining": len(_active_requests)
             }
+            
+            # Warn if request took too long
+            if duration > 5.0:
+                logging.warning("slow_request", extra=log_data)
             
             # Add current round information from the database
             try:
@@ -166,13 +227,35 @@ try:
                     log_data["tid"] = current_round.id
                     log_data["day"] = current_round.day
                     log_data["hour"] = current_round.hour
-            except Exception:
-                # If there's an error querying the database, continue without round info
-                pass
+            except Exception as e:
+                # If there's an error querying the database, log it
+                log_data["db_query_error"] = str(e)
+                logging.warning("db_query_failed_in_after_request", extra={"error": str(e)})
 
             # Pass log data as extra dict so fields appear at top level in JSON output
-            logging.info("request", extra=log_data)
+            logging.info("request_complete", extra=log_data)
         return response
+    
+    # Add endpoint to check active requests (for debugging hangs)
+    @app.route("/debug/active_requests", methods=["GET"])
+    def debug_active_requests():
+        """Return list of currently active requests for debugging hangs."""
+        with _request_lock:
+            active = []
+            current_time = time.time()
+            for req_id, req_info in _active_requests.items():
+                active.append({
+                    "request_id": req_id,
+                    "path": req_info["path"],
+                    "method": req_info["method"],
+                    "duration_so_far": round(current_time - req_info["start_time"], 2),
+                    "thread_id": req_info["thread_id"]
+                })
+            return json.dumps({
+                "active_request_count": len(active),
+                "requests": active,
+                "server_pid": os.getpid()
+            })
 
 except:  # Y Web subprocess
     # base path
@@ -205,6 +288,17 @@ except:  # Y Web subprocess
 
     db.init_app(app)
     
+    # Enable WAL mode for SQLite to reduce database locks
+    from sqlalchemy import event
+    
+    @event.listens_for(db.engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=30000")
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+    
     # Set up file logging to _server.log for Y Web subprocess
     log_dir = f"{BASE_DIR}experiments"
     log_path = os.path.join(log_dir, "_server.log")
@@ -212,7 +306,7 @@ except:  # Y Web subprocess
     # Set up JSON logging
     from pythonjsonlogger import jsonlogger
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
+    root_logger.setLevel(logging.DEBUG)  # Set to DEBUG for more detailed logging
     
     # Remove all existing handlers to avoid duplicate logging
     root_logger.handlers.clear()
@@ -221,7 +315,7 @@ except:  # Y Web subprocess
     formatter = jsonlogger.JsonFormatter()
     file_handler = logging.FileHandler(log_path, mode='a')
     file_handler.setFormatter(formatter)
-    file_handler.setLevel(logging.INFO)
+    file_handler.setLevel(logging.DEBUG)  # Set to DEBUG for more detailed logging
     root_logger.addHandler(file_handler)
     
     # Disable propagation to prevent logging to parent handlers
@@ -233,20 +327,46 @@ except:  # Y Web subprocess
     # Log startup information
     logging.info("YServer started (Y Web subprocess)", extra={
         "database_uri": app.config["SQLALCHEMY_DATABASE_URI"],
-        "log_path": log_path
+        "log_path": log_path,
+        "pid": os.getpid(),
+        "thread_id": threading.current_thread().ident
     })
     
     # Clean up database sessions after each request
     # Essential when using NullPool to ensure connections are properly closed
     @app.teardown_appcontext
     def shutdown_session(exception=None):
+        if exception:
+            logging.warning("teardown_appcontext with exception", extra={
+                "exception": str(exception),
+                "path": request.path if request else "unknown"
+            })
         db.session.remove()
 
-    # Log the request duration
+    # Enhanced before_request logging to track active requests
     @app.before_request
     def start_timer():
         g.start_time = time.time()
-
+        g.request_id = f"{time.time()}-{threading.current_thread().ident}"
+        
+        # Track this request
+        with _request_lock:
+            _active_requests[g.request_id] = {
+                "path": request.path,
+                "method": request.method,
+                "start_time": g.start_time,
+                "thread_id": threading.current_thread().ident
+            }
+        
+        # Log request start with detailed info
+        logging.debug("request_start", extra={
+            "request_id": g.request_id,
+            "path": request.path,
+            "method": request.method,
+            "thread_id": threading.current_thread().ident,
+            "active_requests": len(_active_requests),
+            "content_length": request.content_length
+        })
 
     @app.after_request
     def log_request(response):
@@ -255,14 +375,28 @@ except:  # Y Web subprocess
             from y_server.modals import Rounds
             
             duration = time.time() - g.start_time
+            
+            # Remove from active requests tracking
+            request_id = getattr(g, 'request_id', None)
+            if request_id:
+                with _request_lock:
+                    _active_requests.pop(request_id, None)
+            
             log_data = {
+                "request_id": request_id,
                 "remote_addr": request.remote_addr,
                 "method": request.method,
                 "path": request.path,
                 "status_code": response.status_code,
                 "duration": round(duration, 4),
-                "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+                "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+                "thread_id": threading.current_thread().ident,
+                "active_requests_remaining": len(_active_requests)
             }
+            
+            # Warn if request took too long
+            if duration > 5.0:
+                logging.warning("slow_request", extra=log_data)
             
             # Add current round information from the database
             try:
@@ -271,12 +405,34 @@ except:  # Y Web subprocess
                     log_data["tid"] = current_round.id
                     log_data["day"] = current_round.day
                     log_data["hour"] = current_round.hour
-            except Exception:
-                # If there's an error querying the database, continue without round info
-                pass
+            except Exception as e:
+                # If there's an error querying the database, log it
+                log_data["db_query_error"] = str(e)
+                logging.warning("db_query_failed_in_after_request", extra={"error": str(e)})
 
             # Pass log data as extra dict so fields appear at top level in JSON output
-            logging.info("request", extra=log_data)
+            logging.info("request_complete", extra=log_data)
         return response
+    
+    # Add endpoint to check active requests (for debugging hangs)
+    @app.route("/debug/active_requests", methods=["GET"])
+    def debug_active_requests():
+        """Return list of currently active requests for debugging hangs."""
+        with _request_lock:
+            active = []
+            current_time = time.time()
+            for req_id, req_info in _active_requests.items():
+                active.append({
+                    "request_id": req_id,
+                    "path": req_info["path"],
+                    "method": req_info["method"],
+                    "duration_so_far": round(current_time - req_info["start_time"], 2),
+                    "thread_id": req_info["thread_id"]
+                })
+            return json.dumps({
+                "active_request_count": len(active),
+                "requests": active,
+                "server_pid": os.getpid()
+            })
 
 from y_server.routes import *
