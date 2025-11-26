@@ -137,9 +137,9 @@ try:
     def shutdown_session(exception=None):
         db.session.remove()
 
-    # Teardown request handler to clean up database session and handle exceptions
+    # Teardown request handler to rollback uncommitted transactions on error
     # This ensures database access is safe and reliable by rolling back any
-    # uncommitted transactions on error and cleaning up the session
+    # uncommitted transactions when an exception occurs during request handling
     @app.teardown_request
     def teardown_request_handler(exception=None):
         if exception is not None:
@@ -148,11 +148,6 @@ try:
                 db.session.rollback()
             except Exception:
                 pass
-        # Always remove the session to restore the context
-        try:
-            db.session.remove()
-        except Exception:
-            pass
 
     # Log the request duration
     @app.before_request
@@ -259,9 +254,9 @@ except:  # Y Web subprocess
     def shutdown_session(exception=None):
         db.session.remove()
 
-    # Teardown request handler to clean up database session and handle exceptions
+    # Teardown request handler to rollback uncommitted transactions on error
     # This ensures database access is safe and reliable by rolling back any
-    # uncommitted transactions on error and cleaning up the session
+    # uncommitted transactions when an exception occurs during request handling
     @app.teardown_request
     def teardown_request_handler(exception=None):
         if exception is not None:
@@ -270,11 +265,6 @@ except:  # Y Web subprocess
                 db.session.rollback()
             except Exception:
                 pass
-        # Always remove the session to restore the context
-        try:
-            db.session.remove()
-        except Exception:
-            pass
 
     # Log the request duration
     @app.before_request
