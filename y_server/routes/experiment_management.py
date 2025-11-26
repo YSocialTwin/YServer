@@ -159,6 +159,22 @@ def shutdown_server():
     shutdown()
 
 
+@app.route("/status", methods=["GET"])
+def get_status():
+    """
+    Get the status of the server.
+
+    :return: the status of the server
+    """
+    # test db connection
+    try:
+        db.session.execute("SELECT 1")
+    except Exception as e:
+        return {"status": 500, "message": f"Database connection error: {str(e)}"}
+
+    return {"status": 200, "message": "Server is running."}
+
+
 @app.route("/reset", methods=["POST"])
 def reset_experiment():
     """

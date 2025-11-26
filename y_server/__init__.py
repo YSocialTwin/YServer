@@ -3,6 +3,7 @@ import logging
 import os
 import shutil
 import time
+import sys
 
 from flask import Flask, g, request
 from flask_sqlalchemy import SQLAlchemy
@@ -272,6 +273,7 @@ except:  # Y Web subprocess
                     log_data["day"] = current_round.day
                     log_data["hour"] = current_round.hour
             except Exception:
+                print("Error querying Rounds for logging", file=sys.stderr)
                 # If there's an error querying the database, continue without round info
                 pass
 
