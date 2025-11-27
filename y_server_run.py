@@ -34,7 +34,17 @@ def start_server(config):
         app.config["perspective_api"] = config["perspective_api"]
         app.config["sentiment_annotation"] = config["sentiment_annotation"]
         app.config["emotion_annotation"] = config["emotion_annotation"]
+        
+        log_error(f"SERVER STARTING: Flask app.run() about to be called\nProcess ID: {os.getpid()}\nHost: {config['host']}\nPort: {config['port']}\nDebug: {debug}")
+        
         app.run(debug=debug, port=int(config["port"]), host=config["host"])
+        
+        # If we reach here, app.run() returned - this should only happen on shutdown
+        log_error(f"SERVER STOPPED: Flask app.run() returned normally\nProcess ID: {os.getpid()}\nThis indicates the server stopped without an exception.\nPossible causes: SIGTERM/SIGINT received, werkzeug reloader exiting, or server shutdown requested.")
+        
+    except SystemExit as e:
+        log_error(f"SERVER EXITING: SystemExit raised in start_server\nProcess ID: {os.getpid()}\nExit code: {e.code}\nTraceback: {traceback.format_exc()}")
+        raise
     except Exception as e:
         log_error(f"Error starting server: {str(e)}\nConfig: {config}\nTraceback: {traceback.format_exc()}")
         raise
