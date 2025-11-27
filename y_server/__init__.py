@@ -29,6 +29,24 @@ def _log_error_stderr(message):
     print(f"### {timestamp} ###\n{message}\n####", file=sys.stderr, flush=True)
 
 
+# Store the original sys.exit for our wrapper
+_original_sys_exit = sys.exit
+
+
+def _wrapped_sys_exit(code=0):
+    """
+    Wrapper around sys.exit to log who is calling it.
+    This helps identify what's causing normal process termination.
+    """
+    stack_trace = ''.join(traceback.format_stack())
+    _log_error_stderr(f"SYS.EXIT CALLED with code={code}\nProcess ID: {os.getpid()}\nThread ID: {threading.current_thread().ident}\nCaller stack trace:\n{stack_trace}")
+    _original_sys_exit(code)
+
+
+# Replace sys.exit with our wrapper
+sys.exit = _wrapped_sys_exit
+
+
 def _signal_handler(signum, frame):
     """
     Handle termination signals and log before exit.
@@ -45,10 +63,10 @@ def _atexit_handler():
     """
     Log when the process is exiting.
     This helps identify unexpected termination.
+    Note: By the time atexit runs, the original call stack is gone.
+    Use the sys.exit wrapper to capture exit calls with their stack traces.
     """
-    # Get current stack trace to understand where exit was called from
-    stack_trace = ''.join(traceback.format_stack())
-    _log_error_stderr(f"PROCESS EXITING: atexit handler called\nProcess ID: {os.getpid()}\nThread ID: {threading.current_thread().ident}\nStack trace at exit:\n{stack_trace}")
+    _log_error_stderr(f"PROCESS EXITING: atexit handler called\nProcess ID: {os.getpid()}\nThread ID: {threading.current_thread().ident}\nNote: If no SYS.EXIT CALLED log appeared before this, the exit was triggered by main thread completion or os._exit()")
 
 
 def _uncaught_exception_handler(exc_type, exc_value, exc_traceback):
