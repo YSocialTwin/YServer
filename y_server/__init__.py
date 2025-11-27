@@ -1,7 +1,9 @@
+import atexit
 import json
 import logging
 import os
 import shutil
+import signal
 import sys
 import time
 import threading
@@ -25,6 +27,42 @@ def _log_error_stderr(message):
     """
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"### {timestamp} ###\n{message}\n####", file=sys.stderr, flush=True)
+
+
+def _signal_handler(signum, frame):
+    """
+    Handle termination signals and log before exit.
+    This helps identify why the process is dying unexpectedly.
+    """
+    signal_name = signal.Signals(signum).name if hasattr(signal, 'Signals') else str(signum)
+    _log_error_stderr(f"SIGNAL RECEIVED: {signal_name} (signal {signum})\nProcess ID: {os.getpid()}\nThread ID: {threading.current_thread().ident}\nStack trace:\n{''.join(traceback.format_stack(frame))}")
+    # Re-raise the signal to allow normal termination after logging
+    signal.signal(signum, signal.SIG_DFL)
+    os.kill(os.getpid(), signum)
+
+
+def _atexit_handler():
+    """
+    Log when the process is exiting.
+    This helps identify unexpected termination.
+    """
+    _log_error_stderr(f"PROCESS EXITING: atexit handler called\nProcess ID: {os.getpid()}\nThread ID: {threading.current_thread().ident}")
+
+
+# Register atexit handler to log process exit
+atexit.register(_atexit_handler)
+
+# Register signal handlers for common termination signals
+# Note: SIGKILL (9) cannot be caught
+try:
+    signal.signal(signal.SIGTERM, _signal_handler)  # Termination signal
+    signal.signal(signal.SIGINT, _signal_handler)   # Interrupt (Ctrl+C)
+    if hasattr(signal, 'SIGHUP'):
+        signal.signal(signal.SIGHUP, _signal_handler)  # Hangup signal (Unix only)
+    if hasattr(signal, 'SIGQUIT'):
+        signal.signal(signal.SIGQUIT, _signal_handler)  # Quit signal (Unix only)
+except Exception as e:
+    _log_error_stderr(f"Failed to register signal handlers: {str(e)}")
 
 
 log = logging.getLogger('werkzeug')
@@ -174,7 +212,10 @@ try:
                 "exception": str(exception),
                 "path": request.path if request else "unknown"
             })
-        db.session.remove()
+        try:
+            db.session.remove()
+        except Exception as e:
+            _log_error_stderr(f"teardown_appcontext: CRITICAL ERROR removing session\nError: {str(e)}\nPath: {request.path if request else 'unknown'}\nTraceback: {traceback.format_exc()}")
 
     # Enhanced before_request logging to track active requests
     @app.before_request
@@ -356,7 +397,10 @@ except Exception as init_exception:  # Y Web subprocess
                 "exception": str(exception),
                 "path": request.path if request else "unknown"
             })
-        db.session.remove()
+        try:
+            db.session.remove()
+        except Exception as e:
+            _log_error_stderr(f"teardown_appcontext (subprocess): CRITICAL ERROR removing session\nError: {str(e)}\nPath: {request.path if request else 'unknown'}\nTraceback: {traceback.format_exc()}")
 
     # Enhanced before_request logging to track active requests
     @app.before_request
