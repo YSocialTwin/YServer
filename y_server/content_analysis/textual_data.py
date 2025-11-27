@@ -1,6 +1,23 @@
+import sys
+import traceback
+from datetime import datetime
+
 from nltk.sentiment import SentimentIntensityAnalyzer
 from perspective import PerspectiveAPI
 from y_server.modals import Post_Toxicity
+
+
+def _log_error_stderr(message):
+    """
+    Log an error message to stderr with timestamp formatting.
+    
+    Each write starts with "### date and time ###\n" and ends with "\n####".
+    Uses flush=True to ensure immediate output for debugging.
+    
+    :param message: the error message to log
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"### {timestamp} ###\n{message}\n####", file=sys.stderr, flush=True)
 
 
 def vader_sentiment(text):
@@ -42,5 +59,5 @@ def toxicity(text, api_key, post_id, db):
             db.session.commit()
 
         except Exception as e:
-            print(e)
+            _log_error_stderr(f"Toxicity API error for post_id={post_id}: {str(e)}\nText: {text[:100]}...\nTraceback: {traceback.format_exc()}")
             return

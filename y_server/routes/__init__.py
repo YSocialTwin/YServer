@@ -1,5 +1,22 @@
 import json
 import os
+import sys
+import traceback
+from datetime import datetime
+
+
+def _log_error_stderr(message):
+    """
+    Log an error message to stderr with timestamp formatting.
+    
+    Each write starts with "### date and time ###\n" and ends with "\n####".
+    Uses flush=True to ensure immediate output for debugging.
+    
+    :param message: the error message to log
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"### {timestamp} ###\n{message}\n####", file=sys.stderr, flush=True)
+
 
 from .content_management import *
 from .experiment_management import *
@@ -15,10 +32,12 @@ try:
     for module in config["modules"]:
         try:
             importlib.import_module(f".{module}_management", "y_server.routes")
-        except:
+        except Exception as module_error:
+            _log_error_stderr(f"Failed to import module '{module}_management': {str(module_error)}\nTraceback: {traceback.format_exc()}")
             raise Exception(f"Module {module} does not exists")
-except:
-    # Y Web subprocess
+except Exception as config_error:
+    # Y Web subprocess - log the initialization fallback
+    _log_error_stderr(f"Routes initialization fallback to Y Web subprocess mode: {str(config_error)}\nTraceback: {traceback.format_exc()}")
     from .content_management import *
     from .image_management import *
     from .news_management import *

@@ -27,21 +27,45 @@ Note for running multiple instances:
 """
 import json
 import os
+import sys
+import traceback
+from datetime import datetime
 
-from y_server import app
 
-# Read configuration and set Flask app config values
-# This ensures the same config values are set as in start_server()
-# Note: Database URI is already configured in y_server/__init__.py based on YSERVER_CONFIG
-config_file = os.environ.get('YSERVER_CONFIG', os.path.join('config_files', 'exp_config.json'))
-if os.path.exists(config_file):
-    with open(config_file, 'r') as f:
-        config = json.load(f)
+def _log_error_stderr(message):
+    """
+    Log an error message to stderr with timestamp formatting.
     
-    # Set Flask app config values from the experiment config
-    app.config["perspective_api"] = config.get("perspective_api")
-    app.config["sentiment_annotation"] = config.get("sentiment_annotation", False)
-    app.config["emotion_annotation"] = config.get("emotion_annotation", False)
+    Each write starts with "### date and time ###\n" and ends with "\n####".
+    Uses flush=True to ensure immediate output for debugging.
+    
+    :param message: the error message to log
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"### {timestamp} ###\n{message}\n####", file=sys.stderr, flush=True)
+
+
+try:
+    from y_server import app
+
+    # Read configuration and set Flask app config values
+    # This ensures the same config values are set as in start_server()
+    # Note: Database URI is already configured in y_server/__init__.py based on YSERVER_CONFIG
+    config_file = os.environ.get('YSERVER_CONFIG', os.path.join('config_files', 'exp_config.json'))
+    if os.path.exists(config_file):
+        with open(config_file, 'r') as f:
+            config = json.load(f)
+        
+        # Set Flask app config values from the experiment config
+        app.config["perspective_api"] = config.get("perspective_api")
+        app.config["sentiment_annotation"] = config.get("sentiment_annotation", False)
+        app.config["emotion_annotation"] = config.get("emotion_annotation", False)
+    else:
+        _log_error_stderr(f"WSGI config file not found: {config_file}")
+
+except Exception as e:
+    _log_error_stderr(f"WSGI initialization error: {str(e)}\nTraceback: {traceback.format_exc()}")
+    raise
 
 # The app object is automatically created when y_server is imported
 # and can be used directly by WSGI servers like Gunicorn

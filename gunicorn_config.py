@@ -33,14 +33,38 @@ import json
 import os
 import multiprocessing
 import sys
+import traceback
+from datetime import datetime
+
+
+def _log_error_stderr(message):
+    """
+    Log an error message to stderr with timestamp formatting.
+    
+    Each write starts with "### date and time ###\n" and ends with "\n####".
+    Uses flush=True to ensure immediate output for debugging.
+    
+    :param message: the error message to log
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"### {timestamp} ###\n{message}\n####", file=sys.stderr, flush=True)
+
 
 # Read configuration from exp_config.json or custom path via environment variable
 config_file = os.environ.get('YSERVER_CONFIG', os.path.join('config_files', 'exp_config.json'))
-if os.path.exists(config_file):
-    with open(config_file, 'r') as f:
-        exp_config = json.load(f)
-else:
-    # Default configuration
+try:
+    if os.path.exists(config_file):
+        with open(config_file, 'r') as f:
+            exp_config = json.load(f)
+    else:
+        _log_error_stderr(f"Gunicorn config file not found: {config_file}, using defaults")
+        # Default configuration
+        exp_config = {
+            "host": "0.0.0.0",
+            "port": 5010
+        }
+except Exception as e:
+    _log_error_stderr(f"Error loading Gunicorn config: {str(e)}\nTraceback: {traceback.format_exc()}")
     exp_config = {
         "host": "0.0.0.0",
         "port": 5010
