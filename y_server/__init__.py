@@ -46,11 +46,45 @@ def _atexit_handler():
     Log when the process is exiting.
     This helps identify unexpected termination.
     """
-    _log_error_stderr(f"PROCESS EXITING: atexit handler called\nProcess ID: {os.getpid()}\nThread ID: {threading.current_thread().ident}")
+    # Get current stack trace to understand where exit was called from
+    stack_trace = ''.join(traceback.format_stack())
+    _log_error_stderr(f"PROCESS EXITING: atexit handler called\nProcess ID: {os.getpid()}\nThread ID: {threading.current_thread().ident}\nStack trace at exit:\n{stack_trace}")
+
+
+def _uncaught_exception_handler(exc_type, exc_value, exc_traceback):
+    """
+    Handle uncaught exceptions and log them before the process exits.
+    This catches exceptions that would otherwise cause silent termination.
+    """
+    if issubclass(exc_type, KeyboardInterrupt):
+        # Call the default handler for keyboard interrupt
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+    
+    tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+    _log_error_stderr(f"UNCAUGHT EXCEPTION: {exc_type.__name__}: {exc_value}\nProcess ID: {os.getpid()}\nThread ID: {threading.current_thread().ident}\nFull traceback:\n{''.join(tb_lines)}")
+    # Call the default handler
+    sys.__excepthook__(exc_type, exc_value, exc_traceback)
+
+
+def _uncaught_thread_exception_handler(args):
+    """
+    Handle uncaught exceptions in threads.
+    Python 3.8+ threading.excepthook handler.
+    """
+    tb_lines = traceback.format_exception(args.exc_type, args.exc_value, args.exc_traceback)
+    _log_error_stderr(f"UNCAUGHT THREAD EXCEPTION in thread '{args.thread.name}': {args.exc_type.__name__}: {args.exc_value}\nProcess ID: {os.getpid()}\nThread ID: {args.thread.ident}\nFull traceback:\n{''.join(tb_lines)}")
 
 
 # Register atexit handler to log process exit
 atexit.register(_atexit_handler)
+
+# Register global exception hook for uncaught exceptions
+sys.excepthook = _uncaught_exception_handler
+
+# Register thread exception hook (Python 3.8+)
+if hasattr(threading, 'excepthook'):
+    threading.excepthook = _uncaught_thread_exception_handler
 
 # Register signal handlers for common termination signals
 # Note: SIGKILL (9) cannot be caught
