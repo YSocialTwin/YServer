@@ -9,6 +9,9 @@ from y_server.modals import (
     db,
 )
 
+# Re-export log_error for backward compatibility
+from y_server.error_logging import log_error
+
 
 def get_follows(uid):
     """

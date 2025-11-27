@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import traceback
 
 from sqlalchemy import text
 from sqlalchemy.pool import NullPool
@@ -8,6 +9,7 @@ from sqlalchemy.pool import NullPool
 from flask import request
 from pythonjsonlogger import jsonlogger
 from y_server import app, db
+from y_server.error_logging import log_error
 from y_server.modals import (
     Article_topics,
     Articles,
@@ -42,20 +44,32 @@ def rebind_db(new_uri):
     from flask import current_app
     from sqlalchemy import create_engine
 
-    # Use NullPool for both SQLite and PostgreSQL to avoid connection pool issues
-    # with multiple gunicorn workers
-    if new_uri.startswith("sqlite"):
-        engine = create_engine(new_uri, 
-                             poolclass=NullPool,
-                             connect_args={"check_same_thread": False, "timeout": 30})
-    else:
-        # PostgreSQL and other databases: use NullPool to avoid connection pool issues
-        engine = create_engine(new_uri, poolclass=NullPool)
+    log_error(f"rebind_db: Starting database rebind to {new_uri}")
+    
+    try:
+        # Use NullPool for both SQLite and PostgreSQL to avoid connection pool issues
+        # with multiple gunicorn workers
+        if new_uri.startswith("sqlite"):
+            log_error(f"rebind_db: Creating SQLite engine with NullPool")
+            engine = create_engine(new_uri, 
+                                 poolclass=NullPool,
+                                 connect_args={"check_same_thread": False, "timeout": 30})
+        else:
+            log_error(f"rebind_db: Creating PostgreSQL engine with NullPool")
+            # PostgreSQL and other databases: use NullPool to avoid connection pool issues
+            engine = create_engine(new_uri, poolclass=NullPool)
 
-    with current_app.app_context():
-        db.session.remove()
-        db.engine.dispose()
-        db.session.configure(bind=engine)
+        with current_app.app_context():
+            log_error(f"rebind_db: Removing current session")
+            db.session.remove()
+            log_error(f"rebind_db: Disposing current engine")
+            db.engine.dispose()
+            log_error(f"rebind_db: Configuring session with new engine")
+            db.session.configure(bind=engine)
+            log_error(f"rebind_db: Database rebind completed successfully")
+    except Exception as e:
+        log_error(f"rebind_db: CRITICAL ERROR during database rebind\nURI: {new_uri}\nError: {str(e)}\nTraceback: {traceback.format_exc()}")
+        raise
 
 
 @app.route("/change_db", methods=["POST"])
@@ -153,12 +167,8 @@ def change_db():
         return {"status": 200}
         
     except Exception as e:
-        # Log the full error with traceback to application logger (visible in Gunicorn logs)
-        error_msg = f"ERROR in change_db: {str(e)}\n{traceback.format_exc()}"
-        app.logger.error(error_msg)
-        
-        # Also print to stderr as fallback
-        print(error_msg, file=sys.stderr)
+        # Log the full error with traceback to stderr with custom format
+        log_error(f"ERROR in change_db: {str(e)}\nTraceback: {traceback.format_exc()}")
         
         # Return error response with details
         return {"status": 500, "error": str(e), "traceback": traceback.format_exc()}, 500
@@ -175,6 +185,7 @@ def get_status():
     try:
         db.session.execute(text("SELECT 1"))
     except Exception as e:
+        log_error(f"Database connection error in get_status: {str(e)}\nTraceback: {traceback.format_exc()}")
         return {"status": 500, "message": f"Database connection error: {str(e)}"}, 500
 
     return {"status": 200, "message": "Server is running."}
@@ -187,6 +198,7 @@ def shutdown_server():
     """
     shutdown = request.environ.get("werkzeug.server.shutdown")
     if shutdown is None:
+        log_error("Shutdown attempted but not running with the Werkzeug Server")
         raise RuntimeError("Not running with the Werkzeug Server")
     shutdown()
 
@@ -199,23 +211,34 @@ def reset_experiment():
 
     :return: the status of the reset
     """
-    db.session.query(User_mgmt).delete()
-    db.session.query(Post).delete()
-    db.session.query(Reactions).delete()
-    db.session.query(Follow).delete()
-    db.session.query(Hashtags).delete()
-    db.session.query(Post_hashtags).delete()
-    db.session.query(Post_emotions).delete()
-    db.session.query(Mentions).delete()
-    db.session.query(Rounds).delete()
-    db.session.query(Recommendations).delete()
-    db.session.query(Websites).delete()
-    db.session.query(Articles).delete()
-    db.session.query(Interests).delete()
-    db.session.query(User_interest).delete()
-    db.session.query(Voting).delete()
-    db.session.query(Post_topics).delete()
-    db.session.query(Images).delete()
-    db.session.query(Article_topics).delete()
-    db.session.commit()
-    return {"status": 200}
+    try:
+        log_error("reset_experiment: Starting database reset")
+        db.session.query(User_mgmt).delete()
+        db.session.query(Post).delete()
+        db.session.query(Reactions).delete()
+        db.session.query(Follow).delete()
+        db.session.query(Hashtags).delete()
+        db.session.query(Post_hashtags).delete()
+        db.session.query(Post_emotions).delete()
+        db.session.query(Mentions).delete()
+        db.session.query(Rounds).delete()
+        db.session.query(Recommendations).delete()
+        db.session.query(Websites).delete()
+        db.session.query(Articles).delete()
+        db.session.query(Interests).delete()
+        db.session.query(User_interest).delete()
+        db.session.query(Voting).delete()
+        db.session.query(Post_topics).delete()
+        db.session.query(Images).delete()
+        db.session.query(Article_topics).delete()
+        log_error("reset_experiment: Committing database reset")
+        db.session.commit()
+        log_error("reset_experiment: Database reset completed successfully")
+        return {"status": 200}
+    except Exception as e:
+        log_error(f"reset_experiment: CRITICAL ERROR during database reset\nError: {str(e)}\nTraceback: {traceback.format_exc()}")
+        try:
+            db.session.rollback()
+        except Exception as rollback_e:
+            log_error(f"reset_experiment: Rollback also failed\nError: {str(rollback_e)}")
+        return {"status": 500, "error": str(e)}, 500

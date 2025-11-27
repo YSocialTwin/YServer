@@ -2,12 +2,14 @@ import json
 import logging
 import time as pytime
 import threading
+import traceback
 from functools import wraps
 
 from flask import request
 from sqlalchemy import desc
 from sqlalchemy.exc import OperationalError
 from y_server import app, db
+from y_server.error_logging import log_error
 from y_server.modals import (
     Rounds,
 )
@@ -19,6 +21,7 @@ def force_release_sqlite_lock():
     This is a last resort when retries fail and the database remains locked.
     """
     try:
+        log_error(f"force_release_sqlite_lock: Starting force release\nThread ID: {threading.current_thread().ident}")
         logging.warning("force_release_sqlite_lock: Starting force release", extra={
             "thread_id": threading.current_thread().ident
         })
@@ -31,6 +34,7 @@ def force_release_sqlite_lock():
         })
         return True
     except Exception as e:
+        log_error(f"force_release_sqlite_lock: Failed - {str(e)}\nThread ID: {threading.current_thread().ident}\nTraceback: {traceback.format_exc()}")
         logging.error(f"force_release_sqlite_lock: Failed - {str(e)}", extra={
             "thread_id": threading.current_thread().ident,
             "error": str(e)
@@ -68,6 +72,7 @@ def retry_on_db_lock(max_retries=3, delay=0.5, force_release_on_failure=True):
                 except OperationalError as e:
                     if "database is locked" in str(e).lower():
                         last_exception = e
+                        log_error(f"retry_on_db_lock: Database locked on attempt {attempt + 1}\nFunction: {func_name}\nThread ID: {thread_id}\nError: {str(e)}")
                         logging.warning(f"retry_on_db_lock: Database locked on attempt {attempt + 1}", extra={
                             "function": func_name,
                             "attempt": attempt + 1,
@@ -80,6 +85,7 @@ def retry_on_db_lock(max_retries=3, delay=0.5, force_release_on_failure=True):
                             try:
                                 db.session.rollback()
                             except Exception as rollback_e:
+                                log_error(f"retry_on_db_lock: Rollback failed - {str(rollback_e)}\nFunction: {func_name}")
                                 logging.warning(f"retry_on_db_lock: Rollback failed - {str(rollback_e)}")
                             # Wait before retrying with exponential backoff
                             sleep_time = delay * (attempt + 1)
@@ -87,6 +93,7 @@ def retry_on_db_lock(max_retries=3, delay=0.5, force_release_on_failure=True):
                             pytime.sleep(sleep_time)
                             continue
                     else:
+                        log_error(f"retry_on_db_lock: Non-lock OperationalError\nFunction: {func_name}\nThread ID: {thread_id}\nError: {str(e)}\nTraceback: {traceback.format_exc()}")
                         logging.error(f"retry_on_db_lock: Non-lock OperationalError", extra={
                             "function": func_name,
                             "thread_id": thread_id,
@@ -94,6 +101,7 @@ def retry_on_db_lock(max_retries=3, delay=0.5, force_release_on_failure=True):
                         })
                         raise
                 except Exception as e:
+                    log_error(f"retry_on_db_lock: Unexpected exception\nFunction: {func_name}\nThread ID: {thread_id}\nError Type: {type(e).__name__}\nError: {str(e)}\nTraceback: {traceback.format_exc()}")
                     logging.error(f"retry_on_db_lock: Unexpected exception", extra={
                         "function": func_name,
                         "thread_id": thread_id,
@@ -104,6 +112,7 @@ def retry_on_db_lock(max_retries=3, delay=0.5, force_release_on_failure=True):
             
             # If we've exhausted all retries and still have a lock error
             if last_exception and force_release_on_failure:
+                log_error(f"retry_on_db_lock: All {max_retries} retries exhausted, attempting force release\nFunction: {func_name}\nThread ID: {thread_id}")
                 logging.warning(f"retry_on_db_lock: All {max_retries} retries exhausted, attempting force release", extra={
                     "function": func_name,
                     "thread_id": thread_id
@@ -120,6 +129,7 @@ def retry_on_db_lock(max_retries=3, delay=0.5, force_release_on_failure=True):
                         })
                         return func(*args, **kwargs)
                     except Exception as final_e:
+                        log_error(f"retry_on_db_lock: Failed even after force release\nFunction: {func_name}\nThread ID: {thread_id}\nError: {str(final_e)}\nTraceback: {traceback.format_exc()}")
                         logging.error(f"retry_on_db_lock: Failed even after force release", extra={
                             "function": func_name,
                             "thread_id": thread_id,
@@ -129,6 +139,7 @@ def retry_on_db_lock(max_retries=3, delay=0.5, force_release_on_failure=True):
             
             # If we've exhausted all retries, raise the last exception
             if last_exception:
+                log_error(f"retry_on_db_lock: Giving up after all retries\nFunction: {func_name}\nThread ID: {thread_id}\nError: {str(last_exception)}")
                 logging.error(f"retry_on_db_lock: Giving up after all retries", extra={
                     "function": func_name,
                     "thread_id": thread_id,
@@ -180,6 +191,7 @@ def current_time():
         return json.dumps({"id": cround.id, "day": cround.day, "round": cround.hour})
     except Exception as e:
         duration = pytime.time() - start_time
+        log_error(f"current_time: Failed\nThread ID: {thread_id}\nDuration: {duration:.4f}s\nError Type: {type(e).__name__}\nError: {str(e)}\nTraceback: {traceback.format_exc()}")
         logging.error("current_time: Failed", extra={
             "thread_id": thread_id,
             "duration": round(duration, 4),
@@ -190,6 +202,7 @@ def current_time():
         try:
             db.session.rollback()
         except Exception as rollback_e:
+            log_error(f"current_time: Rollback failed - {str(rollback_e)}")
             logging.warning(f"current_time: Rollback failed - {str(rollback_e)}")
         return json.dumps({"error": str(e), "status": 500}), 500
 
@@ -243,6 +256,7 @@ def update_time():
         return json.dumps({"id": cround.id, "day": cround.day, "round": cround.hour})
     except Exception as e:
         duration = pytime.time() - start_time
+        log_error(f"update_time: Failed\nThread ID: {thread_id}\nDuration: {duration:.4f}s\nError Type: {type(e).__name__}\nError: {str(e)}\nTraceback: {traceback.format_exc()}")
         logging.error("update_time: Failed", extra={
             "thread_id": thread_id,
             "duration": round(duration, 4),
@@ -253,5 +267,6 @@ def update_time():
         try:
             db.session.rollback()
         except Exception as rollback_e:
+            log_error(f"update_time: Rollback failed - {str(rollback_e)}")
             logging.warning(f"update_time: Rollback failed - {str(rollback_e)}")
         return json.dumps({"error": str(e), "status": 500}), 500

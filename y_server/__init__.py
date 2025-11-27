@@ -1,14 +1,121 @@
+import atexit
 import json
 import logging
 import os
 import shutil
+import signal
+import sys
 import time
 import threading
+import traceback
+from datetime import datetime
 
 from flask import Flask, g, request
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import desc
 from sqlalchemy.pool import NullPool
+
+
+def _log_error_stderr(message):
+    """
+    Log an error message to stderr with timestamp formatting.
+    
+    Each write starts with "### date and time ###\n" and ends with "\n####".
+    Uses flush=True to ensure immediate output for debugging.
+    
+    :param message: the error message to log
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"### {timestamp} ###\n{message}\n####", file=sys.stderr, flush=True)
+
+
+# Store the original sys.exit for our wrapper
+_original_sys_exit = sys.exit
+
+
+def _wrapped_sys_exit(code=0):
+    """
+    Wrapper around sys.exit to log who is calling it.
+    This helps identify what's causing normal process termination.
+    """
+    stack_trace = ''.join(traceback.format_stack())
+    _log_error_stderr(f"SYS.EXIT CALLED with code={code}\nProcess ID: {os.getpid()}\nThread ID: {threading.current_thread().ident}\nCaller stack trace:\n{stack_trace}")
+    _original_sys_exit(code)
+
+
+# Replace sys.exit with our wrapper
+sys.exit = _wrapped_sys_exit
+
+
+def _signal_handler(signum, frame):
+    """
+    Handle termination signals and log before exit.
+    This helps identify why the process is dying unexpectedly.
+    """
+    signal_name = signal.Signals(signum).name if hasattr(signal, 'Signals') else str(signum)
+    _log_error_stderr(f"SIGNAL RECEIVED: {signal_name} (signal {signum})\nProcess ID: {os.getpid()}\nThread ID: {threading.current_thread().ident}\nStack trace:\n{''.join(traceback.format_stack(frame))}")
+    # Re-raise the signal to allow normal termination after logging
+    signal.signal(signum, signal.SIG_DFL)
+    os.kill(os.getpid(), signum)
+
+
+def _atexit_handler():
+    """
+    Log when the process is exiting.
+    This helps identify unexpected termination.
+    Note: By the time atexit runs, the original call stack is gone.
+    Use the sys.exit wrapper to capture exit calls with their stack traces.
+    """
+    _log_error_stderr(f"PROCESS EXITING: atexit handler called\nProcess ID: {os.getpid()}\nThread ID: {threading.current_thread().ident}\nNote: If no SYS.EXIT CALLED log appeared before this, the exit was triggered by main thread completion or os._exit()")
+
+
+def _uncaught_exception_handler(exc_type, exc_value, exc_traceback):
+    """
+    Handle uncaught exceptions and log them before the process exits.
+    This catches exceptions that would otherwise cause silent termination.
+    """
+    if issubclass(exc_type, KeyboardInterrupt):
+        # Call the default handler for keyboard interrupt
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+    
+    tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+    _log_error_stderr(f"UNCAUGHT EXCEPTION: {exc_type.__name__}: {exc_value}\nProcess ID: {os.getpid()}\nThread ID: {threading.current_thread().ident}\nFull traceback:\n{''.join(tb_lines)}")
+    # Call the default handler
+    sys.__excepthook__(exc_type, exc_value, exc_traceback)
+
+
+def _uncaught_thread_exception_handler(args):
+    """
+    Handle uncaught exceptions in threads.
+    Python 3.8+ threading.excepthook handler.
+    """
+    tb_lines = traceback.format_exception(args.exc_type, args.exc_value, args.exc_traceback)
+    _log_error_stderr(f"UNCAUGHT THREAD EXCEPTION in thread '{args.thread.name}': {args.exc_type.__name__}: {args.exc_value}\nProcess ID: {os.getpid()}\nThread ID: {args.thread.ident}\nFull traceback:\n{''.join(tb_lines)}")
+
+
+# Register atexit handler to log process exit
+atexit.register(_atexit_handler)
+
+# Register global exception hook for uncaught exceptions
+sys.excepthook = _uncaught_exception_handler
+
+# Register thread exception hook (Python 3.8+)
+if hasattr(threading, 'excepthook'):
+    threading.excepthook = _uncaught_thread_exception_handler
+
+# Register signal handlers for common termination signals
+# Note: SIGKILL (9) cannot be caught
+try:
+    signal.signal(signal.SIGTERM, _signal_handler)  # Termination signal
+    signal.signal(signal.SIGINT, _signal_handler)   # Interrupt (Ctrl+C)
+    if hasattr(signal, 'SIGHUP'):
+        signal.signal(signal.SIGHUP, _signal_handler)  # Hangup signal (Unix only)
+    if hasattr(signal, 'SIGQUIT'):
+        signal.signal(signal.SIGQUIT, _signal_handler)  # Quit signal (Unix only)
+except Exception as e:
+    _log_error_stderr(f"Failed to register signal handlers: {str(e)}")
+
 
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.WARNING)
@@ -152,11 +259,15 @@ try:
     @app.teardown_appcontext
     def shutdown_session(exception=None):
         if exception:
+            _log_error_stderr(f"teardown_appcontext exception: {str(exception)}\nPath: {request.path if request else 'unknown'}\nTraceback: {traceback.format_exc()}")
             logging.warning("teardown_appcontext with exception", extra={
                 "exception": str(exception),
                 "path": request.path if request else "unknown"
             })
-        db.session.remove()
+        try:
+            db.session.remove()
+        except Exception as e:
+            _log_error_stderr(f"teardown_appcontext: CRITICAL ERROR removing session\nError: {str(e)}\nPath: {request.path if request else 'unknown'}\nTraceback: {traceback.format_exc()}")
 
     # Enhanced before_request logging to track active requests
     @app.before_request
@@ -209,11 +320,12 @@ try:
                 "active_requests_remaining": len(_active_requests)
             }
             
-            # Warn if request took too long
+            # Warn if request took too long (main process)
             if duration > 5.0:
+                _log_error_stderr(f"slow_request detected (main): {request.path} took {duration:.4f}s")
                 logging.warning("slow_request", extra=log_data)
             
-            # Add current round information from the database
+            # Add current round information from the database (main process)
             try:
                 current_round = Rounds.query.order_by(desc(Rounds.id)).first()
                 if current_round:
@@ -221,7 +333,8 @@ try:
                     log_data["day"] = current_round.day
                     log_data["hour"] = current_round.hour
             except Exception as e:
-                # If there's an error querying the database, log it
+                # If there's an error querying the database, log it (main process)
+                _log_error_stderr(f"db_query_failed_in_after_request (main): {str(e)}\nPath: {request.path}\nTraceback: {traceback.format_exc()}")
                 log_data["db_query_error"] = str(e)
                 logging.warning("db_query_failed_in_after_request", extra={"error": str(e)})
 
@@ -250,7 +363,10 @@ try:
                 "server_pid": os.getpid()
             })
 
-except:  # Y Web subprocess
+except Exception as init_exception:  # Y Web subprocess
+    # Log initialization error to stderr
+    _log_error_stderr(f"YServer initialization error (falling back to Y Web subprocess mode): {str(init_exception)}\nTraceback: {traceback.format_exc()}")
+    
     # base path
     BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("y_server")[0]
 
@@ -328,11 +444,15 @@ except:  # Y Web subprocess
     @app.teardown_appcontext
     def shutdown_session(exception=None):
         if exception:
+            _log_error_stderr(f"teardown_appcontext exception (subprocess): {str(exception)}\nPath: {request.path if request else 'unknown'}\nTraceback: {traceback.format_exc()}")
             logging.warning("teardown_appcontext with exception", extra={
                 "exception": str(exception),
                 "path": request.path if request else "unknown"
             })
-        db.session.remove()
+        try:
+            db.session.remove()
+        except Exception as e:
+            _log_error_stderr(f"teardown_appcontext (subprocess): CRITICAL ERROR removing session\nError: {str(e)}\nPath: {request.path if request else 'unknown'}\nTraceback: {traceback.format_exc()}")
 
     # Enhanced before_request logging to track active requests
     @app.before_request
@@ -385,11 +505,12 @@ except:  # Y Web subprocess
                 "active_requests_remaining": len(_active_requests)
             }
             
-            # Warn if request took too long
+            # Warn if request took too long (Y Web subprocess)
             if duration > 5.0:
+                _log_error_stderr(f"slow_request detected (subprocess): {request.path} took {duration:.4f}s")
                 logging.warning("slow_request", extra=log_data)
             
-            # Add current round information from the database
+            # Add current round information from the database (Y Web subprocess)
             try:
                 current_round = Rounds.query.order_by(desc(Rounds.id)).first()
                 if current_round:
@@ -397,7 +518,8 @@ except:  # Y Web subprocess
                     log_data["day"] = current_round.day
                     log_data["hour"] = current_round.hour
             except Exception as e:
-                # If there's an error querying the database, log it
+                # If there's an error querying the database, log it (Y Web subprocess)
+                _log_error_stderr(f"db_query_failed_in_after_request (subprocess): {str(e)}\nPath: {request.path}\nTraceback: {traceback.format_exc()}")
                 log_data["db_query_error"] = str(e)
                 logging.warning("db_query_failed_in_after_request", extra={"error": str(e)})
 
