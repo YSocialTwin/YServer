@@ -2,6 +2,7 @@ import json
 import logging
 import os
 
+from sqlalchemy import text
 from sqlalchemy.pool import NullPool
 
 from flask import request
@@ -90,16 +91,22 @@ def change_db():
             cwd = os.path.join(cwd, "y_web")
             log_dir = os.path.join(cwd, log_dir)
         else:
-            app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:////{data['path']}"
+            # Build SQLite URI
+            sqlite_uri = f"sqlite:////{data['path']}"
+            app.config["SQLALCHEMY_DATABASE_URI"] = sqlite_uri
             app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
             # SQLite-specific: use NullPool and check_same_thread=False
             app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
                 "poolclass": NullPool,
+                "pool_pre_ping": True,
                 "connect_args": {
                     "check_same_thread": False,
                     "timeout": 30
                 }
             }
+            # Use rebind_db to switch database without calling init_app
+            # (init_app cannot be called after the first request has been handled)
+            rebind_db(sqlite_uri)
 
             log_dir = uri.split("database_server.db")[0]
 
@@ -121,8 +128,15 @@ def change_db():
         # Remove all existing handlers to avoid duplicate logging
         logger.handlers.clear()
         
-        # Create file handler with JSON formatter
-        fileHandler = logging.FileHandler(log_path, mode='a')
+        # Create rotating file handler with JSON formatter to prevent log file growth
+        # Large log files can cause I/O blocking and contribute to performance issues
+        from logging.handlers import RotatingFileHandler
+        fileHandler = RotatingFileHandler(
+            log_path, 
+            mode='a', 
+            maxBytes=10*1024*1024,  # 10MB
+            backupCount=5
+        )
         fileHandler.setFormatter(formatter)
         fileHandler.setLevel(logging.INFO)
         logger.addHandler(fileHandler)
@@ -136,7 +150,6 @@ def change_db():
         # Log success to application logger (will appear in Gunicorn error log)
         app.logger.info(f"Database configuration successful. URI: {uri}, Log: {log_path}")
         
-        db.init_app(app)
         return {"status": 200}
         
     except Exception as e:
@@ -149,6 +162,22 @@ def change_db():
         
         # Return error response with details
         return {"status": 500, "error": str(e), "traceback": traceback.format_exc()}, 500
+
+
+@app.route("/status", methods=["GET"])
+def get_status():
+    """
+    Get the status of the server.
+
+    :return: the status of the server
+    """
+    # test db connection
+    try:
+        db.session.execute(text("SELECT 1"))
+    except Exception as e:
+        return {"status": 500, "message": f"Database connection error: {str(e)}"}, 500
+
+    return {"status": 200, "message": "Server is running."}
 
 
 @app.route("/shutdown", methods=["POST"])
