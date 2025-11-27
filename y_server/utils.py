@@ -1,6 +1,3 @@
-import sys
-from datetime import datetime
-
 from sqlalchemy import case, desc, func
 from y_server.modals import (
     Follow,
@@ -12,18 +9,8 @@ from y_server.modals import (
     db,
 )
 
-
-def log_error(message):
-    """
-    Log an error message to stderr with timestamp formatting.
-    
-    Each write starts with "### date and time ###\n" and ends with "\n####".
-    Uses flush=True to ensure immediate output for debugging.
-    
-    :param message: the error message to log
-    """
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"### {timestamp} ###\n{message}\n####", file=sys.stderr, flush=True)
+# Re-export log_error for backward compatibility
+from y_server.error_logging import log_error
 
 
 def get_follows(uid):

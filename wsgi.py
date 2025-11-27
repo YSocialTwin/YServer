@@ -32,12 +32,14 @@ import traceback
 from datetime import datetime
 
 
-def _log_error_stderr(message):
+def log_error(message):
     """
     Log an error message to stderr with timestamp formatting.
     
     Each write starts with "### date and time ###\n" and ends with "\n####".
     Uses flush=True to ensure immediate output for debugging.
+    
+    Note: This is defined locally to avoid import issues during module loading.
     
     :param message: the error message to log
     """
@@ -61,10 +63,10 @@ try:
         app.config["sentiment_annotation"] = config.get("sentiment_annotation", False)
         app.config["emotion_annotation"] = config.get("emotion_annotation", False)
     else:
-        _log_error_stderr(f"WSGI config file not found: {config_file}")
+        log_error(f"WSGI config file not found: {config_file}")
 
 except Exception as e:
-    _log_error_stderr(f"WSGI initialization error: {str(e)}\nTraceback: {traceback.format_exc()}")
+    log_error(f"WSGI initialization error: {str(e)}\nTraceback: {traceback.format_exc()}")
     raise
 
 # The app object is automatically created when y_server is imported

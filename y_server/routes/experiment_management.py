@@ -1,9 +1,7 @@
 import json
 import logging
 import os
-import sys
 import traceback
-from datetime import datetime
 
 from sqlalchemy import text
 from sqlalchemy.pool import NullPool
@@ -11,6 +9,7 @@ from sqlalchemy.pool import NullPool
 from flask import request
 from pythonjsonlogger import jsonlogger
 from y_server import app, db
+from y_server.error_logging import log_error
 from y_server.modals import (
     Article_topics,
     Articles,
@@ -39,19 +38,6 @@ logger.setLevel(logging.INFO)
 # The JsonFormatter will include any fields that are present in the LogRecord
 # Request logs pass custom fields via 'extra' parameter which will be included automatically
 formatter = jsonlogger.JsonFormatter()
-
-
-def _log_error_stderr(message):
-    """
-    Log an error message to stderr with timestamp formatting.
-    
-    Each write starts with "### date and time ###\n" and ends with "\n####".
-    Uses flush=True to ensure immediate output for debugging.
-    
-    :param message: the error message to log
-    """
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"### {timestamp} ###\n{message}\n####", file=sys.stderr, flush=True)
 
 
 def rebind_db(new_uri):
@@ -170,11 +156,7 @@ def change_db():
         
     except Exception as e:
         # Log the full error with traceback to stderr with custom format
-        _log_error_stderr(f"ERROR in change_db: {str(e)}\nTraceback: {traceback.format_exc()}")
-        
-        # Log the full error with traceback to application logger (visible in Gunicorn logs)
-        error_msg = f"ERROR in change_db: {str(e)}\n{traceback.format_exc()}"
-        app.logger.error(error_msg)
+        log_error(f"ERROR in change_db: {str(e)}\nTraceback: {traceback.format_exc()}")
         
         # Return error response with details
         return {"status": 500, "error": str(e), "traceback": traceback.format_exc()}, 500
@@ -191,7 +173,7 @@ def get_status():
     try:
         db.session.execute(text("SELECT 1"))
     except Exception as e:
-        _log_error_stderr(f"Database connection error in get_status: {str(e)}\nTraceback: {traceback.format_exc()}")
+        log_error(f"Database connection error in get_status: {str(e)}\nTraceback: {traceback.format_exc()}")
         return {"status": 500, "message": f"Database connection error: {str(e)}"}, 500
 
     return {"status": 200, "message": "Server is running."}
@@ -204,7 +186,7 @@ def shutdown_server():
     """
     shutdown = request.environ.get("werkzeug.server.shutdown")
     if shutdown is None:
-        _log_error_stderr("Shutdown attempted but not running with the Werkzeug Server")
+        log_error("Shutdown attempted but not running with the Werkzeug Server")
         raise RuntimeError("Not running with the Werkzeug Server")
     shutdown()
 

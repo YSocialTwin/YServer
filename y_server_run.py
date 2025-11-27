@@ -5,12 +5,14 @@ import traceback
 from datetime import datetime
 
 
-def _log_error_stderr(message):
+def log_error(message):
     """
     Log an error message to stderr with timestamp formatting.
     
     Each write starts with "### date and time ###\n" and ends with "\n####".
     Uses flush=True to ensure immediate output for debugging.
+    
+    Note: This is defined locally to avoid import issues during module loading.
     
     :param message: the error message to log
     """
@@ -34,7 +36,7 @@ def start_server(config):
         app.config["emotion_annotation"] = config["emotion_annotation"]
         app.run(debug=debug, port=int(config["port"]), host=config["host"])
     except Exception as e:
-        _log_error_stderr(f"Error starting server: {str(e)}\nConfig: {config}\nTraceback: {traceback.format_exc()}")
+        log_error(f"Error starting server: {str(e)}\nConfig: {config}\nTraceback: {traceback.format_exc()}")
         raise
 
 
@@ -55,7 +57,7 @@ if __name__ == "__main__":
     try:
         config = json.load(open(config_file, "r"))
     except Exception as e:
-        _log_error_stderr(f"Error loading config file {config_file}: {str(e)}\nTraceback: {traceback.format_exc()}")
+        log_error(f"Error loading config file {config_file}: {str(e)}\nTraceback: {traceback.format_exc()}")
         raise
 
     start_server(config)

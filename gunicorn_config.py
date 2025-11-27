@@ -37,12 +37,14 @@ import traceback
 from datetime import datetime
 
 
-def _log_error_stderr(message):
+def log_error(message):
     """
     Log an error message to stderr with timestamp formatting.
     
     Each write starts with "### date and time ###\n" and ends with "\n####".
     Uses flush=True to ensure immediate output for debugging.
+    
+    Note: This is defined locally to avoid import issues during module loading.
     
     :param message: the error message to log
     """
@@ -57,14 +59,14 @@ try:
         with open(config_file, 'r') as f:
             exp_config = json.load(f)
     else:
-        _log_error_stderr(f"Gunicorn config file not found: {config_file}, using defaults")
+        log_error(f"Gunicorn config file not found: {config_file}, using defaults")
         # Default configuration
         exp_config = {
             "host": "0.0.0.0",
             "port": 5010
         }
 except Exception as e:
-    _log_error_stderr(f"Error loading Gunicorn config: {str(e)}\nTraceback: {traceback.format_exc()}")
+    log_error(f"Error loading Gunicorn config: {str(e)}\nTraceback: {traceback.format_exc()}")
     exp_config = {
         "host": "0.0.0.0",
         "port": 5010
