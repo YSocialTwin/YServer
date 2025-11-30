@@ -65,6 +65,9 @@ db.sqlite3-journal
 instance/
 .webassets-cache
 
+# Experiments databases
+experiments/*.db
+
 # Scrapy stuff:
 .scrapy
 
