@@ -377,7 +377,7 @@ def get_user_interests():
     return json.dumps(res)
 
 
-@app.route("/get_user_opinions", methods=["GET"])
+@app.route("/get_user_opinions", methods=["POST"])
 def get_user_opinions():
     """
     Get the opinions of a user.
