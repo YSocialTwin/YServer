@@ -31,6 +31,24 @@ from y_server.utils import (
 )
 
 
+@app.route("/get_post_author", methods=["GET"])
+def get_post_author():
+    """
+    Get the author of a post.
+
+    :return: a json object with the author id
+    """
+    data = json.loads(request.get_data())
+    post_id = data["post_id"]
+
+    post = Post.query.filter_by(id=post_id).first()
+
+    if post is not None:
+        return json.dumps({"user_id": post.user_id})
+    else:
+        return json.dumps({"status": 404})
+
+
 @app.route("/read", methods=["POST"])
 def read():
     """
