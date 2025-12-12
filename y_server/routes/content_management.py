@@ -512,6 +512,11 @@ def add_post():
     post.thread_id = post.id
     db.session.commit()
 
+    for topic_id in topics:
+        tp = Post_topics(post_id=post.id, topic_id=topic_id)
+        db.session.add(tp)
+        db.session.commit()
+
     # allow to disable sentiment & toxicity analysis
     if current_app.config["perspective_api"] is not None:
         toxicity(text, app.config["perspective_api"], post.id, db)
@@ -519,9 +524,6 @@ def add_post():
     if current_app.config["sentiment_annotation"]:
         sentiment = vader_sentiment(text)
         for topic_id in topics:
-            tp = Post_topics(post_id=post.id, topic_id=topic_id)
-            db.session.add(tp)
-            db.session.commit()
 
             post_sentiment = Post_Sentiment(
                 post_id=post.id,
@@ -624,6 +626,14 @@ def add_comment():
 
     db.session.add(new_post)
     db.session.commit()
+
+    # add to the comment the topics of the parent post
+    parent_post_topics = Post_topics.query.filter_by(post_id=post.thread_id).all()
+    for topic in parent_post_topics:
+        tp = Post_topics(post_id=new_post.id, topic_id=topic.topic_id)
+        db.session.add(tp)
+        db.session.commit()
+
     #########
     # get sentiment of the post is responding to
 
@@ -899,13 +909,20 @@ def get_post_topics():
     :return: a json object with the topics
     """
     data = json.loads(request.get_data())
-    post_id = data["post_id"]
-
-    post_topics = Post_topics.query.filter_by(post_id=post_id)
+    post_id = int(data["post_id"])
+    post_topics = Post_topics.query.filter_by(post_id=post_id).all()
 
     res = []
     for topic in post_topics:
         res.append(topic.topic_id)
+
+    # if len(res) == 0 get the topics of the parent post (if comment the root post is thread_id)
+    if len(res) == 0:
+        post = Post.query.filter_by(id=post_id).first()
+        if post is not None:
+            parent_post_topics = Post_topics.query.filter_by(post_id=post.thread_id).all()
+            for topic in parent_post_topics:
+                res.append(topic.topic_id)
 
     return json.dumps(res)
 

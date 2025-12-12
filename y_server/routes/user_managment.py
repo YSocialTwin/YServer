@@ -1,4 +1,5 @@
 import json
+import sys
 
 from flask import request
 from sqlalchemy import desc
@@ -434,15 +435,22 @@ def set_user_opinions():
 
             # if topic_id is a string, get the iid from the Interests table
             if isinstance(topic_id, str):
-                interest = Interests.query.filter_by(interest=topic_id).first()
-                if interest is None:
-                    # create the interest
-                    new_interest = Interests(interest=topic_id)
-                    db.session.add(new_interest)
-                    db.session.commit()
-                    topic_id = new_interest.iid
-                else:
-                    topic_id = interest.iid
+                try:
+                    topic_id = int(topic_id)
+                    # check if the topic_id exists in the Interests table
+                    interest = Interests.query.filter_by(iid=topic_id).first()
+                    if interest is None:
+                        raise ValueError(f"Interest ID {topic_id} does not exist.")
+                except:
+                    interest = Interests.query.filter_by(interest=topic_id).first()
+                    if interest is None:
+                        # create the interest
+                        new_interest = Interests(interest=topic_id)
+                        db.session.add(new_interest)
+                        db.session.commit()
+                        topic_id = new_interest.iid
+                    else:
+                        topic_id = interest.iid
 
             # Insert a new opinion record
             new_record = Agent_Opinion(
