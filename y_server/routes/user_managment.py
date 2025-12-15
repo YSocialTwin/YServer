@@ -381,14 +381,15 @@ def get_user_interests():
 @app.route("/get_user_opinions", methods=["POST"])
 def get_user_opinions():
     """
-    Get the opinions of a user.
+    Get the opinions of a user mapped to interest names.
 
-    :return: a json object with the opinions
+    :return: a json object with the opinions {interest_name: opinion_value}
     """
     data = json.loads(request.get_data())
     user_id = int(data["user_id"])
-    # query Agent_opinions table to get all the latest opinions for each topic of the user
+
     # Subquery: for this agent, get the latest tid for each topic_id
+    # (This ensures we only get the most recent opinion per topic)
     subq = (
         db.session.query(
             Agent_Opinion.topic_id,
@@ -399,18 +400,22 @@ def get_user_opinions():
         .subquery()
     )
 
-    # Main query: join to retrieve the full rows
+    # Main query: Join Agent_Opinion with Subquery (for latest) AND Interest (for name)
+    # We query specific columns: Interest.interest and Agent_Opinion.opinion
     rows = (
-        db.session.query(Agent_Opinion)
+        db.session.query(Interests.interest, Agent_Opinion.opinion)
         .join(
             subq,
             (Agent_Opinion.topic_id == subq.c.topic_id) &
             (Agent_Opinion.tid == subq.c.max_tid)
         )
+        .join(Interests, Agent_Opinion.topic_id == Interests.iid)  # Join to get the interest name
         .filter(Agent_Opinion.agent_id == user_id)
+        .all()
     )
 
-    res = {row.topic_id: float(row.opinion) for row in rows}
+    # Construct the dictionary using the Interest name as the key
+    res = {row.interest: float(row.opinion) for row in rows}
 
     return json.dumps(res)
 
