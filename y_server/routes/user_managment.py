@@ -4,7 +4,7 @@ import sys
 from flask import request
 from sqlalchemy import desc
 from y_server import app, db
-from y_server.modals import Interests, Post, Reactions, Rounds, User_interest, User_mgmt, Agent_Opinion
+from y_server.modals import Interests, Post, Reactions, Rounds, User_interest, User_mgmt, Agent_Opinion, Follow
 from sqlalchemy import func
 
 
@@ -403,7 +403,7 @@ def get_user_opinions():
     # Main query: Join Agent_Opinion with Subquery (for latest) AND Interest (for name)
     # We query specific columns: Interest.interest and Agent_Opinion.opinion
     rows = (
-        db.session.query(Interests.interest, Agent_Opinion.opinion)
+        db.session.query(Interests.interest, Interests.iid, Agent_Opinion.opinion)
         .join(
             subq,
             (Agent_Opinion.topic_id == subq.c.topic_id) &
@@ -415,7 +415,72 @@ def get_user_opinions():
     )
 
     # Construct the dictionary using the Interest name as the key
-    res = {row.interest: float(row.opinion) for row in rows}
+    res = {row.interest: [float(row.opinion), row.iid] for row in rows}
+
+    return json.dumps(res)
+
+
+@app.route("/get_users_opinions", methods=["POST"])
+def get_users_opinions():
+    """
+    Get the opinions of a user mapped to interest names.
+
+    :return: a json object with the opinions {interest_name: opinion_value}
+    """
+    data = json.loads(request.get_data())
+    user_id = int(data["user_id"])
+    topic = data["topic"]
+
+    # get topic id from Interests table
+    interest = Interests.query.filter_by(interest=topic).first()
+    if interest is not None:
+        target_topic_id = int(interest.iid)
+    else:
+        return []
+
+    followee_ids = [f.follower_id for f in Follow.query.filter_by(user_id=user_id, action="follow").all()]
+
+    # ---------------------------------------------------------
+    # Subquery: Get the latest tid per AGENT for this specific TOPIC
+    # ---------------------------------------------------------
+    subq = (
+        db.session.query(
+            Agent_Opinion.agent_id,
+            func.max(Agent_Opinion.tid).label("max_tid")
+        )
+        .filter(
+            Agent_Opinion.topic_id == target_topic_id,  # Filter for the input topic
+            Agent_Opinion.agent_id.in_(followee_ids)  # Filter for the list of agents
+        )
+        .group_by(Agent_Opinion.agent_id)  # Group by agent (one opinion per person)
+        .subquery()
+    )
+
+    # ---------------------------------------------------------
+    # Main Query: Join back to get the actual opinion text
+    # ---------------------------------------------------------
+    rows = (
+        db.session.query(
+            Agent_Opinion.agent_id,  # Include this so you know WHO said it
+            Interests.interest,  # The topic name
+            Agent_Opinion.opinion
+        )
+        .join(
+            subq,
+            (Agent_Opinion.agent_id == subq.c.agent_id) &
+            (Agent_Opinion.tid == subq.c.max_tid)
+        )
+        .join(Interests, Agent_Opinion.topic_id == Interests.iid)
+        # We repeat the filters here for query optimizer safety,
+        # though the join on subq technically limits the rows already.
+        .filter(
+            Agent_Opinion.topic_id == target_topic_id,
+            Agent_Opinion.agent_id.in_(followee_ids)
+        )
+        .all()
+    )
+
+    res = [float(row.opinion) for row in rows]
 
     return json.dumps(res)
 
