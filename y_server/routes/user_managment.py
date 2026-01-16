@@ -1,9 +1,11 @@
 import json
+import sys
 
 from flask import request
 from sqlalchemy import desc
 from y_server import app, db
-from y_server.modals import Interests, Post, Reactions, Rounds, User_interest, User_mgmt
+from y_server.modals import Interests, Post, Reactions, Rounds, User_interest, User_mgmt, Agent_Opinion, Follow
+from sqlalchemy import func
 
 
 @app.route("/get_user_id", methods=["GET", "POST"])
@@ -66,6 +68,7 @@ def get_user():
             "is_page": user.is_page,
             "activity_profile": user.activity_profile if user.is_page == 0 else "Always On",
             "profession": user.profession if user.is_page == 0 else "",
+            "archetype": user.archetype if user.is_page == 0 else "",
         }
     )
 
@@ -374,3 +377,167 @@ def get_user_interests():
         res.append({"id": int(interest[0]), "topic": interest.interest})
 
     return json.dumps(res)
+
+
+@app.route("/get_user_opinions", methods=["POST"])
+def get_user_opinions():
+    """
+    Get the opinions of a user mapped to interest names.
+
+    :return: a json object with the opinions {interest_name: opinion_value}
+    """
+    data = json.loads(request.get_data())
+    user_id = int(data["user_id"])
+
+    # Subquery: for this agent, get the latest tid for each topic_id
+    # (This ensures we only get the most recent opinion per topic)
+    subq = (
+        db.session.query(
+            Agent_Opinion.topic_id,
+            func.max(Agent_Opinion.tid).label("max_tid")
+        )
+        .filter(Agent_Opinion.agent_id == user_id)
+        .group_by(Agent_Opinion.topic_id)
+        .subquery()
+    )
+
+    # Main query: Join Agent_Opinion with Subquery (for latest) AND Interest (for name)
+    # We query specific columns: Interest.interest and Agent_Opinion.opinion
+    rows = (
+        db.session.query(Interests.interest, Interests.iid, Agent_Opinion.opinion)
+        .join(
+            subq,
+            (Agent_Opinion.topic_id == subq.c.topic_id) &
+            (Agent_Opinion.tid == subq.c.max_tid)
+        )
+        .join(Interests, Agent_Opinion.topic_id == Interests.iid)  # Join to get the interest name
+        .filter(Agent_Opinion.agent_id == user_id)
+        .all()
+    )
+
+    # Construct the dictionary using the Interest name as the key
+    res = {row.interest: [float(row.opinion), row.iid] for row in rows}
+
+    return json.dumps(res)
+
+
+@app.route("/get_users_opinions", methods=["POST"])
+def get_users_opinions():
+    """
+    Get the opinions of a user mapped to interest names.
+
+    :return: a json object with the opinions {interest_name: opinion_value}
+    """
+    data = json.loads(request.get_data())
+    user_id = int(data["user_id"])
+    topic = data["topic"]
+
+    # get topic id from Interests table
+    interest = Interests.query.filter_by(interest=topic).first()
+    if interest is not None:
+        target_topic_id = int(interest.iid)
+    else:
+        return []
+
+    followee_ids = [f.follower_id for f in Follow.query.filter_by(user_id=user_id, action="follow").all()]
+
+    # ---------------------------------------------------------
+    # Subquery: Get the latest tid per AGENT for this specific TOPIC
+    # ---------------------------------------------------------
+    subq = (
+        db.session.query(
+            Agent_Opinion.agent_id,
+            func.max(Agent_Opinion.tid).label("max_tid")
+        )
+        .filter(
+            Agent_Opinion.topic_id == target_topic_id,  # Filter for the input topic
+            Agent_Opinion.agent_id.in_(followee_ids)  # Filter for the list of agents
+        )
+        .group_by(Agent_Opinion.agent_id)  # Group by agent (one opinion per person)
+        .subquery()
+    )
+
+    # ---------------------------------------------------------
+    # Main Query: Join back to get the actual opinion text
+    # ---------------------------------------------------------
+    rows = (
+        db.session.query(
+            Agent_Opinion.agent_id,  # Include this so you know WHO said it
+            Interests.interest,  # The topic name
+            Agent_Opinion.opinion
+        )
+        .join(
+            subq,
+            (Agent_Opinion.agent_id == subq.c.agent_id) &
+            (Agent_Opinion.tid == subq.c.max_tid)
+        )
+        .join(Interests, Agent_Opinion.topic_id == Interests.iid)
+        # We repeat the filters here for query optimizer safety,
+        # though the join on subq technically limits the rows already.
+        .filter(
+            Agent_Opinion.topic_id == target_topic_id,
+            Agent_Opinion.agent_id.in_(followee_ids)
+        )
+        .all()
+    )
+
+    res = [float(row.opinion) for row in rows]
+
+    return json.dumps(res)
+
+
+@app.route("/set_user_opinions", methods=["POST"])
+def set_user_opinions():
+    """
+    Set the opinions of a user.
+
+    :return: a json object with the status of the update
+    """
+    data = json.loads(request.get_data())
+
+    agent_id = data.get("user_id")
+    opinions = data.get("opinions", {})
+    tid = data.get("round")
+    id_interacted_with = data.get("id_interacted_with", -1)
+    id_post = data.get("id_post", -1)
+
+    try:
+        for topic_id, opinion_value in opinions.items():
+
+            # if topic_id is a string, get the iid from the Interests table
+            if isinstance(topic_id, str):
+                try:
+                    topic_id = int(topic_id)
+                    # check if the topic_id exists in the Interests table
+                    interest = Interests.query.filter_by(iid=topic_id).first()
+                    if interest is None:
+                        raise ValueError(f"Interest ID {topic_id} does not exist.")
+                except:
+                    interest = Interests.query.filter_by(interest=topic_id).first()
+                    if interest is None:
+                        # create the interest
+                        new_interest = Interests(interest=topic_id)
+                        db.session.add(new_interest)
+                        db.session.commit()
+                        topic_id = new_interest.iid
+                    else:
+                        topic_id = interest.iid
+
+            # Insert a new opinion record
+            new_record = Agent_Opinion(
+                    agent_id=agent_id,
+                    tid=tid,
+                    topic_id=topic_id,
+                    id_interacted_with=id_interacted_with,
+                    id_post=id_post,
+                    opinion=float(opinion_value)
+            )
+            db.session.add(new_record)
+
+        db.session.commit()
+
+    except Exception as e:
+        db.session.rollback()
+        return json.dumps({"status": 400, "error": str(e)})
+
+    return json.dumps({"status": 200})

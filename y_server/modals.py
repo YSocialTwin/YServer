@@ -30,6 +30,7 @@ class User_mgmt(UserMixin, db.Model):
     daily_activity_level = db.Column(db.Integer(), default=1)
     profession = db.Column(db.String(50), default="")
     activity_profile = db.Column(db.String(50), default="Always On")
+    archetype = db.Column(db.String(50), nullable=True, default=None)
 
     posts = db.relationship("Post", backref="author", lazy=True)
     liked = db.relationship("Reactions", backref="liked_by", lazy=True)
@@ -197,3 +198,31 @@ class Post_Toxicity(db.Model):
     threat = db.Column(db.REAL, default=0)
     sexually_explicit = db.Column(db.REAL, default=0)
     flirtation = db.Column(db.REAL, default=0)
+
+
+class Agent_Opinion(db.Model):
+    """
+    Agent opinion tracking for interactions.
+
+    Stores opinions that agents form about topics, posts, and other agents
+    during their interactions in the simulation. The opinion is stored as
+    a float value representing the agent's sentiment or stance.
+
+    Fields:
+        id: Primary key
+        agent_id: ID of the agent forming the opinion
+        tid: Transaction/interaction ID for this opinion event
+        topic_id: ID of the topic being discussed (FK to interests)
+        id_interacted_with: ID of the user/agent being interacted with
+        id_post: ID of the post that triggered this opinion (FK to post)
+        opinion: Numerical opinion value (float) indicating sentiment/stance
+    """
+
+    __tablename__ = "agent_opinion"
+    id = db.Column(db.Integer, primary_key=True)
+    agent_id = db.Column(db.Integer, nullable=False)
+    tid = db.Column(db.Integer, nullable=False)
+    topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
+    id_interacted_with = db.Column(db.Integer, nullable=False)
+    id_post = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
+    opinion = db.Column(db.REAL, nullable=False)
