@@ -68,6 +68,7 @@ def get_user():
             "is_page": user.is_page,
             "activity_profile": user.activity_profile if user.is_page == 0 else "Always On",
             "profession": user.profession if user.is_page == 0 else "",
+            "archetype": user.archetype if user.is_page == 0 else "",
         }
     )
 
