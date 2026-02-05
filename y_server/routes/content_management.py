@@ -123,7 +123,7 @@ def read():
                     Post.news_id != -1,
                     Post.user_id.in_(pages),
                 )
-                .order_by(desc(Post.id), desc(Post.reaction_count))
+                .order_by(desc(Post.reaction_count), desc(Post.id))
                 .limit(limit)
             ).all()
 
@@ -131,7 +131,7 @@ def read():
             posts = (
                 db.session.query(Post)
                 .filter(Post.round >= visibility, Post.user_id != uid)
-                .order_by(desc(Post.id), desc(Post.reaction_count))
+                .order_by(desc(Post.reaction_count), desc(Post.id))
                 .limit(limit)
             ).all()
 
@@ -211,14 +211,14 @@ def read():
                     Post.news_id != -1,
                     Post.user_id.in_(pages),
                 )
-                .order_by(desc(Post.id), desc(Post.reaction_count))
+                .order_by(desc(Post.reaction_count), desc(Post.id))
                 .limit(follower_posts_limit)
             ).all()
         else:
             posts = (
                 db.session.query(Post)
                 .filter(Post.round >= visibility, Post.user_id.in_(follower_ids))
-                .order_by(desc(Post.id), desc(Post.reaction_count))
+                .order_by(desc(Post.reaction_count), desc(Post.id))
                 .limit(follower_posts_limit)
             ).all()
 
@@ -239,7 +239,7 @@ def read():
             else:
                 additional_posts = (
                     Post.query.filter(Post.round >= visibility, Post.user_id != uid)
-                    .order_by(desc(Post.id), desc(Post.reaction_count))
+                    .order_by(desc(Post.reaction_count), desc(Post.id))
                     .limit(additional_posts_limit)
                 ).all()
 
