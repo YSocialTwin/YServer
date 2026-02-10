@@ -194,6 +194,32 @@ try:
     
     db = SQLAlchemy(app)
 
+    # Migrate database schema if needed (add missing columns)
+    def migrate_database_schema():
+        """
+        Check and add missing columns to database tables.
+        This ensures backward compatibility when new columns are added to models.
+        """
+        try:
+            # Check if archetype column exists in user_mgmt table
+            from sqlalchemy import text, inspect
+            
+            inspector = inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('user_mgmt')]
+            
+            if 'archetype' not in columns:
+                # Add the archetype column with default value
+                with db.engine.begin() as conn:
+                    conn.execute(text('ALTER TABLE user_mgmt ADD COLUMN archetype TEXT DEFAULT NULL'))
+                logging.info("Database migration: Added archetype column to user_mgmt table")
+        except Exception as e:
+            logging.error(f"Database migration error: {str(e)}")
+            _log_error_stderr(f"Database migration error: {str(e)}\nTraceback: {traceback.format_exc()}")
+    
+    # Run migration after database is initialized
+    with app.app_context():
+        migrate_database_schema()
+
     # Set up file logging to _server.log
     # Determine log directory based on database URI
     if db_uri.startswith("sqlite"):
@@ -396,6 +422,32 @@ except Exception as init_exception:  # Y Web subprocess
     # db = SQLAlchemy()
 
     db.init_app(app)
+    
+    # Migrate database schema if needed (add missing columns) - subprocess mode
+    def migrate_database_schema():
+        """
+        Check and add missing columns to database tables.
+        This ensures backward compatibility when new columns are added to models.
+        """
+        try:
+            # Check if archetype column exists in user_mgmt table
+            from sqlalchemy import text, inspect
+            
+            inspector = inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('user_mgmt')]
+            
+            if 'archetype' not in columns:
+                # Add the archetype column with default value
+                with db.engine.begin() as conn:
+                    conn.execute(text('ALTER TABLE user_mgmt ADD COLUMN archetype TEXT DEFAULT NULL'))
+                logging.info("Database migration (subprocess): Added archetype column to user_mgmt table")
+        except Exception as e:
+            logging.error(f"Database migration error (subprocess): {str(e)}")
+            _log_error_stderr(f"Database migration error (subprocess): {str(e)}\nTraceback: {traceback.format_exc()}")
+    
+    # Run migration after database is initialized
+    with app.app_context():
+        migrate_database_schema()
     
     # Set up file logging to _server.log for Y Web subprocess with rotation
     # Large log files can cause I/O blocking and contribute to performance issues
