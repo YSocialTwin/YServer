@@ -139,10 +139,8 @@ def _migrate_database_schema(db_instance, mode="main"):
             # Add the archetype column with default value
             with db_instance.engine.begin() as conn:
                 conn.execute(text('ALTER TABLE user_mgmt ADD COLUMN archetype TEXT DEFAULT NULL'))
-            log_msg = "Database migration: Added archetype column to user_mgmt table"
-            if mode == "subprocess":
-                log_msg = "Database migration (subprocess): Added archetype column to user_mgmt table"
-            logging.info(log_msg)
+            mode_suffix = f" ({mode})" if mode != "main" else ""
+            logging.info(f"Database migration{mode_suffix}: Added archetype column to user_mgmt table")
     except Exception as e:
         error_msg = f"Database migration error ({mode}): {str(e)}"
         logging.error(error_msg)
