@@ -12,7 +12,7 @@ from datetime import datetime
 
 from flask import Flask, g, request
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import desc
+from sqlalchemy import desc, text, inspect
 from sqlalchemy.pool import NullPool
 
 
@@ -121,6 +121,32 @@ log = logging.getLogger('werkzeug')
 log.setLevel(logging.WARNING)
 db = SQLAlchemy()
 
+
+def _migrate_database_schema(db_instance, mode="main"):
+    """
+    Check and add missing columns to database tables.
+    This ensures backward compatibility when new columns are added to models.
+    
+    :param db_instance: SQLAlchemy database instance
+    :param mode: "main" or "subprocess" for logging context
+    """
+    try:
+        # Check if archetype column exists in user_mgmt table
+        inspector = inspect(db_instance.engine)
+        columns = [col['name'] for col in inspector.get_columns('user_mgmt')]
+        
+        if 'archetype' not in columns:
+            # Add the archetype column with default value
+            with db_instance.engine.begin() as conn:
+                conn.execute(text('ALTER TABLE user_mgmt ADD COLUMN archetype TEXT DEFAULT NULL'))
+            mode_suffix = f" ({mode})" if mode != "main" else ""
+            logging.info(f"Database migration{mode_suffix}: Added archetype column to user_mgmt table")
+    except Exception as e:
+        error_msg = f"Database migration error ({mode}): {str(e)}"
+        logging.error(error_msg)
+        _log_error_stderr(f"{error_msg}\nTraceback: {traceback.format_exc()}")
+
+
 # Track active requests for debugging hangs
 _active_requests = {}
 _request_lock = threading.Lock()
@@ -193,6 +219,10 @@ try:
         }
     
     db = SQLAlchemy(app)
+
+    # Run migration after database is initialized
+    with app.app_context():
+        _migrate_database_schema(db, mode="main")
 
     # Set up file logging to _server.log
     # Determine log directory based on database URI
@@ -396,6 +426,10 @@ except Exception as init_exception:  # Y Web subprocess
     # db = SQLAlchemy()
 
     db.init_app(app)
+    
+    # Run migration after database is initialized
+    with app.app_context():
+        _migrate_database_schema(db, mode="subprocess")
     
     # Set up file logging to _server.log for Y Web subprocess with rotation
     # Large log files can cause I/O blocking and contribute to performance issues
