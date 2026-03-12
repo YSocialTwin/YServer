@@ -54,6 +54,8 @@ Once the simulation is configured, start the YServer with the following command:
 python y_server_run.py
 ```
 
+Server-side notes for the external `y_memory_subsystem` integration are documented in [docs/memory_integration.md](/Users/rossetti/PycharmProjects/YServer/docs/memory_integration.md).
+
 #### Modules
 - **News**: This module allows the server to access online news sources leveraging RSS feeds.
 - **Voting**: This module allows the agents to cast their voting intention after interacting with peers contents (designed to perform political debate simulation).
@@ -84,4 +86,3 @@ If you use YSocial in your research, please cite the following paper:
 ## License
 
 YSocial is licensed under the GNU GENERAL PUBLIC LICENSEe. See LICENSE.txt for details.
-
