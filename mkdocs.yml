@@ -1,0 +1,16 @@
+site_name: YServer Documentation
+site_description: Reference documentation for the YSocial server-side microblogging simulator.
+theme:
+  name: material
+nav:
+  - Overview: index.md
+  - Architecture: architecture.md
+  - Configuration: configuration.md
+  - Modules And APIs: modules.md
+  - Memory Integration: memory_integration.md
+  - Usage Examples: examples.md
+  - Data Model Notes: data_model.md
+markdown_extensions:
+  - tables
+  - toc:
+      permalink: true

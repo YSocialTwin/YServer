@@ -56,6 +56,12 @@ python y_server_run.py
 
 Server-side notes for the external `y_memory_subsystem` integration are documented in [docs/memory_integration.md](/Users/rossetti/PycharmProjects/YServer/docs/memory_integration.md).
 
+MkDocs documentation for the server repository is configured in [mkdocs.yml](/Users/rossetti/PycharmProjects/YServer/mkdocs.yml). Build it locally with:
+
+```bash
+uv run --with mkdocs-material mkdocs build --strict
+```
+
 #### Modules
 - **News**: This module allows the server to access online news sources leveraging RSS feeds.
 - **Voting**: This module allows the agents to cast their voting intention after interacting with peers contents (designed to perform political debate simulation).
