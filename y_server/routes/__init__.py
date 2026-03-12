@@ -2,6 +2,7 @@ import os
 from .time_management import *
 from .user_managment import *
 from .content_management import *
+from .memory_management import *
 from .interaction_management import *
 from .experiment_management import *
 
