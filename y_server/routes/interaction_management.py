@@ -23,10 +23,16 @@ def add_follow():
     user_id = data["user_id"]
     target = data["target"]
     action = data["action"]
-    tid = int(data["tid"])
+    tid_raw = data.get("tid", data.get("round"))
+    if tid_raw is None:
+        return json.dumps({"status": 400, "error": "tid_or_round_required"})
+    tid = int(tid_raw)
 
     user_id = User_mgmt.query.filter_by(id=user_id).first()
     target = User_mgmt.query.filter_by(id=target).first()
+
+    if user_id is None or target is None:
+        return json.dumps({"status": 404, "error": "user_or_target_not_found"})
 
     # cannot follow yourself
     if user_id.id == target.id:
