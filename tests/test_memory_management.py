@@ -6,6 +6,7 @@ import pytest
 
 from y_server import app, db
 from y_server.modals import (
+    Interests,
     MemoryCommunityDigest,
     MemoryInteractionEvent,
     MemoryItem,
@@ -222,3 +223,19 @@ def test_memory_community_and_events_recent_and_reset(client):
     with app.app_context():
         assert MemoryInteractionEvent.query.filter_by(run_id="run-4").count() == 0
         assert MemoryCommunityDigest.query.filter_by(run_id="run-4").count() == 0
+
+
+def test_set_interests_is_idempotent(client):
+    with app.app_context():
+        Interests.query.filter(Interests.interest.in_(["transport", "economy"])).delete()
+        db.session.commit()
+
+    first = post_json(client, "/set_interests", ["transport", "economy"])
+    second = post_json(client, "/set_interests", ["transport", "economy"])
+
+    assert json.loads(first.data)["status"] == 200
+    assert json.loads(second.data)["status"] == 200
+
+    with app.app_context():
+        interests = Interests.query.filter(Interests.interest.in_(["transport", "economy"])).all()
+        assert len(interests) == 2
