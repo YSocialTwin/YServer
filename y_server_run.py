@@ -33,7 +33,9 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    config_file = args.config_file
+    config_file = os.path.abspath(args.config_file)
+    # y_server reads config during import, so expose the selected config first.
+    os.environ["YSERVER_CONFIG"] = config_file
     config = json.load(open(config_file, "r"))
 
     log_file = _resolve_server_log_file(config_file)

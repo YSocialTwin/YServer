@@ -26,7 +26,9 @@ def _ensure_optional_analytics_schema():
 
 try:
     # read the experiment configuration
-    config = json.load(open(f"config_files{os.sep}exp_config.json"))
+    config = json.load(
+        open(os.environ.get("YSERVER_CONFIG", f"config_files{os.sep}exp_config.json"))
+    )
 
     # create the experiments folder
     if not os.path.exists(f".{os.sep}experiments"):

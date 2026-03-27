@@ -1,0 +1,17 @@
+{
+  "name": "testbed_bot_yclient_embed_10a",
+  "host": "127.0.0.1",
+  "port": 5052,
+  "debug": "False",
+  "reset_db": "True",
+  "modules": [
+    "news",
+    "voting",
+    "image"
+  ],
+  "memory_embeddings": {
+    "service": "ollama",
+    "host": "http://127.0.0.1:11434",
+    "model": "embeddinggemma:latest"
+  }
+}
