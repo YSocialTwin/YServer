@@ -5,15 +5,28 @@ from sqlalchemy import desc
 from y_server.modals import Post, User_mgmt, Reactions, User_interest, Interests, Rounds
 
 
-@app.route("/get_user_id", methods=["GET"])
+@app.route("/get_user_id", methods=["GET", "POST"])
 def get_user_id():
     """
     Get the user id.
 
     :return: a json object with the user id
     """
-    data = json.loads(request.get_data())
-    username = data["username"]
+    data = {}
+    try:
+        raw = request.get_data()
+        if raw:
+            data = json.loads(raw)
+    except Exception:
+        data = {}
+
+    username = (
+        (data.get("username") if isinstance(data, dict) else None)
+        or request.args.get("username")
+        or request.form.get("username")
+    )
+    if not username:
+        return json.dumps({"id": None, "status": 400, "error": "username_required"})
 
     user = User_mgmt.query.filter_by(username=username).first()
     if user is None:

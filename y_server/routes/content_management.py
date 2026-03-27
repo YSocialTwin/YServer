@@ -39,7 +39,7 @@ def read():
     except:
         fratio = 1
     articles = False
-    if "article" in data:
+    if "article" in data or "articles" in data:
         articles = True
 
     # visibility
@@ -74,7 +74,7 @@ def read():
                         Post.news_id != -1,
                         Post.user_id != uid,
                     )
-                    .join(Reactions)
+                    .outerjoin(Reactions, Reactions.post_id == Post.id)
                     .group_by(Post)
                     .order_by(desc("total"), desc(Post.id))
                 ).limit(limit)
@@ -84,7 +84,7 @@ def read():
                 (
                     db.session.query(Post, func.count(Reactions.user_id).label("total"))
                     .filter(Post.round >= visibility, Post.user_id != uid)
-                    .join(Reactions)
+                    .outerjoin(Reactions, Reactions.post_id == Post.id)
                     .group_by(Post)
                     .order_by(desc("total"), desc(Post.id))
                 ).limit(limit)
@@ -101,6 +101,10 @@ def read():
         # get followers
         follower = Follow.query.filter_by(action="follow", user_id=uid)
         follower_ids = [f.follower_id for f in follower if f.follower_id != uid]
+
+        if not follower_ids:
+            follower_posts_limit = 0
+            additional_posts_limit = limit
 
         # get posts from followers in reverse chronological order
         if articles:
@@ -155,14 +159,19 @@ def read():
         follower = Follow.query.filter_by(action="follow", user_id=uid)
         follower_ids = [f.follower_id for f in follower if f.follower_id != uid]
 
+        if not follower_ids:
+            follower_posts_limit = 0
+            additional_posts_limit = limit
+
         # get posts from followers ordered by likes and reverse chronologically
         if articles:
             posts = (
                 db.session.query(Post, func.count(Reactions.user_id).label("total"))
-                .join(Reactions)
+                .outerjoin(Reactions, Reactions.post_id == Post.id)
                 .filter(
                     Post.round >= visibility,
                     Post.news_id != -1,
+                    Post.user_id != uid,
                     Post.user_id.in_(follower_ids),
                 )
                 .group_by(Post)
@@ -172,8 +181,12 @@ def read():
         else:
             posts = (
                 db.session.query(Post, func.count(Reactions.user_id).label("total"))
-                .join(Reactions)
-                .filter(Post.round >= visibility, Post.user_id.in_(follower_ids))
+                .outerjoin(Reactions, Reactions.post_id == Post.id)
+                .filter(
+                    Post.round >= visibility,
+                    Post.user_id != uid,
+                    Post.user_id.in_(follower_ids),
+                )
                 .group_by(Post)
                 .order_by(desc("total"), desc(Post.id))
                 .limit(follower_posts_limit)
