@@ -6,6 +6,24 @@ import os
 import time
 from datetime import datetime
 
+
+def _ensure_optional_analytics_schema():
+    """
+    Create additive analytics/opinion tables for legacy experiment DBs.
+
+    Existing installations are based on prebuilt SQLite files, so these tables
+    may be missing even though newer client logic expects them to exist.
+    """
+    try:
+        with app.app_context():
+            from y_server.modals import Agent_Opinion, Post_Sentiment, Post_Toxicity
+
+            Agent_Opinion.__table__.create(bind=db.engine, checkfirst=True)
+            Post_Sentiment.__table__.create(bind=db.engine, checkfirst=True)
+            Post_Toxicity.__table__.create(bind=db.engine, checkfirst=True)
+    except Exception:
+        pass
+
 try:
     # read the experiment configuration
     config = json.load(open(f"config_files{os.sep}exp_config.json"))
@@ -131,3 +149,5 @@ def _ysocial_after_request(response):
     return response
 
 from y_server.routes import *
+
+_ensure_optional_analytics_schema()

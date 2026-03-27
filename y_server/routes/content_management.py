@@ -3,9 +3,12 @@ from flask import request
 from y_server import app, db
 from sqlalchemy import desc
 from sqlalchemy.sql.expression import func
+from y_server.content_analysis import toxicity, vader_sentiment
 from y_server.modals import (
     Hashtags,
     Post_hashtags,
+    Interests,
+    Post_Sentiment,
     Rounds,
     Post,
     Recommendations,
@@ -350,6 +353,7 @@ def add_post():
     user = User_mgmt.query.filter_by(id=account_id).first()
 
     text = text.strip("-")
+    sentiment = vader_sentiment(text)
 
     post = Post(
         tweet=text,
@@ -361,12 +365,28 @@ def add_post():
     db.session.add(post)
     db.session.commit()
 
+    toxicity(text, app.config.get("perspective_api"), post.id, db)
+
     post.thread_id = post.id
     db.session.commit()
 
     for topic_id in topics:
         tp = Post_topics(post_id=post.id, topic_id=topic_id)
         db.session.add(tp)
+        db.session.commit()
+
+        post_sentiment = Post_Sentiment(
+            post_id=post.id,
+            user_id=user.id,
+            pos=sentiment["pos"],
+            neg=sentiment["neg"],
+            neu=sentiment["neu"],
+            compound=sentiment["compound"],
+            round=tid,
+            is_post=1,
+            topic_id=topic_id,
+        )
+        db.session.add(post_sentiment)
         db.session.commit()
 
     for emotion in emotions:
@@ -435,20 +455,52 @@ def add_comment():
     tid = int(data["tid"])
 
     user = User_mgmt.query.filter_by(id=account_id).first()
-    post = Post.query.filter_by(id=post_id).first()
+    parent_post = Post.query.filter_by(id=post_id).first()
 
     text = text.strip("-")
+    sentiment = vader_sentiment(text)
 
     post = Post(
         tweet=text,
         round=tid,
         user_id=user.id,
         comment_to=post_id,
-        thread_id=post.thread_id,
+        thread_id=parent_post.thread_id,
     )
 
     db.session.add(post)
     db.session.commit()
+
+    toxicity(text, app.config.get("perspective_api"), post.id, db)
+
+    sentiment_parent = Post_Sentiment.query.filter_by(post_id=post_id).first()
+    if sentiment_parent is not None:
+        compound = float(sentiment_parent.compound or 0.0)
+        if compound > 0.05:
+            sentiment_parent = "pos"
+        elif compound < -0.05:
+            sentiment_parent = "neg"
+        else:
+            sentiment_parent = "neu"
+    else:
+        sentiment_parent = ""
+
+    post_topics = Post_topics.query.filter_by(post_id=parent_post.thread_id).all()
+    for topic in post_topics:
+        post_sentiment = Post_Sentiment(
+            post_id=post.id,
+            user_id=user.id,
+            pos=sentiment["pos"],
+            neg=sentiment["neg"],
+            neu=sentiment["neu"],
+            compound=sentiment["compound"],
+            sentiment_parent=sentiment_parent,
+            round=tid,
+            is_comment=1,
+            topic_id=topic.topic_id,
+        )
+        db.session.add(post_sentiment)
+        db.session.commit()
 
     for emotion in emotions:
         if len(emotion) < 1:
@@ -570,6 +622,31 @@ def add_reaction():
     except:
         pass
 
+    post_sentiment = Post_Sentiment.query.filter_by(post_id=int(post_id)).all()
+    for topic_sentiment in post_sentiment:
+        compound = float(topic_sentiment.compound or 0.0)
+        if compound > 0.05:
+            sentiment_parent = "pos"
+        elif compound < -0.05:
+            sentiment_parent = "neg"
+        else:
+            sentiment_parent = "neu"
+
+        reaction_sentiment = Post_Sentiment(
+            post_id=post_id,
+            user_id=user.id,
+            pos=0 if rtype == "dislike" else 1,
+            neg=0 if rtype == "like" else 1,
+            neu=0,
+            compound=1 if rtype == "like" else -1,
+            sentiment_parent=sentiment_parent,
+            round=tid,
+            is_reaction=1,
+            topic_id=topic_sentiment.topic_id,
+        )
+        db.session.add(reaction_sentiment)
+        db.session.commit()
+
     return json.dumps({"status": 200})
 
 
@@ -588,6 +665,66 @@ def get_post_topics():
     res = []
     for topic in post_topics:
         res.append(topic.topic_id)
+
+    return json.dumps(res)
+
+
+@app.route("/get_post_topics_name", methods=["GET", "POST"])
+def get_post_topics_name():
+    """
+    Get the topic names of a post.
+
+    :return: a json object with the topic names
+    """
+    data = json.loads(request.get_data())
+    post_id = data["post_id"]
+
+    post = Post.query.filter_by(id=post_id).first()
+    topic_post_id = post_id
+    if post is not None:
+        direct_topics = Post_topics.query.filter_by(post_id=post_id).all()
+        if not direct_topics and post.thread_id is not None:
+            topic_post_id = post.thread_id
+    post_topics = Post_topics.query.filter_by(post_id=topic_post_id).all()
+
+    res = []
+    for topic in post_topics:
+        tp = Interests.query.filter_by(iid=topic.topic_id).first()
+        if tp is not None:
+            res.append(tp.interest)
+
+    return json.dumps(res)
+
+
+@app.route("/get_sentiment", methods=["POST", "GET"])
+def get_sentiment():
+    """
+    Get the latest sentiment of a user's content for the requested interests.
+    """
+    data = json.loads(request.get_data())
+    user_id = data["user_id"]
+    interests = data["interests"]
+
+    res = []
+    for interest in interests:
+        topic = Interests.query.filter_by(interest=interest).first()
+        if topic is None:
+            continue
+        post_sentiment = (
+            Post_Sentiment.query.filter_by(user_id=user_id, topic_id=topic.iid)
+            .order_by(desc(Post_Sentiment.id))
+            .first()
+        )
+        if post_sentiment is None:
+            continue
+        compound = float(post_sentiment.compound or 0.0)
+        if compound > 0.05:
+            sentiment = "positive"
+        elif compound < -0.05:
+            sentiment = "negative"
+        else:
+            sentiment = "neutral"
+        res.append({"topic": interest, "sentiment": sentiment})
 
     return json.dumps(res)
 

@@ -1,6 +1,7 @@
 import json
 from flask import request
 from y_server import app, db
+from y_server.content_analysis import toxicity, vader_sentiment
 from y_server.modals import (
     Images,
     Post,
@@ -8,6 +9,7 @@ from y_server.modals import (
     Post_emotions,
     Hashtags,
     Post_hashtags,
+    Post_Sentiment,
 )
 
 
@@ -26,7 +28,10 @@ def post_image():
     tid = int(data["tid"])
     image_url = data["image_url"]
     image_description = data["image_description"]
-    article_id = int(data["article_id"])
+    try:
+        article_id = int(data["article_id"])
+    except:
+        article_id = None
 
     # check if image exists
     image = Images.query.filter_by(url=image_url).first()
@@ -51,6 +56,23 @@ def post_image():
     )
 
     db.session.add(post)
+    db.session.commit()
+
+    sentiment = vader_sentiment(text)
+    toxicity(text, app.config.get("perspective_api"), post.id, db)
+
+    post_sentiment = Post_Sentiment(
+        post_id=post.id,
+        user_id=account_id,
+        pos=sentiment["pos"],
+        neg=sentiment["neg"],
+        neu=sentiment["neu"],
+        compound=sentiment["compound"],
+        round=tid,
+        is_post=1,
+        topic_id=-1,
+    )
+    db.session.add(post_sentiment)
     db.session.commit()
 
     post.thread_id = post.id

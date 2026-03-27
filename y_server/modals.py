@@ -138,6 +138,18 @@ class Interests(db.Model):
     interest = db.Column(db.String(20), nullable=False)
 
 
+class Agent_Opinion(db.Model):
+    __tablename__ = "agent_opinion"
+
+    id = db.Column(db.Integer, primary_key=True)
+    agent_id = db.Column(db.Integer, nullable=False, index=True)
+    tid = db.Column(db.Integer, nullable=False, index=True)
+    topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False, index=True)
+    id_interacted_with = db.Column(db.Integer, nullable=False, default=-1)
+    id_post = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False, default=-1)
+    opinion = db.Column(db.REAL, nullable=False)
+
+
 # ---------------------------------------------------------------------------
 # Run-scoped agent memory. This is additive and inactive until the dedicated
 # /memory/* API is used by a client.
@@ -271,3 +283,36 @@ class Article_topics(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     article_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=False)
     topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
+
+
+class Post_Sentiment(db.Model):
+    __tablename__ = "post_sentiment"
+
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False)
+    round = db.Column(db.Integer, db.ForeignKey("rounds.id"), nullable=False)
+    topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
+    is_post = db.Column(db.Integer, default=0)
+    is_comment = db.Column(db.Integer, default=0)
+    is_reaction = db.Column(db.Integer, default=0)
+    neg = db.Column(db.REAL)
+    neu = db.Column(db.REAL)
+    pos = db.Column(db.REAL)
+    compound = db.Column(db.REAL)
+    sentiment_parent = db.Column(db.String(5), default="")
+
+
+class Post_Toxicity(db.Model):
+    __tablename__ = "post_toxicity"
+
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
+    toxicity = db.Column(db.REAL, default=0)
+    severe_toxicity = db.Column(db.REAL, default=0)
+    identity_attack = db.Column(db.REAL, default=0)
+    insult = db.Column(db.REAL, default=0)
+    profanity = db.Column(db.REAL, default=0)
+    threat = db.Column(db.REAL, default=0)
+    sexually_explicit = db.Column(db.REAL, default=0)
+    flirtation = db.Column(db.REAL, default=0)

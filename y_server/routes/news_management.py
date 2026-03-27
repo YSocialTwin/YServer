@@ -1,6 +1,7 @@
 import json
 from flask import request
 from y_server import app, db
+from y_server.content_analysis import toxicity, vader_sentiment
 from y_server.modals import (
     Post,
     User_mgmt,
@@ -13,6 +14,7 @@ from y_server.modals import (
     Websites,
     Interests,
     Article_topics,
+    Post_Sentiment,
     Post_topics
 )
 
@@ -43,6 +45,7 @@ def comment_news():
     fetched_on = data["fetched_on"]
 
     user = User_mgmt.query.filter_by(id=account_id).first()
+    sentiment = vader_sentiment(text)
 
     # check if website exists
     website = Websites.query.filter_by(rss=rss).first()
@@ -75,6 +78,8 @@ def comment_news():
         db.session.commit()
     article_id = Articles.query.filter_by(link=link, website_id=website_id).first().id
 
+    post = None
+
     # add post only if the text is not empty
     # (this might happen if the method is called to save the article for image processing)
     if len(text) > 0:
@@ -88,6 +93,8 @@ def comment_news():
 
         db.session.add(post)
         db.session.commit()
+
+        toxicity(text, app.config.get("perspective_api"), post.id, db)
 
         post.thread_id = post.id
         db.session.commit()
@@ -145,8 +152,24 @@ def comment_news():
                 at = Article_topics(article_id=article_id, topic_id=interests.iid)
                 db.session.add(at)
 
-            pt = Post_topics(post_id=post.id, topic_id=interests.iid)
-            db.session.add(pt)
+            if post is not None:
+                pt = Post_topics(post_id=post.id, topic_id=interests.iid)
+                db.session.add(pt)
+
+                post_sentiment = Post_Sentiment(
+                    post_id=post.id,
+                    user_id=user.id,
+                    pos=sentiment["pos"],
+                    neg=sentiment["neg"],
+                    neu=sentiment["neu"],
+                    compound=sentiment["compound"],
+                    round=tid,
+                    is_post=1,
+                    topic_id=interests.iid,
+                )
+                db.session.add(post_sentiment)
+
+        db.session.commit()
 
     return json.dumps({"status": 200, "article_id": article_id})
 
@@ -211,21 +234,54 @@ def share():
     tid = int(data["tid"])
 
     user = User_mgmt.query.filter_by(id=account_id).first()
-    post = Post.query.filter_by(id=post_id).first()
+    original_post = Post.query.filter_by(id=post_id).first()
+    sentiment = vader_sentiment(text)
 
     post = Post(
         tweet=text,
         round=tid,
         user_id=user.id,
         shared_from=post_id,
-        news_id=post.news_id,
+        news_id=original_post.news_id,
     )
 
     db.session.add(post)
     db.session.commit()
 
+    toxicity(text, app.config.get("perspective_api"), post.id, db)
+
     post.thread_id = post.id
     db.session.commit()
+
+    topics = Post_topics.query.filter_by(post_id=post_id).all()
+
+    sentiment_parent = Post_Sentiment.query.filter_by(post_id=post_id).first()
+    if sentiment_parent is not None:
+        compound = float(sentiment_parent.compound or 0.0)
+        if compound > 0.05:
+            sentiment_parent = "pos"
+        elif compound < -0.05:
+            sentiment_parent = "neg"
+        else:
+            sentiment_parent = "neu"
+    else:
+        sentiment_parent = ""
+
+    for topic in topics:
+        post_sentiment = Post_Sentiment(
+            post_id=post.id,
+            user_id=user.id,
+            pos=sentiment["pos"],
+            neg=sentiment["neg"],
+            neu=sentiment["neu"],
+            compound=sentiment["compound"],
+            sentiment_parent=sentiment_parent,
+            round=tid,
+            is_post=1,
+            topic_id=topic.topic_id,
+        )
+        db.session.add(post_sentiment)
+        db.session.commit()
 
     for emotion in emotions:
         if len(emotion) < 1:

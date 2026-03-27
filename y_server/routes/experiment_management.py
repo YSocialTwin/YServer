@@ -2,8 +2,11 @@ from flask import request
 import json
 from y_server import app, db
 from y_server.modals import (
+    Agent_Opinion,
     User_mgmt,
     Post,
+    Post_Sentiment,
+    Post_Toxicity,
     Reactions,
     Follow,
     Hashtags,
@@ -71,9 +74,12 @@ def reset_experiment():
     db.session.query(Websites).delete()
     db.session.query(Articles).delete()
     db.session.query(Interests).delete()
+    db.session.query(Agent_Opinion).delete()
     db.session.query(User_interest).delete()
     db.session.query(Voting).delete()
     db.session.query(Post_topics).delete()
+    db.session.query(Post_Sentiment).delete()
+    db.session.query(Post_Toxicity).delete()
     db.session.query(Images).delete()
     db.session.query(Article_topics).delete()
     db.session.commit()

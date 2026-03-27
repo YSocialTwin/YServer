@@ -1,8 +1,31 @@
 import json
 from flask import request
 from y_server import app, db
-from sqlalchemy import desc
-from y_server.modals import Post, User_mgmt, Reactions, User_interest, Interests, Rounds
+from sqlalchemy import desc, func, inspect
+from y_server.modals import (
+    Agent_Opinion,
+    Follow,
+    Interests,
+    Post,
+    Reactions,
+    Rounds,
+    User_interest,
+    User_mgmt,
+)
+
+
+def _ensure_agent_opinion_schema():
+    try:
+        table_names = set(inspect(db.engine).get_table_names())
+        if "agent_opinion" in table_names:
+            return
+    except Exception:
+        pass
+
+    try:
+        Agent_Opinion.__table__.create(bind=db.engine, checkfirst=True)
+    except Exception:
+        pass
 
 
 @app.route("/get_user_id", methods=["GET", "POST"])
@@ -365,3 +388,131 @@ def get_user_interests():
         res.append({"id": int(interest[0]), "topic": interest.interest})
 
     return json.dumps(res)
+
+
+@app.route("/get_user_opinions", methods=["POST"])
+def get_user_opinions():
+    _ensure_agent_opinion_schema()
+    data = json.loads(request.get_data())
+    user_id = int(data["user_id"])
+
+    subq = (
+        db.session.query(
+            Agent_Opinion.topic_id,
+            func.max(Agent_Opinion.tid).label("max_tid"),
+        )
+        .filter(Agent_Opinion.agent_id == user_id)
+        .group_by(Agent_Opinion.topic_id)
+        .subquery()
+    )
+
+    rows = (
+        db.session.query(Interests.interest, Interests.iid, Agent_Opinion.opinion)
+        .join(
+            subq,
+            (Agent_Opinion.topic_id == subq.c.topic_id)
+            & (Agent_Opinion.tid == subq.c.max_tid),
+        )
+        .join(Interests, Agent_Opinion.topic_id == Interests.iid)
+        .filter(Agent_Opinion.agent_id == user_id)
+        .all()
+    )
+
+    res = {row.interest: [float(row.opinion), int(row.iid)] for row in rows}
+    return json.dumps(res)
+
+
+@app.route("/get_users_opinions", methods=["POST"])
+def get_users_opinions():
+    _ensure_agent_opinion_schema()
+    data = json.loads(request.get_data())
+    user_id = int(data["user_id"])
+    topic = str(data["topic"])
+
+    interest = Interests.query.filter_by(interest=topic).first()
+    if interest is None:
+        return json.dumps([])
+    target_topic_id = int(interest.iid)
+
+    followee_ids = [
+        f.follower_id
+        for f in Follow.query.filter_by(user_id=user_id, action="follow").all()
+    ]
+    if not followee_ids:
+        return json.dumps([])
+
+    subq = (
+        db.session.query(
+            Agent_Opinion.agent_id,
+            func.max(Agent_Opinion.tid).label("max_tid"),
+        )
+        .filter(
+            Agent_Opinion.topic_id == target_topic_id,
+            Agent_Opinion.agent_id.in_(followee_ids),
+        )
+        .group_by(Agent_Opinion.agent_id)
+        .subquery()
+    )
+
+    rows = (
+        db.session.query(Agent_Opinion.opinion)
+        .join(
+            subq,
+            (Agent_Opinion.agent_id == subq.c.agent_id)
+            & (Agent_Opinion.tid == subq.c.max_tid),
+        )
+        .filter(
+            Agent_Opinion.topic_id == target_topic_id,
+            Agent_Opinion.agent_id.in_(followee_ids),
+        )
+        .all()
+    )
+
+    return json.dumps([float(row.opinion) for row in rows])
+
+
+@app.route("/set_user_opinions", methods=["POST"])
+def set_user_opinions():
+    _ensure_agent_opinion_schema()
+    data = json.loads(request.get_data())
+
+    agent_id = int(data.get("user_id"))
+    opinions = data.get("opinions", {})
+    tid = int(data.get("round"))
+    id_interacted_with = int(data.get("id_interacted_with", -1))
+    id_post = int(data.get("id_post", -1))
+
+    try:
+        for topic_id, opinion_value in opinions.items():
+            resolved_topic_id = topic_id
+            if isinstance(topic_id, str):
+                try:
+                    resolved_topic_id = int(topic_id)
+                    interest = Interests.query.filter_by(iid=resolved_topic_id).first()
+                    if interest is None:
+                        raise ValueError(f"Interest ID {resolved_topic_id} does not exist.")
+                except Exception:
+                    interest = Interests.query.filter_by(interest=topic_id).first()
+                    if interest is None:
+                        interest = Interests(interest=topic_id)
+                        db.session.add(interest)
+                        db.session.commit()
+                    resolved_topic_id = int(interest.iid)
+
+            db.session.add(
+                Agent_Opinion(
+                    agent_id=agent_id,
+                    tid=tid,
+                    topic_id=int(resolved_topic_id),
+                    id_interacted_with=id_interacted_with,
+                    id_post=id_post,
+                    opinion=float(opinion_value),
+                )
+            )
+
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        return json.dumps({"status": 400, "error": str(exc)}), 400
+
+    return json.dumps({"status": 200})
