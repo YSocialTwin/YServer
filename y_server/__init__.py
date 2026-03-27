@@ -152,4 +152,11 @@ def _ysocial_after_request(response):
 
 from y_server.routes import *
 
+try:
+    from y_server.routes.memory_management import configure_memory_embedding_from_config
+
+    configure_memory_embedding_from_config(config)
+except Exception:
+    pass
+
 _ensure_optional_analytics_schema()

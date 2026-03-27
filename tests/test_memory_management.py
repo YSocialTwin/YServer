@@ -5,6 +5,7 @@ import json
 import pytest
 
 from y_server import app, db
+from y_server.routes import memory_management
 from y_server.modals import (
     Interests,
     MemoryCommunityDigest,
@@ -52,6 +53,29 @@ def post_json(client, path, payload):
     return client.post(path, data=json.dumps(payload), content_type="application/json")
 
 
+class StubEmbeddingService:
+    def __init__(self, model_name="stub-embed", vector=None):
+        self.model_name = model_name
+        self._vector = vector or [0.1, 0.2, 0.3]
+        self.last_error = None
+
+    @property
+    def available(self):
+        return True
+
+    def embed_text(self, text):
+        if not text:
+            return None
+        return list(self._vector)
+
+
+@pytest.fixture(autouse=True)
+def reset_memory_embedding():
+    memory_management.configure_memory_embedding()
+    yield
+    memory_management.configure_memory_embedding()
+
+
 def test_memory_event_creates_event_and_item(client):
     response = post_json(
         client,
@@ -77,6 +101,52 @@ def test_memory_event_creates_event_and_item(client):
         item = MemoryItem.query.first()
         assert item.item_type == "event"
         assert item.other_user_id == 2
+        assert item.embedding_status == "pending"
+
+
+def test_memory_event_embeds_when_backend_configured(client, monkeypatch):
+    monkeypatch.setattr(memory_management, "_MEMORY_EMBEDDING", StubEmbeddingService(model_name="stub-embed"))
+
+    response = post_json(
+        client,
+        "/memory/event",
+        {
+            "run_id": "run-embed",
+            "round_id": 2,
+            "actor_user_id": 1,
+            "event_type": "post",
+            "salient_claim": "Configured embeddings should be stored",
+        },
+    )
+    payload = json.loads(response.data)
+    assert response.status_code == 200
+    assert payload["status"] == 200
+
+    with app.app_context():
+        item = (
+            MemoryItem.query.filter_by(run_id="run-embed", agent_user_id=1)
+            .order_by(MemoryItem.id.desc())
+            .first()
+        )
+        assert item is not None
+        assert item.embedding_status == "ready"
+        assert item.embedding_model == "stub-embed"
+        assert item.embedding_dim == 3
+
+
+def test_configure_memory_embedding_requires_explicit_config():
+    memory_management.configure_memory_embedding()
+    assert memory_management._MEMORY_EMBEDDING is None
+
+    memory_management.configure_memory_embedding(
+        service="ollama",
+        host="127.0.0.1:11434",
+        model="embeddinggemma:latest",
+    )
+    configured = memory_management._MEMORY_EMBEDDING
+    assert configured is not None
+    assert configured.model_name == "embeddinggemma:latest"
+    assert configured.ollama_host == "http://127.0.0.1:11434"
 
 
 def test_memory_social_and_thread_upsert_and_context(client):

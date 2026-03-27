@@ -18,12 +18,67 @@ from y_server.modals import (
 
 
 _MEMORY_SCHEMA_READY = False
-_MEMORY_EMBEDDING = MemoryEmbeddingService("embeddinggemma")
+_MEMORY_EMBEDDING = None
 _PROMPT_SCAFFOLD_PATTERNS = [
     re.compile(r"\bmemory context\b", re.IGNORECASE),
     re.compile(r"\bmemory search brief\b", re.IGNORECASE),
     re.compile(r"\bmemory pack\b", re.IGNORECASE),
 ]
+
+
+def _normalize_embedding_host(value):
+    host = str(value or "").strip()
+    if not host:
+        return ""
+    if not host.startswith("http://") and not host.startswith("https://"):
+        host = f"http://{host}"
+    host = host.rstrip("/")
+    if host.endswith("/v1"):
+        host = host[:-3].rstrip("/")
+    return host
+
+
+def configure_memory_embedding(service=None, host=None, model=None):
+    global _MEMORY_EMBEDDING
+
+    normalized_service = str(service or "").strip().lower()
+    normalized_host = _normalize_embedding_host(host)
+    normalized_model = str(model or "").strip()
+
+    if normalized_service == "ollama" and normalized_host and normalized_model:
+        _MEMORY_EMBEDDING = MemoryEmbeddingService(
+            model_name=normalized_model,
+            ollama_host=normalized_host,
+        )
+    else:
+        _MEMORY_EMBEDDING = None
+
+    try:
+        app.logger.info(
+            "memory_embedding_configured",
+            extra={
+                "service": normalized_service or "disabled",
+                "host": normalized_host,
+                "model": normalized_model,
+                "available": bool(_MEMORY_EMBEDDING and _MEMORY_EMBEDDING.available),
+                "error": None if _MEMORY_EMBEDDING is None else _MEMORY_EMBEDDING.last_error,
+            },
+        )
+    except Exception:
+        pass
+
+
+def configure_memory_embedding_from_config(config_data):
+    settings = {}
+    if isinstance(config_data, dict):
+        settings = config_data.get("memory_embeddings") or {}
+    if not isinstance(settings, dict):
+        settings = {}
+    configure_memory_embedding(
+        service=settings.get("service"),
+        host=settings.get("host"),
+        model=settings.get("model"),
+    )
 
 
 def _ensure_index(table_name, index_name, columns):
@@ -307,7 +362,7 @@ def memory_event():
         access_count=0,
         embedding_status="pending",
     )
-    if bool(data.get("force_sync_embedding")) and _MEMORY_EMBEDDING.available:
+    if _MEMORY_EMBEDDING and _MEMORY_EMBEDDING.available:
         vec = _MEMORY_EMBEDDING.embed_text(item.text)
         if vec:
             item.embedding_json = json.dumps(vec)
@@ -463,7 +518,7 @@ def memory_item_upsert():
     item.recency_anchor_round = _to_int_or_none(data.get("recency_anchor_round")) or item.round_id
     item.last_accessed_round = _to_int_or_none(data.get("last_accessed_round")) or item.round_id
     item.access_count = _to_int_or_none(data.get("access_count")) or 0
-    if bool(data.get("force_sync_embedding")) and _MEMORY_EMBEDDING.available:
+    if bool(data.get("force_sync_embedding")) and _MEMORY_EMBEDDING and _MEMORY_EMBEDDING.available:
         vec = _MEMORY_EMBEDDING.embed_text(item.text)
         if vec:
             item.embedding_json = json.dumps(vec)
@@ -513,7 +568,7 @@ def memory_search():
     candidates = query.order_by(desc(MemoryItem.round_id), desc(MemoryItem.id)).limit(300).all()
 
     query_variants = _build_memory_query_variants(query_text)
-    query_embedding = _MEMORY_EMBEDDING.embed_text(query_text)
+    query_embedding = _MEMORY_EMBEDDING.embed_text(query_text) if _MEMORY_EMBEDDING and _MEMORY_EMBEDDING.available else None
     query_has_embedding = isinstance(query_embedding, list) and bool(query_embedding)
     results = []
     ready_count = 0
