@@ -2,7 +2,7 @@ import json
 
 from flask import request
 from y_server import app, db
-from y_server.content_analysis import toxicity, vader_sentiment
+from y_server.content_analysis import should_annotate_toxicity, toxicity, vader_sentiment
 from y_server.modals import (
     Emotions,
     Hashtags,
@@ -58,13 +58,15 @@ def post_image():
 
     db.session.add(post)
     db.session.commit()
+    post_id = post.id
 
     sentiment = vader_sentiment(text)
 
-    toxicity(text, app.config["perspective_api"], post.id, db)
+    if should_annotate_toxicity(app.config):
+        toxicity(text, app.config.get("perspective_api"), post_id, db, enabled=True)
 
     post_sentiment = Post_Sentiment(
-        post_id=post.id,
+        post_id=post_id,
         user_id=account_id,
         pos=sentiment["pos"],
         neg=sentiment["neg"],
@@ -77,7 +79,7 @@ def post_image():
     db.session.add(post_sentiment)
     db.session.commit()
 
-    post.thread_id = post.id
+    post.thread_id = post_id
     db.session.commit()
 
     for emotion in emotions:
@@ -86,7 +88,7 @@ def post_image():
 
         em = Emotions.query.filter_by(emotion=emotion).first()
         if em is not None:
-            post_emotion = Post_emotions(post_id=post.id, emotion_id=em.id)
+            post_emotion = Post_emotions(post_id=post_id, emotion_id=em.id)
             db.session.add(post_emotion)
             db.session.commit()
 
@@ -102,7 +104,7 @@ def post_image():
                 db.session.commit()
                 ht = Hashtags.query.filter_by(hashtag=tag).first()
 
-            post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
+            post_tag = Post_hashtags(post_id=post_id, hashtag_id=ht.id)
             db.session.add(post_tag)
             db.session.commit()
 

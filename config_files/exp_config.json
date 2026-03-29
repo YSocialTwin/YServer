@@ -6,6 +6,7 @@
   "reset_db": "True",
   "modules": ["news", "voting", "image"],
   "perspective_api": null,
+  "toxicity_annotation": false,
   "sentiment_annotation": false,
   "emotion_annotation": false
 }

@@ -4,7 +4,7 @@ from flask import current_app, request
 from sqlalchemy import desc, select
 from sqlalchemy.sql.expression import func
 from y_server import app, db
-from y_server.content_analysis import toxicity, vader_sentiment
+from y_server.content_analysis import should_annotate_toxicity, toxicity, vader_sentiment
 from y_server.modals import (
     Emotions,
     Follow,
@@ -508,25 +508,26 @@ def add_post():
 
     db.session.add(post)
     db.session.commit()
+    post_id = post.id
 
-    post.thread_id = post.id
+    post.thread_id = post_id
     db.session.commit()
 
     for topic_id in topics:
-        tp = Post_topics(post_id=post.id, topic_id=topic_id)
+        tp = Post_topics(post_id=post_id, topic_id=topic_id)
         db.session.add(tp)
         db.session.commit()
 
     # allow to disable sentiment & toxicity analysis
-    if current_app.config["perspective_api"] is not None:
-        toxicity(text, app.config["perspective_api"], post.id, db)
+    if should_annotate_toxicity(current_app.config):
+        toxicity(text, current_app.config.get("perspective_api"), post_id, db, enabled=True)
 
-    if current_app.config["sentiment_annotation"]:
+    if current_app.config.get("sentiment_annotation", False):
         sentiment = vader_sentiment(text)
         for topic_id in topics:
 
             post_sentiment = Post_Sentiment(
-                post_id=post.id,
+                post_id=post_id,
                 user_id=user.id,
                 pos=sentiment["pos"],
                 neg=sentiment["neg"],
@@ -542,14 +543,14 @@ def add_post():
     ######
 
     # allow disabling emotion analysis
-    if current_app.config["emotion_annotation"]:
+    if current_app.config.get("emotion_annotation", False):
         for emotion in emotions:
             if len(emotion) < 1:
                 continue
 
             em = Emotions.query.filter_by(emotion=emotion).first()
             if em is not None:
-                post_emotion = Post_emotions(post_id=post.id, emotion_id=em.id)
+                post_emotion = Post_emotions(post_id=post_id, emotion_id=em.id)
                 db.session.add(post_emotion)
                 db.session.commit()
     ############
@@ -566,7 +567,7 @@ def add_post():
                 db.session.commit()
                 ht = Hashtags.query.filter_by(hashtag=tag).first()
 
-            post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
+            post_tag = Post_hashtags(post_id=post_id, hashtag_id=ht.id)
             db.session.add(post_tag)
             db.session.commit()
 
@@ -579,14 +580,14 @@ def add_post():
 
             # existing user and not self
             if us is not None and us.id != user.id:
-                mn = Mentions(user_id=us.id, post_id=post.id, round=tid)
+                mn = Mentions(user_id=us.id, post_id=post_id, round=tid)
                 db.session.add(mn)
                 db.session.commit()
             else:
                 text = text.replace(mention, "")
 
                 # update post
-                post.tweet = text.lstrip().rstrip()
+                Post.query.filter_by(id=post_id).update({"tweet": text.lstrip().rstrip()})
                 db.session.commit()
 
     return json.dumps({"status": 200})
@@ -626,18 +627,20 @@ def add_comment():
 
     db.session.add(new_post)
     db.session.commit()
+    new_post_id = new_post.id
+    thread_id = post.thread_id
 
     # add to the comment the topics of the parent post
-    parent_post_topics = Post_topics.query.filter_by(post_id=post.thread_id).all()
+    parent_post_topics = Post_topics.query.filter_by(post_id=thread_id).all()
     for topic in parent_post_topics:
-        tp = Post_topics(post_id=new_post.id, topic_id=topic.topic_id)
+        tp = Post_topics(post_id=new_post_id, topic_id=topic.topic_id)
         db.session.add(tp)
         db.session.commit()
 
     #########
     # get sentiment of the post is responding to
 
-    if current_app.config["sentiment_annotation"]:
+    if current_app.config.get("sentiment_annotation", False):
         sentiment_parent = Post_Sentiment.query.filter_by(post_id=post_id).first()
         if sentiment_parent is not None:
             sentiment_parent = sentiment_parent.compound
@@ -654,10 +657,10 @@ def add_comment():
         sentiment = vader_sentiment(text)
 
         # get topics associated to post.id
-        post_topics = Post_topics.query.filter_by(post_id=post.thread_id).all()
+        post_topics = Post_topics.query.filter_by(post_id=thread_id).all()
         for topic in post_topics:
             post_sentiment = Post_Sentiment(
-                post_id=new_post.id,
+                post_id=new_post_id,
                 user_id=user.id,
                 pos=sentiment["pos"],
                 neg=sentiment["neg"],
@@ -671,20 +674,20 @@ def add_comment():
             db.session.add(post_sentiment)
             db.session.commit()
 
-    if current_app.config["perspective_api"] is not None:
-        toxicity(text, app.config["perspective_api"], new_post.id, db)
+    if should_annotate_toxicity(current_app.config):
+        toxicity(text, current_app.config.get("perspective_api"), new_post_id, db, enabled=True)
 
     #########
 
     # allow disabling emotion analysis
-    if current_app.config["emotion_annotation"]:
+    if current_app.config.get("emotion_annotation", False):
         for emotion in emotions:
             if len(emotion) < 1:
                 continue
 
             em = Emotions.query.filter_by(emotion=emotion).first()
             if em is not None:
-                post_emotion = Post_emotions(post_id=new_post.id, emotion_id=em.id)
+                post_emotion = Post_emotions(post_id=new_post_id, emotion_id=em.id)
                 db.session.add(post_emotion)
                 db.session.commit()
 
@@ -702,7 +705,7 @@ def add_comment():
                 db.session.commit()
                 ht = Hashtags.query.filter_by(hashtag=tag).first()
 
-            post_tag = Post_hashtags(post_id=new_post.id, hashtag_id=ht.id)
+            post_tag = Post_hashtags(post_id=new_post_id, hashtag_id=ht.id)
             db.session.add(post_tag)
             db.session.commit()
 
@@ -713,20 +716,20 @@ def add_comment():
 
             us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
             if us is not None:
-                mn = Mentions(user_id=us.id, post_id=new_post.id, round=tid)
+                mn = Mentions(user_id=us.id, post_id=new_post_id, round=tid)
                 db.session.add(mn)
                 db.session.commit()
             else:
                 text = text.replace(mention, "")
 
                 # update post
-                post.tweet = text.lstrip().rstrip()
+                Post.query.filter_by(id=new_post_id).update({"tweet": text.lstrip().rstrip()})
 
                 # more than one word
-                if len(post.tweet.split(" ")) > 1:
+                if len(text.lstrip().rstrip().split(" ")) > 1:
                     db.session.commit()
                 else:
-                    db.session.delete(post)
+                    Post.query.filter_by(id=new_post_id).delete()
                     db.session.commit()
 
     return json.dumps({"status": 200})
@@ -860,7 +863,7 @@ def add_reaction():
         pass
 
     # allow disabling sentiment analysis for reactions
-    if current_app.config["sentiment_annotation"]:
+    if current_app.config.get("sentiment_annotation", False):
         # get compound sentiment of post
         post_sentiment = Post_Sentiment.query.filter_by(post_id=int(post_id)).all()
         for topic_sentiment in post_sentiment:

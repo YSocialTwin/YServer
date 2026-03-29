@@ -26,12 +26,16 @@ def start_server(config):
     """
     try:
         print(config)
+        config_path = config.get("__config_file__")
+        if config_path:
+            os.environ["YSERVER_CONFIG"] = config_path
         from y_server import app
 
         # import nltk
         # nltk.download("vader_lexicon")
         debug = False
         app.config["perspective_api"] = config["perspective_api"]
+        app.config["toxicity_annotation"] = config.get("toxicity_annotation", False)
         app.config["sentiment_annotation"] = config["sentiment_annotation"]
         app.config["emotion_annotation"] = config["emotion_annotation"]
         
@@ -66,6 +70,7 @@ if __name__ == "__main__":
     config_file = args.config_file
     try:
         config = json.load(open(config_file, "r"))
+        config["__config_file__"] = config_file
     except Exception as e:
         log_error(f"Error loading config file {config_file}: {str(e)}\nTraceback: {traceback.format_exc()}")
         raise

@@ -68,8 +68,14 @@ def vader_sentiment(text):
         return {"neg": 0.0, "neu": 1.0, "pos": 0.0, "compound": 0.0}
 
 
-def toxicity(text, api_key, post_id, db):
+def should_annotate_toxicity(config):
+    return bool(config.get("toxicity_annotation", False))
+
+
+def toxicity(text, api_key, post_id, db, enabled=True):
     try:
+        if not enabled:
+            return
         if api_key:
             from perspective import PerspectiveAPI
 

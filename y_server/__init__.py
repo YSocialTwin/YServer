@@ -189,6 +189,11 @@ try:
     app.config["SECRET_KEY"] = "4YrzfpQ4kGXjuP6w"
     app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    app.config.update(config)
+    app.config.setdefault("perspective_api", None)
+    app.config.setdefault("sentiment_annotation", False)
+    app.config.setdefault("emotion_annotation", False)
+    app.config.setdefault("toxicity_annotation", False)
     
     # Configure engine options based on database type
     # Use NullPool for both SQLite and PostgreSQL for Gunicorn compatibility
@@ -403,6 +408,10 @@ except Exception as init_exception:  # Y Web subprocess
     app.config["SECRET_KEY"] = "4YrzfpQ4kGXjuP6w"
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///../experiments/dummy.db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    app.config.setdefault("perspective_api", None)
+    app.config.setdefault("sentiment_annotation", False)
+    app.config.setdefault("emotion_annotation", False)
+    app.config.setdefault("toxicity_annotation", False)
     
     # SQLite-specific configuration for Gunicorn compatibility
     # Use NullPool to disable connection pooling (SQLite doesn't handle pooling well)

@@ -291,11 +291,14 @@ def set_interests():
     data = json.loads(request.get_data())
 
     for interest in data:
-        ints = Interests(
-            interest=interest,
-        )
-        db.session.add(ints)
-        db.session.commit()
+        existing = Interests.query.filter_by(interest=interest).first()
+        if existing is None:
+            ints = Interests(
+                interest=interest,
+            )
+            db.session.add(ints)
+
+    db.session.commit()
 
     return json.dumps({"status": 200})
 
