@@ -1,11 +1,12 @@
+import json
+
+import numpy as np
 from flask import request
 from sqlalchemy.sql.expression import func
-import json
 from y_server import app, db
-import numpy as np
 from y_server.modals import (
-    User_mgmt,
     Follow,
+    User_mgmt,
 )
 
 

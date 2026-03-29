@@ -1,31 +1,11 @@
 import json
+import sys
+
 from flask import request
+from sqlalchemy import desc
 from y_server import app, db
-from sqlalchemy import desc, func, inspect
-from y_server.modals import (
-    Agent_Opinion,
-    Follow,
-    Interests,
-    Post,
-    Reactions,
-    Rounds,
-    User_interest,
-    User_mgmt,
-)
-
-
-def _ensure_agent_opinion_schema():
-    try:
-        table_names = set(inspect(db.engine).get_table_names())
-        if "agent_opinion" in table_names:
-            return
-    except Exception:
-        pass
-
-    try:
-        Agent_Opinion.__table__.create(bind=db.engine, checkfirst=True)
-    except Exception:
-        pass
+from y_server.modals import Interests, Post, Reactions, Rounds, User_interest, User_mgmt, Agent_Opinion, Follow
+from sqlalchemy import func
 
 
 @app.route("/get_user_id", methods=["GET", "POST"])
@@ -35,21 +15,8 @@ def get_user_id():
 
     :return: a json object with the user id
     """
-    data = {}
-    try:
-        raw = request.get_data()
-        if raw:
-            data = json.loads(raw)
-    except Exception:
-        data = {}
-
-    username = (
-        (data.get("username") if isinstance(data, dict) else None)
-        or request.args.get("username")
-        or request.form.get("username")
-    )
-    if not username:
-        return json.dumps({"id": None, "status": 400, "error": "username_required"})
+    data = json.loads(request.get_data())
+    username = data["username"]
 
     user = User_mgmt.query.filter_by(username=username).first()
     if user is None:
@@ -67,9 +34,12 @@ def get_user():
     """
     data = json.loads(request.get_data())
     username = data["username"]
-    email = data["email"]
+    # email = data["email"]
 
-    user = User_mgmt.query.filter_by(username=username, email=email).first()
+    user = User_mgmt.query.filter_by(username=username).first()
+
+    if user is None:
+        return json.dumps({"error": "User not found", "status": 404, "username": username})
 
     return json.dumps(
         {
@@ -96,6 +66,9 @@ def get_user():
             "nationality": user.nationality,
             "toxicity": user.toxicity,
             "is_page": user.is_page,
+            "activity_profile": user.activity_profile if user.is_page == 0 else "Always On",
+            "profession": user.profession if user.is_page == 0 else "",
+            "archetype": user.archetype if user.is_page == 0 else "",
         }
     )
 
@@ -129,12 +102,17 @@ def register():
     gender = data["gender"]
     nationality = data["nationality"]
     toxicity = data["toxicity"]
+    daily_activity_level = data["daily_activity_level"]
+    activity_profile = data["activity_profile"]
+
+    profession = data["profession"]
+
     if "is_page" in data:
         is_page = data["is_page"]
     else:
         is_page = 0
 
-    user = User_mgmt.query.filter_by(username=data["name"], email=data["email"]).first()
+    user = User_mgmt.query.filter_by(username=data["name"]).first()
 
     if user is None:
         user = User_mgmt(
@@ -159,14 +137,18 @@ def register():
             nationality=nationality,
             toxicity=toxicity,
             is_page=is_page,
+            daily_activity_level=daily_activity_level,
+            profession=profession,
+            activity_profile=activity_profile,
         )
-        db.session.add(user)
-        try:
-            db.session.commit()
-        except:
-            return json.dumps({"status": 404})
 
-    return json.dumps({"status": 200})
+        db.session.add(user)
+        db.session.commit()
+
+        return json.dumps({"status": 200, "id": user.id, "username": user.username})
+
+    else:
+        return json.dumps({"status": 200, "id": user.id, "username": user.username})
 
 
 @app.route("/churn", methods=["POST"])
@@ -182,10 +164,16 @@ def churn_agents():
     left_on = data["left_on"]
 
     #  get the max round value from the post table for each user
-    query = (db.session.query(Post.user_id, db.func.max(Post.round)).
-             join(User_mgmt, Post.user_id == User_mgmt.id).
-             filter(User_mgmt.left_on.is_(None), User_mgmt.is_page == 0).
-             group_by(Post.user_id)).order_by(db.func.max(Post.round).asc()).limit(n_users)
+    query = (
+        (
+            db.session.query(Post.user_id, db.func.max(Post.round))
+            .join(User_mgmt, Post.user_id == User_mgmt.id)
+            .filter(User_mgmt.left_on.is_(None), User_mgmt.is_page == 0)
+            .group_by(Post.user_id)
+        )
+        .order_by(db.func.max(Post.round).asc())
+        .limit(n_users)
+    )
 
     results = query.all()
 
@@ -256,6 +244,9 @@ def get_user_from_post():
     post_id = data["post_id"]
     post = Post.query.filter_by(id=post_id).first()
 
+    if post is None:
+        return json.dumps({"error": "Post not found", "status": 404})
+
     return json.dumps(post.user_id)
 
 
@@ -300,13 +291,11 @@ def set_interests():
     data = json.loads(request.get_data())
 
     for interest in data:
-        existing = Interests.query.filter_by(interest=interest).first()
-        if existing is None:
-            ints = Interests(
-                interest=interest,
-            )
-            db.session.add(ints)
-            db.session.commit()
+        ints = Interests(
+            interest=interest,
+        )
+        db.session.add(ints)
+        db.session.commit()
 
     return json.dumps({"status": 200})
 
@@ -377,7 +366,7 @@ def get_user_interests():
             User_interest.round_id >= base_rounds,
             User_interest.round_id <= round_id,
         )
-        .group_by(User_interest.interest_id)
+        .group_by(User_interest.interest_id, Interests.interest)
         .order_by(db.desc(db.func.count(User_interest.interest_id)))
         .limit(n_interests)
         .all()
@@ -392,127 +381,163 @@ def get_user_interests():
 
 @app.route("/get_user_opinions", methods=["POST"])
 def get_user_opinions():
-    _ensure_agent_opinion_schema()
+    """
+    Get the opinions of a user mapped to interest names.
+
+    :return: a json object with the opinions {interest_name: opinion_value}
+    """
     data = json.loads(request.get_data())
     user_id = int(data["user_id"])
 
+    # Subquery: for this agent, get the latest tid for each topic_id
+    # (This ensures we only get the most recent opinion per topic)
     subq = (
         db.session.query(
             Agent_Opinion.topic_id,
-            func.max(Agent_Opinion.tid).label("max_tid"),
+            func.max(Agent_Opinion.tid).label("max_tid")
         )
         .filter(Agent_Opinion.agent_id == user_id)
         .group_by(Agent_Opinion.topic_id)
         .subquery()
     )
 
+    # Main query: Join Agent_Opinion with Subquery (for latest) AND Interest (for name)
+    # We query specific columns: Interest.interest and Agent_Opinion.opinion
     rows = (
         db.session.query(Interests.interest, Interests.iid, Agent_Opinion.opinion)
         .join(
             subq,
-            (Agent_Opinion.topic_id == subq.c.topic_id)
-            & (Agent_Opinion.tid == subq.c.max_tid),
+            (Agent_Opinion.topic_id == subq.c.topic_id) &
+            (Agent_Opinion.tid == subq.c.max_tid)
         )
-        .join(Interests, Agent_Opinion.topic_id == Interests.iid)
+        .join(Interests, Agent_Opinion.topic_id == Interests.iid)  # Join to get the interest name
         .filter(Agent_Opinion.agent_id == user_id)
         .all()
     )
 
-    res = {row.interest: [float(row.opinion), int(row.iid)] for row in rows}
+    # Construct the dictionary using the Interest name as the key
+    res = {row.interest: [float(row.opinion), row.iid] for row in rows}
+
     return json.dumps(res)
 
 
 @app.route("/get_users_opinions", methods=["POST"])
 def get_users_opinions():
-    _ensure_agent_opinion_schema()
+    """
+    Get the opinions of a user mapped to interest names.
+
+    :return: a json object with the opinions {interest_name: opinion_value}
+    """
     data = json.loads(request.get_data())
     user_id = int(data["user_id"])
-    topic = str(data["topic"])
+    topic = data["topic"]
 
+    # get topic id from Interests table
     interest = Interests.query.filter_by(interest=topic).first()
-    if interest is None:
-        return json.dumps([])
-    target_topic_id = int(interest.iid)
+    if interest is not None:
+        target_topic_id = int(interest.iid)
+    else:
+        return []
 
-    followee_ids = [
-        f.follower_id
-        for f in Follow.query.filter_by(user_id=user_id, action="follow").all()
-    ]
-    if not followee_ids:
-        return json.dumps([])
+    followee_ids = [f.follower_id for f in Follow.query.filter_by(user_id=user_id, action="follow").all()]
 
+    # ---------------------------------------------------------
+    # Subquery: Get the latest tid per AGENT for this specific TOPIC
+    # ---------------------------------------------------------
     subq = (
         db.session.query(
             Agent_Opinion.agent_id,
-            func.max(Agent_Opinion.tid).label("max_tid"),
+            func.max(Agent_Opinion.tid).label("max_tid")
         )
         .filter(
-            Agent_Opinion.topic_id == target_topic_id,
-            Agent_Opinion.agent_id.in_(followee_ids),
+            Agent_Opinion.topic_id == target_topic_id,  # Filter for the input topic
+            Agent_Opinion.agent_id.in_(followee_ids)  # Filter for the list of agents
         )
-        .group_by(Agent_Opinion.agent_id)
+        .group_by(Agent_Opinion.agent_id)  # Group by agent (one opinion per person)
         .subquery()
     )
 
+    # ---------------------------------------------------------
+    # Main Query: Join back to get the actual opinion text
+    # ---------------------------------------------------------
     rows = (
-        db.session.query(Agent_Opinion.opinion)
+        db.session.query(
+            Agent_Opinion.agent_id,  # Include this so you know WHO said it
+            Interests.interest,  # The topic name
+            Agent_Opinion.opinion
+        )
         .join(
             subq,
-            (Agent_Opinion.agent_id == subq.c.agent_id)
-            & (Agent_Opinion.tid == subq.c.max_tid),
+            (Agent_Opinion.agent_id == subq.c.agent_id) &
+            (Agent_Opinion.tid == subq.c.max_tid)
         )
+        .join(Interests, Agent_Opinion.topic_id == Interests.iid)
+        # We repeat the filters here for query optimizer safety,
+        # though the join on subq technically limits the rows already.
         .filter(
             Agent_Opinion.topic_id == target_topic_id,
-            Agent_Opinion.agent_id.in_(followee_ids),
+            Agent_Opinion.agent_id.in_(followee_ids)
         )
         .all()
     )
 
-    return json.dumps([float(row.opinion) for row in rows])
+    res = [float(row.opinion) for row in rows]
+
+    return json.dumps(res)
 
 
 @app.route("/set_user_opinions", methods=["POST"])
 def set_user_opinions():
-    _ensure_agent_opinion_schema()
+    """
+    Set the opinions of a user.
+
+    :return: a json object with the status of the update
+    """
     data = json.loads(request.get_data())
 
-    agent_id = int(data.get("user_id"))
+    agent_id = data.get("user_id")
     opinions = data.get("opinions", {})
-    tid = int(data.get("round"))
-    id_interacted_with = int(data.get("id_interacted_with", -1))
-    id_post = int(data.get("id_post", -1))
+    tid = data.get("round")
+    id_interacted_with = data.get("id_interacted_with", -1)
+    id_post = data.get("id_post", -1)
 
     try:
         for topic_id, opinion_value in opinions.items():
-            resolved_topic_id = topic_id
+
+            # if topic_id is a string, get the iid from the Interests table
             if isinstance(topic_id, str):
                 try:
-                    resolved_topic_id = int(topic_id)
-                    interest = Interests.query.filter_by(iid=resolved_topic_id).first()
+                    topic_id = int(topic_id)
+                    # check if the topic_id exists in the Interests table
+                    interest = Interests.query.filter_by(iid=topic_id).first()
                     if interest is None:
-                        raise ValueError(f"Interest ID {resolved_topic_id} does not exist.")
-                except Exception:
+                        raise ValueError(f"Interest ID {topic_id} does not exist.")
+                except:
                     interest = Interests.query.filter_by(interest=topic_id).first()
                     if interest is None:
-                        interest = Interests(interest=topic_id)
-                        db.session.add(interest)
+                        # create the interest
+                        new_interest = Interests(interest=topic_id)
+                        db.session.add(new_interest)
                         db.session.commit()
-                    resolved_topic_id = int(interest.iid)
+                        topic_id = new_interest.iid
+                    else:
+                        topic_id = interest.iid
 
-            db.session.add(
-                Agent_Opinion(
+            # Insert a new opinion record
+            new_record = Agent_Opinion(
                     agent_id=agent_id,
                     tid=tid,
-                    topic_id=int(resolved_topic_id),
+                    topic_id=topic_id,
                     id_interacted_with=id_interacted_with,
                     id_post=id_post,
-                    opinion=float(opinion_value),
-                )
+                    opinion=float(opinion_value)
             )
+            db.session.add(new_record)
 
         db.session.commit()
-    except Exception as exc:
+
+    except Exception as e:
         db.session.rollback()
-        return json.dumps({"status": 400, "error": str(exc)}), 400
+        return json.dumps({"status": 400, "error": str(e)})
 
     return json.dumps({"status": 200})

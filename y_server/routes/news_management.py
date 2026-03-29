@@ -1,21 +1,22 @@
 import json
+
 from flask import request
 from y_server import app, db
 from y_server.content_analysis import toxicity, vader_sentiment
 from y_server.modals import (
-    Post,
-    User_mgmt,
-    Emotions,
-    Post_emotions,
-    Hashtags,
-    Post_hashtags,
-    Mentions,
-    Articles,
-    Websites,
-    Interests,
     Article_topics,
+    Articles,
+    Emotions,
+    Hashtags,
+    Interests,
+    Mentions,
+    Post,
+    Post_emotions,
+    Post_hashtags,
     Post_Sentiment,
-    Post_topics
+    Post_topics,
+    User_mgmt,
+    Websites,
 )
 
 
@@ -45,7 +46,6 @@ def comment_news():
     fetched_on = data["fetched_on"]
 
     user = User_mgmt.query.filter_by(id=account_id).first()
-    sentiment = vader_sentiment(text)
 
     # check if website exists
     website = Websites.query.filter_by(rss=rss).first()
@@ -78,11 +78,12 @@ def comment_news():
         db.session.commit()
     article_id = Articles.query.filter_by(link=link, website_id=website_id).first().id
 
-    post = None
-
     # add post only if the text is not empty
     # (this might happen if the method is called to save the article for image processing)
-    if len(text) > 0:
+    if len(text) == 0:
+        post = None
+
+    else:
         post = Post(
             tweet=text,
             round=tid,
@@ -93,8 +94,6 @@ def comment_news():
 
         db.session.add(post)
         db.session.commit()
-
-        toxicity(text, app.config.get("perspective_api"), post.id, db)
 
         post.thread_id = post.id
         db.session.commit()
@@ -109,32 +108,39 @@ def comment_news():
                 db.session.add(post_emotion)
                 db.session.commit()
 
-        for tag in hastags:
-            if len(tag) < 4:
-                continue
+        if hastags is not None:
+            for tag in hastags:
+                if len(tag) < 4:
+                    continue
 
-            ht = Hashtags.query.filter_by(hashtag=tag).first()
-            if ht is None:
-                ht = Hashtags(hashtag=tag)
-                db.session.add(ht)
-                db.session.commit()
                 ht = Hashtags.query.filter_by(hashtag=tag).first()
+                if ht is None:
+                    ht = Hashtags(hashtag=tag)
+                    db.session.add(ht)
+                    db.session.commit()
+                    ht = Hashtags.query.filter_by(hashtag=tag).first()
 
-            post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
-            db.session.add(post_tag)
-            db.session.commit()
-
-        for mention in mentions:
-            if len(mention) < 1:
-                continue
-
-            us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
-            if us is not None:
-                mention = Mentions(user_id=us.id, post_id=post.id, round=tid)
-                db.session.add(mention)
+                post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
+                db.session.add(post_tag)
                 db.session.commit()
 
-    if "topics" in data:
+        if mentions is not None:
+            for mention in mentions:
+                if len(mention) < 1:
+                    continue
+
+                us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
+                if us is not None:
+                    mention = Mentions(user_id=us.id, post_id=post.id, round=tid)
+                    db.session.add(mention)
+                    db.session.commit()
+
+    if post is not None and "topics" in data:
+        # compute sentiment
+        sentiment = vader_sentiment(text)
+
+        toxicity(text, app.config["perspective_api"], post.id, db)
+
         for topic in data["topics"]:
             if len(topic) < 1:
                 continue
@@ -147,29 +153,29 @@ def comment_news():
 
             interests = Interests.query.filter_by(interest=topic).first()
 
-            at = Article_topics.query.filter_by(article_id=article_id, topic_id=interests.iid).first()
+            at = Article_topics.query.filter_by(
+                article_id=article_id, topic_id=interests.iid
+            ).first()
             if at is None:
                 at = Article_topics(article_id=article_id, topic_id=interests.iid)
                 db.session.add(at)
 
-            if post is not None:
-                pt = Post_topics(post_id=post.id, topic_id=interests.iid)
-                db.session.add(pt)
+            pt = Post_topics(post_id=post.id, topic_id=interests.iid)
+            db.session.add(pt)
 
-                post_sentiment = Post_Sentiment(
-                    post_id=post.id,
-                    user_id=user.id,
-                    pos=sentiment["pos"],
-                    neg=sentiment["neg"],
-                    neu=sentiment["neu"],
-                    compound=sentiment["compound"],
-                    round=tid,
-                    is_post=1,
-                    topic_id=interests.iid,
-                )
-                db.session.add(post_sentiment)
-
-        db.session.commit()
+            post_sentiment = Post_Sentiment(
+                post_id=post.id,
+                user_id=user.id,
+                pos=sentiment["pos"],
+                neg=sentiment["neg"],
+                neu=sentiment["neu"],
+                compound=sentiment["compound"],
+                round=tid,
+                is_post=1,
+                topic_id=interests.iid,
+            )
+            db.session.add(post_sentiment)
+            db.session.commit()
 
     return json.dumps({"status": 200, "article_id": article_id})
 
@@ -234,33 +240,35 @@ def share():
     tid = int(data["tid"])
 
     user = User_mgmt.query.filter_by(id=account_id).first()
-    original_post = Post.query.filter_by(id=post_id).first()
-    sentiment = vader_sentiment(text)
+    post = Post.query.filter_by(id=post_id).first()
 
     post = Post(
         tweet=text,
         round=tid,
         user_id=user.id,
         shared_from=post_id,
-        news_id=original_post.news_id,
+        news_id=post.news_id,
     )
 
     db.session.add(post)
     db.session.commit()
 
-    toxicity(text, app.config.get("perspective_api"), post.id, db)
-
     post.thread_id = post.id
     db.session.commit()
+
+    sentiment = vader_sentiment(text)
+
+    toxicity(text, app.config["perspective_api"], post.id, db)
 
     topics = Post_topics.query.filter_by(post_id=post_id).all()
 
     sentiment_parent = Post_Sentiment.query.filter_by(post_id=post_id).first()
     if sentiment_parent is not None:
-        compound = float(sentiment_parent.compound or 0.0)
-        if compound > 0.05:
+        sentiment_parent = sentiment_parent.compound
+        # thresholding
+        if sentiment_parent > 0.05:
             sentiment_parent = "pos"
-        elif compound < -0.05:
+        elif sentiment_parent < -0.05:
             sentiment_parent = "neg"
         else:
             sentiment_parent = "neu"
@@ -293,29 +301,31 @@ def share():
             db.session.add(post_emotion)
             db.session.commit()
 
-    for tag in hastags:
-        if len(tag) < 1:
-            continue
+    if hastags is not None:
+        for tag in hastags:
+            if len(tag) < 1:
+                continue
 
-        ht = Hashtags.query.filter_by(hashtag=tag).first()
-        if ht is None:
-            ht = Hashtags(hashtag=tag)
-            db.session.add(ht)
-            db.session.commit()
             ht = Hashtags.query.filter_by(hashtag=tag).first()
+            if ht is None:
+                ht = Hashtags(hashtag=tag)
+                db.session.add(ht)
+                db.session.commit()
+                ht = Hashtags.query.filter_by(hashtag=tag).first()
 
-        post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
-        db.session.add(post_tag)
-        db.session.commit()
-
-    for mention in mentions:
-        if len(mention) < 1:
-            continue
-
-        us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
-        if us is not None:
-            mention = Mentions(user_id=us.id, post_id=post.id, round=tid)
-            db.session.add(mention)
+            post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
+            db.session.add(post_tag)
             db.session.commit()
+
+    if mentions is not None:
+        for mention in mentions:
+            if len(mention) < 1:
+                continue
+
+            us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
+            if us is not None:
+                mention = Mentions(user_id=us.id, post_id=post.id, round=tid)
+                db.session.add(mention)
+                db.session.commit()
 
     return json.dumps({"status": 200})

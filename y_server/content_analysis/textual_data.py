@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import traceback
+
+from y_server.error_logging import log_error
 from y_server.modals import Post_Toxicity
 
 
@@ -87,5 +90,6 @@ def toxicity(text, api_key, post_id, db):
         else:
             scores = _detoxify_scores(text)
         _persist_toxicity_scores(post_id, db, scores)
-    except Exception:
+    except Exception as e:
+        log_error(f"Toxicity API error for post_id={post_id}: {str(e)}\nTraceback: {traceback.format_exc()}")
         return

@@ -1,23 +1,53 @@
 import json
 import os
+import sys
+import traceback
+from datetime import datetime
 
 
-def _resolve_server_log_file(config_file: str) -> str:
-    env_path = str(os.environ.get("YSERVER_LOG_FILE", "") or "").strip()
-    if env_path:
-        return env_path
-    config_dir = os.path.dirname(os.path.abspath(config_file or "")) or os.getcwd()
-    return os.path.join(config_dir, "_server.log")
+def log_error(message):
+    """
+    Log an error message to stderr with timestamp formatting.
+    
+    Each write starts with "### date and time ###\n" and ends with "\n####".
+    Uses flush=True to ensure immediate output for debugging.
+    
+    Note: This is defined locally to avoid import issues during module loading.
+    
+    :param message: the error message to log
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"### {timestamp} ###\n{message}\n####", file=sys.stderr, flush=True)
 
 
 def start_server(config):
     """
     Start the app
     """
-    from y_server import app
+    try:
+        print(config)
+        from y_server import app
 
-    debug = False
-    app.run(debug=debug, port=int(config["port"]), host=config["host"])
+        # import nltk
+        # nltk.download("vader_lexicon")
+        debug = False
+        app.config["perspective_api"] = config["perspective_api"]
+        app.config["sentiment_annotation"] = config["sentiment_annotation"]
+        app.config["emotion_annotation"] = config["emotion_annotation"]
+        
+        log_error(f"SERVER STARTING: Flask app.run() about to be called\nProcess ID: {os.getpid()}\nHost: {config['host']}\nPort: {config['port']}\nDebug: {debug}")
+        
+        app.run(debug=debug, port=int(config["port"]), host=config["host"])
+        
+        # If we reach here, app.run() returned - this should only happen on shutdown
+        log_error(f"SERVER STOPPED: Flask app.run() returned normally\nProcess ID: {os.getpid()}\nThis indicates the server stopped without an exception.\nPossible causes: SIGTERM/SIGINT received, werkzeug reloader exiting, or server shutdown requested.")
+        
+    except SystemExit as e:
+        log_error(f"SERVER EXITING: SystemExit raised in start_server\nProcess ID: {os.getpid()}\nExit code: {e.code}\nTraceback: {traceback.format_exc()}")
+        raise
+    except Exception as e:
+        log_error(f"Error starting server: {str(e)}\nConfig: {config}\nTraceback: {traceback.format_exc()}")
+        raise
 
 
 if __name__ == "__main__":
@@ -33,22 +63,11 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    config_file = os.path.abspath(args.config_file)
-    # y_server reads config during import, so expose the selected config first.
-    os.environ["YSERVER_CONFIG"] = config_file
-    config = json.load(open(config_file, "r"))
-
-    log_file = _resolve_server_log_file(config_file)
-    os.environ["YSERVER_LOG_FILE"] = log_file
+    config_file = args.config_file
     try:
-        os.makedirs(os.path.dirname(log_file), exist_ok=True)
-        with open(log_file, "a", encoding="utf-8"):
-            pass
-    except Exception:
-        pass
-
-    from y_server import app
-
-    app.config["log_file"] = log_file
+        config = json.load(open(config_file, "r"))
+    except Exception as e:
+        log_error(f"Error loading config file {config_file}: {str(e)}\nTraceback: {traceback.format_exc()}")
+        raise
 
     start_server(config)

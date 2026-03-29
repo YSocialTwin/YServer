@@ -1,11 +1,11 @@
-from y_server import db
 from flask_login import UserMixin
+from y_server import db
 
 
 class User_mgmt(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(15), nullable=False, unique=True)
-    email = db.Column(db.String(50), nullable=False, unique=True)
+    email = db.Column(db.String(50), nullable=True, default="")
     password = db.Column(db.String(80), nullable=False)
     leaning = db.Column(db.String(10), default="neutral")
     user_type = db.Column(db.String(10), nullable=False, default="user")
@@ -27,6 +27,10 @@ class User_mgmt(UserMixin, db.Model):
     toxicity = db.Column(db.String(10), default="no")
     is_page = db.Column(db.Integer, default=0)
     left_on = db.Column(db.Integer, default=None)
+    daily_activity_level = db.Column(db.Integer(), default=1)
+    profession = db.Column(db.String(50), default="")
+    activity_profile = db.Column(db.String(50), default="Always On")
+    archetype = db.Column(db.String(50), nullable=True, default=None)
 
     posts = db.relationship("Post", backref="author", lazy=True)
     liked = db.relationship("Reactions", backref="liked_by", lazy=True)
@@ -43,6 +47,7 @@ class Post(db.Model):
     news_id = db.Column(db.String(50), db.ForeignKey("articles.id"), default=None)
     image_id = db.Column(db.Integer(), db.ForeignKey("images.id"), default=None)
     shared_from = db.Column(db.Integer, default=-1)
+    reaction_count = db.Column(db.Integer, default=0)
 
 
 class Hashtags(db.Model):
@@ -138,21 +143,93 @@ class Interests(db.Model):
     interest = db.Column(db.String(20), nullable=False)
 
 
-class Agent_Opinion(db.Model):
-    __tablename__ = "agent_opinion"
-
+class User_interest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    agent_id = db.Column(db.Integer, nullable=False, index=True)
-    tid = db.Column(db.Integer, nullable=False, index=True)
-    topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False, index=True)
-    id_interacted_with = db.Column(db.Integer, nullable=False, default=-1)
-    id_post = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False, default=-1)
+    user_id = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False)
+    interest_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
+    round_id = db.Column(db.Integer, db.ForeignKey("rounds.id"), nullable=False)
+
+
+class Post_topics(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
+    topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
+
+
+class Images(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    url = db.Column(db.String(200), nullable=True)
+    description = db.Column(db.String(400), nullable=True)
+    article_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=True)
+
+
+class Article_topics(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    article_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=False)
+    topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
+
+
+class Post_Sentiment(db.Model):
+    __tablename__ = "post_sentiment"
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False)
+    round = db.Column(db.Integer, db.ForeignKey("rounds.id"), nullable=False)
+    topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
+    is_post = db.Column(db.Integer, default=0)
+    is_comment = db.Column(db.Integer, default=0)
+    is_reaction = db.Column(db.Integer, default=0)
+    neg = db.Column(db.REAL)
+    neu = db.Column(db.REAL)
+    pos = db.Column(db.REAL)
+    compound = db.Column(db.REAL)
+    sentiment_parent = db.Column(db.String(5), default="")
+
+
+class Post_Toxicity(db.Model):
+    __tablename__ = "post_toxicity"
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
+    toxicity = db.Column(db.REAL, default=0)
+    severe_toxicity = db.Column(db.REAL, default=0)
+    identity_attack = db.Column(db.REAL, default=0)
+    insult = db.Column(db.REAL, default=0)
+    profanity = db.Column(db.REAL, default=0)
+    threat = db.Column(db.REAL, default=0)
+    sexually_explicit = db.Column(db.REAL, default=0)
+    flirtation = db.Column(db.REAL, default=0)
+
+
+class Agent_Opinion(db.Model):
+    """
+    Agent opinion tracking for interactions.
+
+    Stores opinions that agents form about topics, posts, and other agents
+    during their interactions in the simulation. The opinion is stored as
+    a float value representing the agent's sentiment or stance.
+
+    Fields:
+        id: Primary key
+        agent_id: ID of the agent forming the opinion
+        tid: Transaction/interaction ID for this opinion event
+        topic_id: ID of the topic being discussed (FK to interests)
+        id_interacted_with: ID of the user/agent being interacted with
+        id_post: ID of the post that triggered this opinion (FK to post)
+        opinion: Numerical opinion value (float) indicating sentiment/stance
+    """
+
+    __tablename__ = "agent_opinion"
+    id = db.Column(db.Integer, primary_key=True)
+    agent_id = db.Column(db.Integer, nullable=False)
+    tid = db.Column(db.Integer, nullable=False)
+    topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
+    id_interacted_with = db.Column(db.Integer, nullable=False)
+    id_post = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
     opinion = db.Column(db.REAL, nullable=False)
 
-
 # ---------------------------------------------------------------------------
-# Run-scoped agent memory. This is additive and inactive until the dedicated
-# /memory/* API is used by a client.
+# Memory subsystem models
+# The /memory/* API is used by a client.
 # ---------------------------------------------------------------------------
 
 
@@ -257,62 +334,3 @@ class MemoryItem(db.Model):
     embedding_status = db.Column(db.String(16), default="pending", index=True)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
-
-
-class User_interest(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False)
-    interest_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
-    round_id = db.Column(db.Integer, db.ForeignKey("rounds.id"), nullable=False)
-
-
-class Post_topics(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
-    topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
-
-
-class Images(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    url = db.Column(db.String(200), nullable=True)
-    description = db.Column(db.String(400), nullable=True)
-    article_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=True)
-
-
-class Article_topics(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    article_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=False)
-    topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
-
-
-class Post_Sentiment(db.Model):
-    __tablename__ = "post_sentiment"
-
-    id = db.Column(db.Integer, primary_key=True)
-    post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False)
-    round = db.Column(db.Integer, db.ForeignKey("rounds.id"), nullable=False)
-    topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
-    is_post = db.Column(db.Integer, default=0)
-    is_comment = db.Column(db.Integer, default=0)
-    is_reaction = db.Column(db.Integer, default=0)
-    neg = db.Column(db.REAL)
-    neu = db.Column(db.REAL)
-    pos = db.Column(db.REAL)
-    compound = db.Column(db.REAL)
-    sentiment_parent = db.Column(db.String(5), default="")
-
-
-class Post_Toxicity(db.Model):
-    __tablename__ = "post_toxicity"
-
-    id = db.Column(db.Integer, primary_key=True)
-    post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
-    toxicity = db.Column(db.REAL, default=0)
-    severe_toxicity = db.Column(db.REAL, default=0)
-    identity_attack = db.Column(db.REAL, default=0)
-    insult = db.Column(db.REAL, default=0)
-    profanity = db.Column(db.REAL, default=0)
-    threat = db.Column(db.REAL, default=0)
-    sexually_explicit = db.Column(db.REAL, default=0)
-    flirtation = db.Column(db.REAL, default=0)

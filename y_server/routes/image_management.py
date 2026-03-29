@@ -1,13 +1,14 @@
 import json
+
 from flask import request
 from y_server import app, db
 from y_server.content_analysis import toxicity, vader_sentiment
 from y_server.modals import (
+    Emotions,
+    Hashtags,
     Images,
     Post,
-    Emotions,
     Post_emotions,
-    Hashtags,
     Post_hashtags,
     Post_Sentiment,
 )
@@ -45,13 +46,13 @@ def post_image():
         db.session.commit()
 
     # get image id
-    image_id = Images.query.filter_by(url=image_url).first().id
+    image_id = Images.query.filter_by(url=image_url).first()
 
     post = Post(
         tweet=text,
         round=tid,
         user_id=account_id,
-        image_id=image_id,
+        image_id=image_id.id,
         comment_to=-1,
     )
 
@@ -59,7 +60,8 @@ def post_image():
     db.session.commit()
 
     sentiment = vader_sentiment(text)
-    toxicity(text, app.config.get("perspective_api"), post.id, db)
+
+    toxicity(text, app.config["perspective_api"], post.id, db)
 
     post_sentiment = Post_Sentiment(
         post_id=post.id,
@@ -88,19 +90,20 @@ def post_image():
             db.session.add(post_emotion)
             db.session.commit()
 
-    for tag in hashtags:
-        if len(tag) < 1:
-            continue
+    if hashtags is not None:
+        for tag in hashtags:
+            if len(tag) < 1:
+                continue
 
-        ht = Hashtags.query.filter_by(hashtag=tag).first()
-        if ht is None:
-            ht = Hashtags(hashtag=tag)
-            db.session.add(ht)
-            db.session.commit()
             ht = Hashtags.query.filter_by(hashtag=tag).first()
+            if ht is None:
+                ht = Hashtags(hashtag=tag)
+                db.session.add(ht)
+                db.session.commit()
+                ht = Hashtags.query.filter_by(hashtag=tag).first()
 
-        post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
-        db.session.add(post_tag)
-        db.session.commit()
+            post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
+            db.session.add(post_tag)
+            db.session.commit()
 
     return json.dumps({"status": 200})
