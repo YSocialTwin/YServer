@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from y_server import app, db
+from y_server import _normalize_database_uri, app, db
 from y_server.routes import memory_management
 from y_server.modals import (
     Interests,
@@ -147,6 +147,24 @@ def test_configure_memory_embedding_requires_explicit_config():
     assert configured is not None
     assert configured.model_name == "embeddinggemma:latest"
     assert configured.ollama_host == "http://127.0.0.1:11434"
+
+
+def test_configure_memory_embedding_accepts_flat_aliases():
+    memory_management.configure_memory_embedding_from_config(
+        {
+            "memory_embedding_model": "embeddinggemma:latest",
+            "memory_embedding_service": "ollama",
+        }
+    )
+    configured = memory_management._MEMORY_EMBEDDING
+    assert configured is not None
+    assert configured.model_name == "embeddinggemma:latest"
+    assert configured.ollama_host == "http://127.0.0.1:11434"
+
+
+def test_normalize_database_uri_accepts_plain_sqlite_path():
+    normalized = _normalize_database_uri("/tmp/yserver-config-contract.db")
+    assert normalized == "sqlite:////tmp/yserver-config-contract.db"
 
 
 def test_memory_social_and_thread_upsert_and_context(client):

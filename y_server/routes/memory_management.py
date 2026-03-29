@@ -72,12 +72,44 @@ def configure_memory_embedding_from_config(config_data):
     settings = {}
     if isinstance(config_data, dict):
         settings = config_data.get("memory_embeddings") or {}
+        if not isinstance(settings, dict) or not settings:
+            memory_block = config_data.get("memory") or {}
+            if isinstance(memory_block, dict):
+                settings = (
+                    memory_block.get("embeddings")
+                    or memory_block.get("embedding")
+                    or {}
+                )
+        if not isinstance(settings, dict) or not settings:
+            service = (
+                config_data.get("memory_embedding_service")
+                or config_data.get("embedding_service")
+                or ""
+            )
+            host = (
+                config_data.get("memory_embedding_host")
+                or config_data.get("embedding_host")
+                or ""
+            )
+            model = (
+                config_data.get("memory_embedding_model")
+                or config_data.get("embedding_model")
+                or ""
+            )
+            settings = {"service": service, "host": host, "model": model}
     if not isinstance(settings, dict):
         settings = {}
+    service = settings.get("service")
+    host = settings.get("host")
+    model = settings.get("model")
+    if model and not service:
+        service = "ollama"
+    if str(service or "").strip().lower() == "ollama" and not host:
+        host = "http://127.0.0.1:11434"
     configure_memory_embedding(
-        service=settings.get("service"),
-        host=settings.get("host"),
-        model=settings.get("model"),
+        service=service,
+        host=host,
+        model=model,
     )
 
 

@@ -124,6 +124,16 @@ db = SQLAlchemy()
 # Track active requests for debugging hangs
 _active_requests = {}
 _request_lock = threading.Lock()
+_loaded_config = {}
+
+
+def _normalize_database_uri(raw_uri):
+    uri = str(raw_uri or "").strip()
+    if not uri:
+        return ""
+    if "://" in uri:
+        return uri
+    return f"sqlite:///{os.path.abspath(uri)}"
 
 
 def _ensure_optional_analytics_schema():
@@ -148,6 +158,7 @@ try:
     # Support YSERVER_CONFIG environment variable to allow custom config paths
     config_file = os.environ.get('YSERVER_CONFIG', f"config_files{os.sep}exp_config.json")
     config = json.load(open(config_file))
+    _loaded_config = config
 
     # create the experiments folder
     if not os.path.exists(f".{os.sep}experiments"):
@@ -156,7 +167,7 @@ try:
     # Determine database URI
     # Priority: 1) database_uri from config, 2) default SQLite based on name
     if "database_uri" in config and config["database_uri"]:
-        db_uri = config["database_uri"]
+        db_uri = _normalize_database_uri(config["database_uri"])
         # For SQLite URIs, ensure the database file exists
         if db_uri.startswith("sqlite"):
             # Extract path from sqlite:/// URI
@@ -194,6 +205,10 @@ try:
     app.config.setdefault("sentiment_annotation", False)
     app.config.setdefault("emotion_annotation", False)
     app.config.setdefault("toxicity_annotation", False)
+    app.config.setdefault(
+        "memory_enabled",
+        bool((config.get("memory") or {}).get("enabled", config.get("memory_enabled", False))),
+    )
     
     # Configure engine options based on database type
     # Use NullPool for both SQLite and PostgreSQL for Gunicorn compatibility
@@ -579,3 +594,8 @@ except Exception as init_exception:  # Y Web subprocess
             })
 
 from y_server.routes import *
+
+try:
+    configure_memory_embedding_from_config(_loaded_config or app.config)
+except Exception:
+    pass

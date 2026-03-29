@@ -34,10 +34,13 @@ def start_server(config):
         # import nltk
         # nltk.download("vader_lexicon")
         debug = False
-        app.config["perspective_api"] = config["perspective_api"]
+        app.config["perspective_api"] = config.get("perspective_api")
         app.config["toxicity_annotation"] = config.get("toxicity_annotation", False)
-        app.config["sentiment_annotation"] = config["sentiment_annotation"]
-        app.config["emotion_annotation"] = config["emotion_annotation"]
+        app.config["sentiment_annotation"] = config.get("sentiment_annotation", False)
+        app.config["emotion_annotation"] = config.get("emotion_annotation", False)
+        app.config["memory_enabled"] = bool(
+            (config.get("memory") or {}).get("enabled", config.get("memory_enabled", False))
+        )
         
         log_error(f"SERVER STARTING: Flask app.run() about to be called\nProcess ID: {os.getpid()}\nHost: {config['host']}\nPort: {config['port']}\nDebug: {debug}")
         

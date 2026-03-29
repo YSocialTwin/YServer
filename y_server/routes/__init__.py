@@ -12,7 +12,8 @@ from .time_management import *
 from .user_managment import *
 
 try:
-    config = json.load(open(f"config_files{os.sep}exp_config.json"))
+    config_file = os.environ.get("YSERVER_CONFIG", f"config_files{os.sep}exp_config.json")
+    config = json.load(open(config_file))
 
     import importlib
 
