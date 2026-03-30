@@ -71,7 +71,7 @@ def read():
 
     # if no user id is provided, return an empty list
     articles = False
-    if "article" in data:
+    if data.get("article") or data.get("articles"):
         articles = True
         # get the user
         us = User_mgmt.query.filter_by(id=uid).first()
