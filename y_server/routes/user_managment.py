@@ -15,8 +15,12 @@ def get_user_id():
 
     :return: a json object with the user id
     """
-    data = json.loads(request.get_data())
-    username = data["username"]
+    raw = request.get_data()
+    if raw:
+        data = json.loads(raw)
+        username = data["username"]
+    else:
+        username = request.args.get("username")
 
     user = User_mgmt.query.filter_by(username=username).first()
     if user is None:
