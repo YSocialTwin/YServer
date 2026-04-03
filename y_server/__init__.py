@@ -204,6 +204,7 @@ try:
     app.config.setdefault("perspective_api", None)
     app.config.setdefault("sentiment_annotation", False)
     app.config.setdefault("emotion_annotation", False)
+    app.config.setdefault("sync_timeout_seconds", 300)
     app.config.setdefault("toxicity_annotation", False)
     app.config.setdefault(
         "memory_enabled",
@@ -426,6 +427,7 @@ except Exception as init_exception:  # Y Web subprocess
     app.config.setdefault("perspective_api", None)
     app.config.setdefault("sentiment_annotation", False)
     app.config.setdefault("emotion_annotation", False)
+    app.config.setdefault("sync_timeout_seconds", 300)
     app.config.setdefault("toxicity_annotation", False)
     
     # SQLite-specific configuration for Gunicorn compatibility

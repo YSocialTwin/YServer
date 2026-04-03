@@ -102,6 +102,16 @@ class Rounds(db.Model):
     hour = db.Column(db.Integer, nullable=False)
 
 
+class SimulationClient(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.String(128), nullable=False, unique=True, index=True)
+    status = db.Column(db.String(16), nullable=False, default="active", index=True)
+    last_heartbeat = db.Column(db.Float, nullable=False, default=0.0)
+    submitted_round_id = db.Column(db.Integer, db.ForeignKey("rounds.id"), nullable=True)
+    created_at = db.Column(db.Float, nullable=False, default=0.0)
+    updated_at = db.Column(db.Float, nullable=False, default=0.0)
+
+
 class Recommendations(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False)

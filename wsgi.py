@@ -62,6 +62,7 @@ try:
         app.config["perspective_api"] = config.get("perspective_api")
         app.config["sentiment_annotation"] = config.get("sentiment_annotation", False)
         app.config["emotion_annotation"] = config.get("emotion_annotation", False)
+        app.config["sync_timeout_seconds"] = config.get("sync_timeout_seconds", 300)
     else:
         log_error(f"WSGI config file not found: {config_file}")
 
