@@ -1,0 +1,10 @@
+{
+  "plugin_name": "YServer",
+  "category": "Simulation Runtime Stack",
+  "group": "Microblogging",
+  "description": "Server-side microblogging simulation runtime for YSocial experiments.",
+  "authors": [
+    "YSocialTwin"
+  ],
+  "repository_url": "https://github.com/YSocialTwin/YServer"
+}
