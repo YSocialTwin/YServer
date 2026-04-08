@@ -49,6 +49,7 @@ class Post(db.Model):
     shared_from = db.Column(db.Integer, default=-1)
     reaction_count = db.Column(db.Integer, default=0)
     moderated = db.Column(db.Integer, default=0, nullable=False)
+    is_moderation_comment = db.Column(db.Integer, default=0, nullable=False)
 
 
 class Hashtags(db.Model):

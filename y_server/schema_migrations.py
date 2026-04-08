@@ -101,6 +101,11 @@ def ensure_moderation_schema(engine) -> None:
         if "moderated" not in post_columns:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE post ADD COLUMN moderated INTEGER DEFAULT 0"))
+        if "is_moderation_comment" not in post_columns:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE post ADD COLUMN is_moderation_comment INTEGER DEFAULT 0")
+                )
 
     SysMessage.__table__.create(bind=engine, checkfirst=True)
     Reported.__table__.create(bind=engine, checkfirst=True)
