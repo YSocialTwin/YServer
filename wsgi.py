@@ -60,6 +60,7 @@ try:
         
         # Set Flask app config values from the experiment config
         app.config["perspective_api"] = config.get("perspective_api")
+        app.config["toxicity_annotation"] = config.get("toxicity_annotation", False)
         app.config["sentiment_annotation"] = config.get("sentiment_annotation", False)
         app.config["emotion_annotation"] = config.get("emotion_annotation", False)
         app.config["sync_timeout_seconds"] = config.get("sync_timeout_seconds", 300)
