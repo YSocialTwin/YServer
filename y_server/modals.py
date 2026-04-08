@@ -128,7 +128,7 @@ class SysMessage(db.Model):
     to_uid = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=True)
     message = db.Column(db.Text, nullable=False)
     from_round = db.Column(db.Integer, db.ForeignKey("rounds.id"), nullable=True)
-    to_round = db.Column(db.Integer, db.ForeignKey("rounds.id"), nullable=True)
+    duration = db.Column(db.Integer, nullable=True)
 
 
 class Reported(db.Model):

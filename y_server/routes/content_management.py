@@ -43,8 +43,10 @@ def _message_active_for_round(message, round_id):
 
     if message.from_round is not None and current_round < int(message.from_round):
         return False
-    if message.to_round is not None and current_round > int(message.to_round):
-        return False
+    if message.from_round is not None and message.duration is not None:
+        max_active_round = int(message.from_round) + int(message.duration)
+        if current_round > max_active_round:
+            return False
     return True
 
 
@@ -64,7 +66,7 @@ def _get_active_system_messages_for_user(user_id, round_id):
                 "message": message.message,
                 "to_uid": message.to_uid,
                 "from_round": message.from_round,
-                "to_round": message.to_round,
+                "duration": message.duration,
             }
         )
     return active

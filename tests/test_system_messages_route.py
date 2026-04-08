@@ -28,7 +28,7 @@ def test_get_active_system_messages_filters_user_and_round(monkeypatch):
             to_uid=7,
             message="Start your post with MOD NOTICE.",
             from_round=2,
-            to_round=5,
+            duration=3,
         ),
         SimpleNamespace(
             id=2,
@@ -36,7 +36,7 @@ def test_get_active_system_messages_filters_user_and_round(monkeypatch):
             to_uid=7,
             message="Expired instruction.",
             from_round=0,
-            to_round=1,
+            duration=1,
         ),
         SimpleNamespace(
             id=3,
@@ -44,7 +44,7 @@ def test_get_active_system_messages_filters_user_and_round(monkeypatch):
             to_uid=8,
             message="Other user.",
             from_round=2,
-            to_round=5,
+            duration=3,
         ),
     ]
 
@@ -64,7 +64,7 @@ def test_get_active_system_messages_filters_user_and_round(monkeypatch):
             "message": "Start your post with MOD NOTICE.",
             "to_uid": 7,
             "from_round": 2,
-            "to_round": 5,
+            "duration": 3,
         }
     ]
 
