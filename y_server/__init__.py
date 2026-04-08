@@ -153,6 +153,16 @@ def _ensure_optional_analytics_schema():
     except Exception:
         pass
 
+
+def _ensure_moderation_schema():
+    try:
+        with app.app_context():
+            from y_server.schema_migrations import ensure_moderation_schema
+
+            ensure_moderation_schema(db.engine)
+    except Exception:
+        pass
+
 try:
     # read the experiment configuration
     # Support YSERVER_CONFIG environment variable to allow custom config paths
@@ -295,6 +305,7 @@ try:
 
     # Ensure analytics/opinion tables exist for legacy databases
     _ensure_optional_analytics_schema()
+    _ensure_moderation_schema()
 
     # Clean up database sessions after each request
     # Essential when using NullPool to ensure connections are properly closed
