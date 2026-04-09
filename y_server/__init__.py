@@ -10,10 +10,91 @@ import threading
 import traceback
 from datetime import datetime
 
+import flask_sqlalchemy
 from flask import Flask, g, request
 from flask_sqlalchemy import SQLAlchemy
+import sqlalchemy
+import sqlalchemy.orm
 from sqlalchemy import desc
 from sqlalchemy.pool import NullPool
+
+
+def _ensure_flask_sqlalchemy_legacy_compat() -> None:
+    """
+    Keep Flask-SQLAlchemy 2.x compatible with SQLAlchemy 2.x.
+
+    The server runtimes still instantiate the legacy extension directly, so they
+    need the same import-time symbol shim already used in YWeb.
+    """
+
+    if not hasattr(sqlalchemy.orm, "relation") and hasattr(
+        sqlalchemy.orm, "relationship"
+    ):
+        sqlalchemy.orm.relation = sqlalchemy.orm.relationship
+
+    sqlalchemy_public = [
+        "Column",
+        "Integer",
+        "BigInteger",
+        "REAL",
+        "Float",
+        "Boolean",
+        "String",
+        "Text",
+        "DateTime",
+        "ForeignKey",
+        "UniqueConstraint",
+        "CheckConstraint",
+        "PrimaryKeyConstraint",
+        "ForeignKeyConstraint",
+        "Index",
+        "Table",
+        "func",
+        "text",
+        "or_",
+        "desc",
+    ]
+    orm_public = [
+        "relationship",
+        "relation",
+        "dynamic_loader",
+        "backref",
+    ]
+
+    if not hasattr(sqlalchemy, "__all__"):
+        sqlalchemy.__all__ = [
+            name for name in sqlalchemy_public if hasattr(sqlalchemy, name)
+        ]
+    if not hasattr(sqlalchemy.orm, "__all__"):
+        sqlalchemy.orm.__all__ = [
+            name for name in orm_public if hasattr(sqlalchemy.orm, name)
+        ]
+
+    session_base = getattr(flask_sqlalchemy, "SessionBase", None)
+    signalling_session = getattr(flask_sqlalchemy, "SignallingSession", None)
+    if session_base is not None and signalling_session is not None:
+        original_get_bind = signalling_session.get_bind
+        if not getattr(original_get_bind, "_ysocial_sa2_compat", False):
+
+            def _compat_get_bind(self, mapper=None, clause=None):
+                if mapper is not None:
+                    try:
+                        persist_selectable = mapper.persist_selectable
+                    except AttributeError:
+                        persist_selectable = mapper.mapped_table
+
+                    info = getattr(persist_selectable, "info", {})
+                    bind_key = info.get("bind_key")
+                    if bind_key is not None:
+                        state = flask_sqlalchemy.get_state(self.app)
+                        return state.db.get_engine(self.app, bind=bind_key)
+                return session_base.get_bind(self, mapper, clause=clause)
+
+            _compat_get_bind._ysocial_sa2_compat = True
+            signalling_session.get_bind = _compat_get_bind
+
+
+_ensure_flask_sqlalchemy_legacy_compat()
 
 
 def _log_error_stderr(message):

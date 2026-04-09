@@ -3,6 +3,7 @@ import os
 import sys
 import traceback
 from datetime import datetime
+from pathlib import Path
 
 
 def log_error(message):
@@ -20,12 +21,30 @@ def log_error(message):
     print(f"### {timestamp} ###\n{message}\n####", file=sys.stderr, flush=True)
 
 
+def _configure_model_cache_env():
+    root = Path(os.environ.get("YSOCIAL_MODEL_CACHE_DIR", "~/.cache/ysocial_models")).expanduser()
+    hf_home = root / "huggingface"
+    transformers_cache = hf_home / "transformers"
+    hub_cache = hf_home / "hub"
+    torch_home = root / "torch"
+
+    for path in (root, hf_home, transformers_cache, hub_cache, torch_home):
+        path.mkdir(parents=True, exist_ok=True)
+
+    os.environ.setdefault("YSOCIAL_MODEL_CACHE_DIR", str(root))
+    os.environ.setdefault("HF_HOME", str(hf_home))
+    os.environ.setdefault("TRANSFORMERS_CACHE", str(transformers_cache))
+    os.environ.setdefault("HUGGINGFACE_HUB_CACHE", str(hub_cache))
+    os.environ.setdefault("TORCH_HOME", str(torch_home))
+
+
 def start_server(config):
     """
     Start the app
     """
     try:
         print(config)
+        _configure_model_cache_env()
         config_path = config.get("__config_file__")
         if config_path:
             os.environ["YSERVER_CONFIG"] = config_path
