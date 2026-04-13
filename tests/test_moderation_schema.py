@@ -60,6 +60,7 @@ def test_ensure_moderation_schema_adds_tables_and_post_column(tmp_path):
     inspector = inspect(engine)
     assert "sys_messages" in inspector.get_table_names()
     assert "reported" in inspector.get_table_names()
+    assert "stress_reward" in inspector.get_table_names()
     assert "agent_custom_features" in inspector.get_table_names()
     post_columns = {column["name"] for column in inspector.get_columns("post")}
     assert "moderated" in post_columns
@@ -69,6 +70,10 @@ def test_ensure_moderation_schema_adds_tables_and_post_column(tmp_path):
     assert "to_round" not in sys_message_columns
     opinion_columns = {column["name"] for column in inspector.get_columns("agent_opinion")}
     assert "stubborn" in opinion_columns
+    stress_reward_columns = {
+        column["name"] for column in inspector.get_columns("stress_reward")
+    }
+    assert {"id", "uid", "variable", "value", "type", "tid"} <= stress_reward_columns
 
 
 def test_ensure_moderation_schema_migrates_sys_messages_to_duration(tmp_path):
