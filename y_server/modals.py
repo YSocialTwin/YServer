@@ -260,6 +260,17 @@ class Agent_Opinion(db.Model):
     id_interacted_with = db.Column(db.Integer, nullable=False)
     id_post = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
     opinion = db.Column(db.REAL, nullable=False)
+    stubborn = db.Column(db.Integer, nullable=False, default=0)
+
+
+class Agent_Custom_Feature(db.Model):
+    __tablename__ = "agent_custom_features"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False, index=True)
+    feature_type = db.Column(db.String(20), nullable=False, default="custom")
+    key = db.Column(db.String(120), nullable=False)
+    value = db.Column(db.Text, nullable=True, default="")
 
 # ---------------------------------------------------------------------------
 # Memory subsystem models

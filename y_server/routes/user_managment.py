@@ -4,8 +4,71 @@ import sys
 from flask import request
 from sqlalchemy import desc
 from y_server import app, db
-from y_server.modals import Interests, Post, Reactions, Rounds, User_interest, User_mgmt, Agent_Opinion, Follow
+from y_server.modals import (
+    Agent_Custom_Feature,
+    Agent_Opinion,
+    Follow,
+    Interests,
+    Post,
+    Reactions,
+    Rounds,
+    User_interest,
+    User_mgmt,
+)
 from sqlalchemy import func
+
+
+def _normalize_custom_features_payload(raw_features):
+    normalized = []
+    if isinstance(raw_features, dict):
+        for key, value in raw_features.items():
+            feature_key = str(key or "").strip()
+            if not feature_key:
+                continue
+            normalized.append(
+                {
+                    "feature_type": "custom",
+                    "key": feature_key,
+                    "value": "" if value is None else str(value),
+                }
+            )
+        return normalized
+    if not isinstance(raw_features, list):
+        return normalized
+    for item in raw_features:
+        if not isinstance(item, dict):
+            continue
+        feature_key = str(item.get("key") or "").strip()
+        if not feature_key:
+            continue
+        normalized.append(
+            {
+                "feature_type": str(item.get("feature_type") or "custom").strip() or "custom",
+                "key": feature_key,
+                "value": "" if item.get("value") is None else str(item.get("value")),
+            }
+        )
+    return normalized
+
+
+def _normalize_stubborn_topics(raw_stubborn_topics):
+    if isinstance(raw_stubborn_topics, dict):
+        return {
+            str(topic).strip()
+            for topic, is_stubborn in raw_stubborn_topics.items()
+            if str(topic).strip() and bool(is_stubborn)
+        }
+    if isinstance(raw_stubborn_topics, (list, tuple, set)):
+        return {str(topic).strip() for topic in raw_stubborn_topics if str(topic).strip()}
+    return set()
+
+
+def _latest_agent_opinion(agent_id, topic_id):
+    return (
+        Agent_Opinion.query.filter_by(agent_id=agent_id, topic_id=topic_id)
+        .order_by(Agent_Opinion.tid.desc(), Agent_Opinion.id.desc())
+        .first()
+    )
 
 
 @app.route("/get_user_id", methods=["GET", "POST"])
@@ -507,6 +570,7 @@ def set_user_opinions():
     tid = data.get("round")
     id_interacted_with = data.get("id_interacted_with", -1)
     id_post = data.get("id_post", -1)
+    stubborn_topics = _normalize_stubborn_topics(data.get("stubborn_topics"))
 
     try:
         for topic_id, opinion_value in opinions.items():
@@ -530,14 +594,30 @@ def set_user_opinions():
                     else:
                         topic_id = interest.iid
 
-            # Insert a new opinion record
+            latest_opinion = _latest_agent_opinion(agent_id, topic_id)
+            is_stubborn = bool(latest_opinion.stubborn) if latest_opinion is not None else False
+            if isinstance(topic_id, int):
+                interest_name = (
+                    Interests.query.filter_by(iid=topic_id).with_entities(Interests.interest).scalar()
+                )
+            else:
+                interest_name = str(topic_id)
+            if interest_name and interest_name in stubborn_topics:
+                is_stubborn = True
+            stored_opinion = (
+                float(latest_opinion.opinion)
+                if latest_opinion is not None and bool(latest_opinion.stubborn)
+                else float(opinion_value)
+            )
+
             new_record = Agent_Opinion(
                     agent_id=agent_id,
                     tid=tid,
                     topic_id=topic_id,
                     id_interacted_with=id_interacted_with,
                     id_post=id_post,
-                    opinion=float(opinion_value)
+                    opinion=stored_opinion,
+                    stubborn=1 if is_stubborn else 0,
             )
             db.session.add(new_record)
 
@@ -548,3 +628,45 @@ def set_user_opinions():
         return json.dumps({"status": 400, "error": str(e)})
 
     return json.dumps({"status": 200})
+
+
+@app.route("/set_user_custom_features", methods=["POST"])
+def set_user_custom_features():
+    data = json.loads(request.get_data())
+    user_id = int(data.get("user_id"))
+    features = _normalize_custom_features_payload(data.get("custom_features"))
+
+    try:
+        Agent_Custom_Feature.query.filter_by(user_id=user_id).delete()
+        for feature in features:
+            db.session.add(
+                Agent_Custom_Feature(
+                    user_id=user_id,
+                    feature_type=feature["feature_type"],
+                    key=feature["key"],
+                    value=feature["value"],
+                )
+            )
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        return json.dumps({"status": 400, "error": str(exc)})
+
+    return json.dumps({"status": 200})
+
+
+@app.route("/get_user_custom_features", methods=["POST"])
+def get_user_custom_features():
+    data = json.loads(request.get_data())
+    user_id = int(data.get("user_id"))
+    rows = Agent_Custom_Feature.query.filter_by(user_id=user_id).all()
+    return json.dumps(
+        [
+            {
+                "feature_type": row.feature_type,
+                "key": row.key,
+                "value": row.value,
+            }
+            for row in rows
+        ]
+    )

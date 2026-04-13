@@ -41,18 +41,34 @@ def test_ensure_moderation_schema_adds_tables_and_post_column(tmp_path):
                 """
             )
         )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE agent_opinion (
+                    id INTEGER PRIMARY KEY,
+                    agent_id INTEGER NOT NULL,
+                    tid INTEGER NOT NULL,
+                    topic_id INTEGER NOT NULL,
+                    opinion FLOAT NOT NULL
+                )
+                """
+            )
+        )
 
     ensure_moderation_schema(engine)
 
     inspector = inspect(engine)
     assert "sys_messages" in inspector.get_table_names()
     assert "reported" in inspector.get_table_names()
+    assert "agent_custom_features" in inspector.get_table_names()
     post_columns = {column["name"] for column in inspector.get_columns("post")}
     assert "moderated" in post_columns
     assert "is_moderation_comment" in post_columns
     sys_message_columns = {column["name"] for column in inspector.get_columns("sys_messages")}
     assert "duration" in sys_message_columns
     assert "to_round" not in sys_message_columns
+    opinion_columns = {column["name"] for column in inspector.get_columns("agent_opinion")}
+    assert "stubborn" in opinion_columns
 
 
 def test_ensure_moderation_schema_migrates_sys_messages_to_duration(tmp_path):
