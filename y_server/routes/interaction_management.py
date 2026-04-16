@@ -90,6 +90,27 @@ def followers():
     return json.dumps(res)
 
 
+@app.route("/check_follow_relationship", methods=["POST"])
+def check_follow_relationship():
+    """
+    Check whether the latest relationship between follower and user is an active follow.
+
+    :return: a json object with the current active status
+    """
+    data = json.loads(request.get_data())
+    follower_id = int(data["follower_id"])
+    user_id = int(data["user_id"])
+
+    latest = (
+        Follow.query.filter_by(follower_id=follower_id, user_id=user_id)
+        .order_by(Follow.round.desc(), Follow.id.desc())
+        .first()
+    )
+
+    is_following = bool(latest and str(latest.action or "").strip().lower() == "follow")
+    return json.dumps({"status": 200, "is_following": is_following})
+
+
 @app.route("/follow_suggestions", methods=["POST"])
 def get_follow_suggestions():
     """
