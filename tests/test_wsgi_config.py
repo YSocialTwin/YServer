@@ -16,6 +16,7 @@ def test_wsgi_loads_toxicity_annotation_flag(tmp_path, monkeypatch):
                 "toxicity_annotation": True,
                 "sentiment_annotation": False,
                 "emotion_annotation": False,
+                "stress_reward": {"enabled": True},
             }
         ),
         encoding="utf-8",
@@ -33,3 +34,4 @@ def test_wsgi_loads_toxicity_annotation_flag(tmp_path, monkeypatch):
     spec.loader.exec_module(module)
 
     assert fake_app.config["toxicity_annotation"] is True
+    assert fake_app.config["stress_reward_enabled"] is True

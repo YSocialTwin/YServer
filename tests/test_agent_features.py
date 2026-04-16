@@ -10,7 +10,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from y_server import app, db
-from y_server.modals import Agent_Custom_Feature, Agent_Opinion
+from y_server.modals import Agent_Custom_Feature, Agent_Opinion, User_mgmt
 
 
 def _post_json(client, path, payload):
@@ -136,3 +136,17 @@ def test_user_custom_features_round_trip(client):
 
     with app.app_context():
         assert Agent_Custom_Feature.query.filter_by(user_id=1).count() == 2
+
+
+def test_churn_route_supports_explicit_user_id(client):
+    _register_user(client, name="alice", email="alice@example.org")
+
+    response = _post_json(client, "/churn", {"user_id": 1, "left_on": 12})
+    assert response.status_code == 200
+
+    body = json.loads(response.get_data(as_text=True))
+    assert body["status"] == 200
+    assert body["removed"] == {"1": None}
+
+    with app.app_context():
+        assert User_mgmt.query.filter_by(id=1).first().left_on == 12

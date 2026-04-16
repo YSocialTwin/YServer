@@ -8,7 +8,7 @@ from sqlalchemy.pool import NullPool
 
 from flask import request
 from pythonjsonlogger import jsonlogger
-from y_server import app, db
+from y_server import _ensure_moderation_schema, _ensure_optional_analytics_schema, app, db
 from y_server.error_logging import log_error
 from y_server.modals import (
     Agent_Opinion,
@@ -29,6 +29,7 @@ from y_server.modals import (
     Recommendations,
     Rounds,
     SimulationClient,
+    StressReward,
     User_interest,
     User_mgmt,
     Voting,
@@ -127,6 +128,9 @@ def change_db():
             rebind_db(sqlite_uri)
 
             log_dir = uri.split("database_server.db")[0]
+
+        _ensure_optional_analytics_schema()
+        _ensure_moderation_schema()
 
         # Set up file logging
         # If path is already absolute, use it as-is
@@ -238,6 +242,7 @@ def reset_experiment():
         db.session.query(Post_topics).delete()
         db.session.query(Post_Sentiment).delete()
         db.session.query(Post_Toxicity).delete()
+        db.session.query(StressReward).delete()
         db.session.query(Images).delete()
         db.session.query(Article_topics).delete()
         log_error("reset_experiment: Committing database reset")

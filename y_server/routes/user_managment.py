@@ -227,8 +227,18 @@ def churn_agents():
     """
 
     data = json.loads(request.get_data())
-    n_users = data["n_users"]
     left_on = data["left_on"]
+
+    user_id = data.get("user_id")
+    if user_id is not None:
+        user = User_mgmt.query.filter_by(id=int(user_id)).first()
+        if user is None:
+            return json.dumps({"status": 404, "removed": {}})
+        user.left_on = left_on
+        db.session.commit()
+        return json.dumps({"status": 200, "removed": {int(user_id): None}})
+
+    n_users = data["n_users"]
 
     #  get the max round value from the post table for each user
     query = (
@@ -327,21 +337,22 @@ def get_timeline():
     data = json.loads(request.get_data())
     user_id = data["user_id"]
 
-    user = User_mgmt.query.filter_by(id=user_id).first()
-    all_posts = Post.query.filter_by(user_id=user.id).order_by(desc(Post.id))
+    all_posts = Post.query.filter_by(user_id=user_id).order_by(desc(Post.id))
     res = []
     for post in all_posts:
+        reposts = Post.query.filter_by(shared_from=post.id).count()
+        likes = Reactions.query.filter_by(post_id=post.id, type="like").count()
+        dislikes = Reactions.query.filter_by(post_id=post.id, type="dislike").count()
+        comments = Post.query.filter_by(comment_to=post.id).count()
         res.append(
             {
                 "post_id": post.id,
                 "post": post.tweet,
                 "round": post.round,
-                "reposts": len(post.retweets),
-                "likes": len(list(Reactions.query.filter_by(id=post.id, type="like"))),
-                "dislikes": len(
-                    list(Reactions.query.filter_by(id=post.id, type="dislike"))
-                ),
-                "comments": len(list(Post.query.filter_by(comment_to=post.id))),
+                "reposts": reposts,
+                "likes": likes,
+                "dislikes": dislikes,
+                "comments": comments,
             }
         )
 

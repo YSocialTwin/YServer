@@ -65,6 +65,8 @@ def test_ensure_moderation_schema_adds_tables_and_post_column(tmp_path):
     post_columns = {column["name"] for column in inspector.get_columns("post")}
     assert "moderated" in post_columns
     assert "is_moderation_comment" in post_columns
+    user_columns = {column["name"] for column in inspector.get_columns("user_mgmt")}
+    assert "archetype" in user_columns
     sys_message_columns = {column["name"] for column in inspector.get_columns("sys_messages")}
     assert "duration" in sys_message_columns
     assert "to_round" not in sys_message_columns
@@ -73,7 +75,7 @@ def test_ensure_moderation_schema_adds_tables_and_post_column(tmp_path):
     stress_reward_columns = {
         column["name"] for column in inspector.get_columns("stress_reward")
     }
-    assert {"id", "uid", "variable", "value", "type", "tid"} <= stress_reward_columns
+    assert {"id", "uid", "variable", "value", "type", "action", "tid"} <= stress_reward_columns
 
 
 def test_ensure_moderation_schema_migrates_sys_messages_to_duration(tmp_path):
@@ -117,3 +119,49 @@ def test_ensure_moderation_schema_migrates_sys_messages_to_duration(tmp_path):
         row = conn.execute(text("SELECT from_round, duration FROM sys_messages WHERE id = 1")).first()
 
     assert row == (4, 3)
+
+
+def test_ensure_moderation_schema_upgrades_legacy_stress_reward_table(tmp_path):
+    db_path = tmp_path / "moderation_schema_stress_reward_legacy.db"
+    engine = create_engine(f"sqlite:///{db_path}")
+
+    with engine.begin() as conn:
+        conn.execute(text("CREATE TABLE user_mgmt (id INTEGER PRIMARY KEY, username VARCHAR(15) NOT NULL)"))
+        conn.execute(text("CREATE TABLE rounds (id INTEGER PRIMARY KEY, day INTEGER NOT NULL, hour INTEGER NOT NULL)"))
+        conn.execute(
+            text(
+                """
+                CREATE TABLE stress_reward (
+                    id VARCHAR(36) PRIMARY KEY,
+                    uid INTEGER NOT NULL,
+                    variable VARCHAR(16) NOT NULL CHECK (variable IN ('stress', 'reward')),
+                    value FLOAT NOT NULL,
+                    type VARCHAR(16) NOT NULL CHECK (type IN ('aggregate', 'variation')),
+                    tid INTEGER NOT NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO stress_reward (id, uid, variable, value, type, tid)
+                VALUES ('sr-1', 1, 'stress', -0.2, 'variation', 3)
+                """
+            )
+        )
+
+    ensure_moderation_schema(engine)
+
+    inspector = inspect(engine)
+    stress_reward_columns = {
+        column["name"] for column in inspector.get_columns("stress_reward")
+    }
+    assert {"id", "uid", "variable", "value", "type", "action", "tid"} <= stress_reward_columns
+
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT variable, value, type, action, tid FROM stress_reward WHERE id = 'sr-1'")
+        ).first()
+
+    assert row == ("stress", -0.2, "variation", None, 3)

@@ -57,6 +57,12 @@ def start_server(config):
         app.config["toxicity_annotation"] = config.get("toxicity_annotation", False)
         app.config["sentiment_annotation"] = config.get("sentiment_annotation", False)
         app.config["emotion_annotation"] = config.get("emotion_annotation", False)
+        app.config["stress_reward_enabled"] = bool(
+            (config.get("stress_reward") or {}).get(
+                "enabled",
+                config.get("stress_reward_enabled", config.get("stress_reward_annotation", False)),
+            )
+        )
         app.config["sync_timeout_seconds"] = config.get("sync_timeout_seconds", 300)
         app.config["memory_enabled"] = bool(
             (config.get("memory") or {}).get("enabled", config.get("memory_enabled", False))

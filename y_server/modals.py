@@ -1,3 +1,5 @@
+import uuid
+
 from flask_login import UserMixin
 from y_server import db
 
@@ -272,14 +274,19 @@ class StressReward(db.Model):
         db.CheckConstraint(
             "type IN ('aggregate', 'variation')", name="ck_stress_reward_type"
         ),
-        db.CheckConstraint("value >= 0 AND value <= 1", name="ck_stress_reward_value"),
+        db.CheckConstraint(
+            "((type = 'aggregate' AND value >= 0 AND value <= 1) "
+            "OR (type = 'variation' AND value >= -1 AND value <= 1))",
+            name="ck_stress_reward_value",
+        ),
     )
 
-    id = db.Column(db.String(36), primary_key=True)
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     uid = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False, index=True)
     variable = db.Column(db.String(16), nullable=False)
     value = db.Column(db.Float, nullable=False)
     type = db.Column(db.String(16), nullable=False)
+    action = db.Column(db.String(64), nullable=True)
     tid = db.Column(db.Integer, db.ForeignKey("rounds.id"), nullable=False, index=True)
 
 

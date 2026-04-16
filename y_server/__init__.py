@@ -295,6 +295,15 @@ try:
     app.config.setdefault("perspective_api", None)
     app.config.setdefault("sentiment_annotation", False)
     app.config.setdefault("emotion_annotation", False)
+    app.config.setdefault(
+        "stress_reward_enabled",
+        bool(
+            (config.get("stress_reward") or {}).get(
+                "enabled",
+                config.get("stress_reward_enabled", config.get("stress_reward_annotation", False)),
+            )
+        ),
+    )
     app.config.setdefault("sync_timeout_seconds", 300)
     app.config.setdefault("toxicity_annotation", False)
     app.config.setdefault(
@@ -519,6 +528,7 @@ except Exception as init_exception:  # Y Web subprocess
     app.config.setdefault("perspective_api", None)
     app.config.setdefault("sentiment_annotation", False)
     app.config.setdefault("emotion_annotation", False)
+    app.config.setdefault("stress_reward_enabled", False)
     app.config.setdefault("sync_timeout_seconds", 300)
     app.config.setdefault("toxicity_annotation", False)
     
