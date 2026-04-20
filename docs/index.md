@@ -8,6 +8,7 @@
 - exposes routes used by the Twitter-like `YClient`
 - maintains simulation time and experiment reset/change-db utilities
 - loads optional feature modules according to `config_files/exp_config.json`
+- persists stress/reward updates and reciprocal-follow edge checks for richer client feedback loops
 - exposes the additive `/memory/*` API used by the external memory subsystem
 
 ## Main Runtime Entry Points
@@ -39,3 +40,4 @@ Typical structure:
 ```
 
 For detailed parameter guidance, see [Configuration](/Users/rossetti/PycharmProjects/YServer/docs/configuration.md).
+For the newer stress/reward and reciprocal-follow routes, see [Social Feedback API](/Users/rossetti/PycharmProjects/YServer/docs/social-feedback-api.md).

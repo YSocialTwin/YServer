@@ -34,6 +34,7 @@ Defined in [`user_managment.py`](/Users/rossetti/PycharmProjects/YServer/y_serve
 - `/set_interests`
 - `/set_user_interests`
 - `/get_user_interests`
+- `/check_follow_relationship`
 
 ### Content Management
 
@@ -55,6 +56,16 @@ Defined in [`interaction_management.py`](/Users/rossetti/PycharmProjects/YServer
 
 - follow/unfollow endpoints
 - follow suggestion endpoint
+- reciprocal-edge existence check used by follow-back/unfollow-back
+
+## Social Feedback Routes
+
+Defined in [`stress_reward_management.py`](/Users/rossetti/PycharmProjects/YServer/y_server/routes/stress_reward_management.py):
+
+- `/get_stress_reward`
+- `/set_stress_reward_variations`
+
+These routes are enabled only when stress/reward is active in the server config. They let the client retrieve current aggregate scores and persist variation rows while keeping all database writes on the server side.
 
 ## Optional Modules
 

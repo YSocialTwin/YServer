@@ -23,6 +23,21 @@ The server runtime is configured through [`config_files/exp_config.json`](/Users
 
 Memory does not use the `modules` list in this branch. Its routes are added directly by the base route loader.
 
+## Stress/Reward Configuration
+
+The server can also accept a top-level `stress_reward` block, typically written by YWeb:
+
+```json
+{
+  "stress_reward": {
+    "enabled": true,
+    "backward_rounds": 24
+  }
+}
+```
+
+Only the enablement state is used directly by YServer. The client still owns LLM-based annotation and delta computation. When this block is disabled or absent, `/get_stress_reward` and `/set_stress_reward_variations` reject requests.
+
 ## Example Config Profiles
 
 ### Local Development
