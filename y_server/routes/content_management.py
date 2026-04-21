@@ -114,6 +114,33 @@ def _is_shadow_banned_post_hidden(post_id, current_round_id):
     return len(filtered) == 0
 
 
+def _resolve_thread_root_id(post):
+    if post is None:
+        return None
+    current = post
+    visited = set()
+    while current is not None:
+        current_id = int(getattr(current, "id", 0) or 0)
+        if current_id <= 0 or current_id in visited:
+            return current_id or None
+        visited.add(current_id)
+        thread_id = getattr(current, "thread_id", None)
+        if thread_id not in (None, "", 0):
+            try:
+                return int(thread_id)
+            except (TypeError, ValueError):
+                pass
+        comment_to = getattr(current, "comment_to", -1)
+        try:
+            comment_to = int(comment_to)
+        except (TypeError, ValueError):
+            return current_id
+        if comment_to == -1:
+            return current_id
+        current = Post.query.filter_by(id=comment_to).first()
+    return None
+
+
 @app.route("/get_post_author", methods=["GET"])
 def get_post_author():
     """
@@ -722,19 +749,18 @@ def add_comment():
 
     text = text.strip("-")
 
+    thread_id = _resolve_thread_root_id(post)
     new_post = Post(
         tweet=text,
         round=tid,
         user_id=user.id,
         comment_to=post_id,
-        thread_id=post.thread_id,
+        thread_id=thread_id,
     )
 
     db.session.add(new_post)
     db.session.commit()
     new_post_id = new_post.id
-    thread_id = post.thread_id
-
     # add to the comment the topics of the parent post
     parent_post_topics = Post_topics.query.filter_by(post_id=thread_id).all()
     for topic in parent_post_topics:
@@ -857,7 +883,8 @@ def post_thread():
     if post is None:
         return json.dumps({"status": 404, "error": "Post not found"})
 
-    thread_id = Post.query.filter_by(thread_id=post.thread_id)
+    thread_root_id = _resolve_thread_root_id(post)
+    thread_id = Post.query.filter_by(thread_id=thread_root_id)
 
     res = []
 
@@ -1063,7 +1090,8 @@ def get_post_topics():
     if len(res) == 0:
         post = Post.query.filter_by(id=post_id).first()
         if post is not None:
-            parent_post_topics = Post_topics.query.filter_by(post_id=post.thread_id).all()
+            thread_root_id = _resolve_thread_root_id(post)
+            parent_post_topics = Post_topics.query.filter_by(post_id=thread_root_id).all()
             for topic in parent_post_topics:
                 res.append(topic.topic_id)
 
@@ -1085,4 +1113,4 @@ def get_thread_root():
     if post is None:
         return json.dumps({"status": 404})
 
-    return json.dumps(post.thread_id)
+    return json.dumps(_resolve_thread_root_id(post))
