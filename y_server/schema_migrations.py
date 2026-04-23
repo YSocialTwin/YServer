@@ -207,6 +207,11 @@ def ensure_moderation_schema(engine) -> None:
         if "archetype" not in user_columns:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE user_mgmt ADD COLUMN archetype VARCHAR(50)"))
+        if "cover_image" not in user_columns:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE user_mgmt ADD COLUMN cover_image VARCHAR(400) DEFAULT ''")
+                )
 
     SysMessage.__table__.create(bind=engine, checkfirst=True)
     Reported.__table__.create(bind=engine, checkfirst=True)
