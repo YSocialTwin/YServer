@@ -3,6 +3,7 @@ import os
 import sys
 import traceback
 from datetime import datetime
+from pathlib import Path
 
 
 def log_error(message):
@@ -20,20 +21,52 @@ def log_error(message):
     print(f"### {timestamp} ###\n{message}\n####", file=sys.stderr, flush=True)
 
 
+def _configure_model_cache_env():
+    root = Path(os.environ.get("YSOCIAL_MODEL_CACHE_DIR", "~/.cache/ysocial_models")).expanduser()
+    hf_home = root / "huggingface"
+    transformers_cache = hf_home / "transformers"
+    hub_cache = hf_home / "hub"
+    torch_home = root / "torch"
+
+    for path in (root, hf_home, transformers_cache, hub_cache, torch_home):
+        path.mkdir(parents=True, exist_ok=True)
+
+    os.environ.setdefault("YSOCIAL_MODEL_CACHE_DIR", str(root))
+    os.environ.setdefault("HF_HOME", str(hf_home))
+    os.environ.setdefault("TRANSFORMERS_CACHE", str(transformers_cache))
+    os.environ.setdefault("HUGGINGFACE_HUB_CACHE", str(hub_cache))
+    os.environ.setdefault("TORCH_HOME", str(torch_home))
+
+
 def start_server(config):
     """
     Start the app
     """
     try:
         print(config)
+        _configure_model_cache_env()
+        config_path = config.get("__config_file__")
+        if config_path:
+            os.environ["YSERVER_CONFIG"] = config_path
         from y_server import app
 
         # import nltk
         # nltk.download("vader_lexicon")
         debug = False
-        app.config["perspective_api"] = config["perspective_api"]
-        app.config["sentiment_annotation"] = config["sentiment_annotation"]
-        app.config["emotion_annotation"] = config["emotion_annotation"]
+        app.config["perspective_api"] = config.get("perspective_api")
+        app.config["toxicity_annotation"] = config.get("toxicity_annotation", False)
+        app.config["sentiment_annotation"] = config.get("sentiment_annotation", False)
+        app.config["emotion_annotation"] = config.get("emotion_annotation", False)
+        app.config["stress_reward_enabled"] = bool(
+            (config.get("stress_reward") or {}).get(
+                "enabled",
+                config.get("stress_reward_enabled", config.get("stress_reward_annotation", False)),
+            )
+        )
+        app.config["sync_timeout_seconds"] = config.get("sync_timeout_seconds", 300)
+        app.config["memory_enabled"] = bool(
+            (config.get("memory") or {}).get("enabled", config.get("memory_enabled", False))
+        )
         
         log_error(f"SERVER STARTING: Flask app.run() about to be called\nProcess ID: {os.getpid()}\nHost: {config['host']}\nPort: {config['port']}\nDebug: {debug}")
         
@@ -66,6 +99,7 @@ if __name__ == "__main__":
     config_file = args.config_file
     try:
         config = json.load(open(config_file, "r"))
+        config["__config_file__"] = config_file
     except Exception as e:
         log_error(f"Error loading config file {config_file}: {str(e)}\nTraceback: {traceback.format_exc()}")
         raise

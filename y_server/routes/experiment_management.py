@@ -8,9 +8,10 @@ from sqlalchemy.pool import NullPool
 
 from flask import request
 from pythonjsonlogger import jsonlogger
-from y_server import app, db
+from y_server import _ensure_moderation_schema, _ensure_optional_analytics_schema, app, db
 from y_server.error_logging import log_error
 from y_server.modals import (
+    Agent_Opinion,
     Article_topics,
     Articles,
     Follow,
@@ -21,10 +22,14 @@ from y_server.modals import (
     Post,
     Post_emotions,
     Post_hashtags,
+    Post_Sentiment,
     Post_topics,
+    Post_Toxicity,
     Reactions,
     Recommendations,
     Rounds,
+    SimulationClient,
+    StressReward,
     User_interest,
     User_mgmt,
     Voting,
@@ -124,6 +129,9 @@ def change_db():
 
             log_dir = uri.split("database_server.db")[0]
 
+        _ensure_optional_analytics_schema()
+        _ensure_moderation_schema()
+
         # Set up file logging
         # If path is already absolute, use it as-is
         if os.path.isabs(log_dir):
@@ -213,6 +221,7 @@ def reset_experiment():
     """
     try:
         log_error("reset_experiment: Starting database reset")
+        SimulationClient.__table__.create(bind=db.engine, checkfirst=True)
         db.session.query(User_mgmt).delete()
         db.session.query(Post).delete()
         db.session.query(Reactions).delete()
@@ -222,13 +231,18 @@ def reset_experiment():
         db.session.query(Post_emotions).delete()
         db.session.query(Mentions).delete()
         db.session.query(Rounds).delete()
+        db.session.query(SimulationClient).delete()
         db.session.query(Recommendations).delete()
         db.session.query(Websites).delete()
         db.session.query(Articles).delete()
         db.session.query(Interests).delete()
+        db.session.query(Agent_Opinion).delete()
         db.session.query(User_interest).delete()
         db.session.query(Voting).delete()
         db.session.query(Post_topics).delete()
+        db.session.query(Post_Sentiment).delete()
+        db.session.query(Post_Toxicity).delete()
+        db.session.query(StressReward).delete()
         db.session.query(Images).delete()
         db.session.query(Article_topics).delete()
         log_error("reset_experiment: Committing database reset")

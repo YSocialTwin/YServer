@@ -24,10 +24,16 @@ def add_follow():
     user_id = data["user_id"]
     target = data["target"]
     action = data["action"]
-    tid = int(data["tid"])
+    tid_raw = data.get("tid", data.get("round"))
+    if tid_raw is None:
+        return json.dumps({"status": 400, "error": "tid_or_round_required"})
+    tid = int(tid_raw)
 
     user_id = User_mgmt.query.filter_by(id=user_id).first()
     target = User_mgmt.query.filter_by(id=target).first()
+
+    if user_id is None or target is None:
+        return json.dumps({"status": 404, "error": "user_or_target_not_found"})
 
     # cannot follow yourself
     if user_id.id == target.id:
@@ -82,6 +88,27 @@ def followers():
         )
 
     return json.dumps(res)
+
+
+@app.route("/check_follow_relationship", methods=["POST"])
+def check_follow_relationship():
+    """
+    Check whether the latest relationship between follower and user is an active follow.
+
+    :return: a json object with the current active status
+    """
+    data = json.loads(request.get_data())
+    follower_id = int(data["follower_id"])
+    user_id = int(data["user_id"])
+
+    latest = (
+        Follow.query.filter_by(follower_id=follower_id, user_id=user_id)
+        .order_by(Follow.round.desc(), Follow.id.desc())
+        .first()
+    )
+
+    is_following = bool(latest and str(latest.action or "").strip().lower() == "follow")
+    return json.dumps({"status": 200, "is_following": is_following})
 
 
 @app.route("/follow_suggestions", methods=["POST"])

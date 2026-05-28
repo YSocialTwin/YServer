@@ -1,3 +1,5 @@
+import uuid
+
 from flask_login import UserMixin
 from y_server import db
 
@@ -31,6 +33,7 @@ class User_mgmt(UserMixin, db.Model):
     profession = db.Column(db.String(50), default="")
     activity_profile = db.Column(db.String(50), default="Always On")
     archetype = db.Column(db.String(50), nullable=True, default=None)
+    cover_image = db.Column(db.String(400), nullable=False, default="")
 
     posts = db.relationship("Post", backref="author", lazy=True)
     liked = db.relationship("Reactions", backref="liked_by", lazy=True)
@@ -48,6 +51,8 @@ class Post(db.Model):
     image_id = db.Column(db.Integer(), db.ForeignKey("images.id"), default=None)
     shared_from = db.Column(db.Integer, default=-1)
     reaction_count = db.Column(db.Integer, default=0)
+    moderated = db.Column(db.Integer, default=0, nullable=False)
+    is_moderation_comment = db.Column(db.Integer, default=0, nullable=False)
 
 
 class Hashtags(db.Model):
@@ -102,11 +107,43 @@ class Rounds(db.Model):
     hour = db.Column(db.Integer, nullable=False)
 
 
+class SimulationClient(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.String(128), nullable=False, unique=True, index=True)
+    status = db.Column(db.String(16), nullable=False, default="active", index=True)
+    last_heartbeat = db.Column(db.Float, nullable=False, default=0.0)
+    submitted_round_id = db.Column(db.Integer, db.ForeignKey("rounds.id"), nullable=True)
+    created_at = db.Column(db.Float, nullable=False, default=0.0)
+    updated_at = db.Column(db.Float, nullable=False, default=0.0)
+
+
 class Recommendations(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False)
     post_ids = db.Column(db.String(500), nullable=False)
     round = db.Column(db.Integer, nullable=False)
+
+
+class SysMessage(db.Model):
+    __tablename__ = "sys_messages"
+
+    id = db.Column(db.Integer, primary_key=True)
+    type = db.Column(db.String(50), nullable=False)
+    to_uid = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=True)
+    message = db.Column(db.Text, nullable=False)
+    from_round = db.Column(db.Integer, db.ForeignKey("rounds.id"), nullable=True)
+    duration = db.Column(db.Integer, nullable=True)
+
+
+class Reported(db.Model):
+    __tablename__ = "reported"
+
+    id = db.Column(db.Integer, primary_key=True)
+    type = db.Column(db.String(50), nullable=False)
+    to_uid = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=True)
+    to_post = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=True)
+    from_uid = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False)
+    tid = db.Column(db.Integer, db.ForeignKey("rounds.id"), nullable=False)
 
 
 class Articles(db.Model):
@@ -226,3 +263,147 @@ class Agent_Opinion(db.Model):
     id_interacted_with = db.Column(db.Integer, nullable=False)
     id_post = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
     opinion = db.Column(db.REAL, nullable=False)
+    stubborn = db.Column(db.Integer, nullable=False, default=0)
+
+
+class StressReward(db.Model):
+    __tablename__ = "stress_reward"
+    __table_args__ = (
+        db.CheckConstraint(
+            "variable IN ('stress', 'reward')", name="ck_stress_reward_variable"
+        ),
+        db.CheckConstraint(
+            "type IN ('aggregate', 'variation')", name="ck_stress_reward_type"
+        ),
+        db.CheckConstraint(
+            "((type = 'aggregate' AND value >= 0 AND value <= 1) "
+            "OR (type = 'variation' AND value >= -1 AND value <= 1))",
+            name="ck_stress_reward_value",
+        ),
+    )
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    uid = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False, index=True)
+    variable = db.Column(db.String(16), nullable=False)
+    value = db.Column(db.Float, nullable=False)
+    type = db.Column(db.String(16), nullable=False)
+    action = db.Column(db.String(64), nullable=True)
+    tid = db.Column(db.Integer, db.ForeignKey("rounds.id"), nullable=False, index=True)
+
+
+class Agent_Custom_Feature(db.Model):
+    __tablename__ = "agent_custom_features"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False, index=True)
+    feature_type = db.Column(db.String(20), nullable=False, default="custom")
+    key = db.Column(db.String(120), nullable=False)
+    value = db.Column(db.Text, nullable=True, default="")
+
+# ---------------------------------------------------------------------------
+# Memory subsystem models
+# The /memory/* API is used by a client.
+# ---------------------------------------------------------------------------
+
+
+class MemoryInteractionEvent(db.Model):
+    __tablename__ = "memory_interaction_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    run_id = db.Column(db.String(64), nullable=False, index=True)
+    round_id = db.Column(db.Integer, nullable=False, index=True)
+    actor_user_id = db.Column(db.Integer, nullable=False, index=True)
+    target_user_id = db.Column(db.Integer, nullable=True, index=True)
+    thread_root_id = db.Column(db.Integer, nullable=True, index=True)
+    target_post_id = db.Column(db.Integer, nullable=True, index=True)
+    actor_post_id = db.Column(db.Integer, nullable=True, index=True)
+    event_type = db.Column(db.String(16), nullable=False)
+    relation_label = db.Column(db.String(16), nullable=True)
+    tone_label = db.Column(db.String(16), nullable=True)
+    topics_json = db.Column(db.Text, nullable=True)
+    salient_claim = db.Column(db.String(200), nullable=True)
+    weight = db.Column(db.Float, default=1.0)
+    event_text = db.Column(db.Text, nullable=True)
+    importance = db.Column(db.Float, default=0.0)
+    last_accessed_round = db.Column(db.Integer, nullable=True, index=True)
+    access_count = db.Column(db.Integer, default=0)
+
+
+class MemorySocialCard(db.Model):
+    __tablename__ = "memory_social_cards"
+    __table_args__ = (
+        db.UniqueConstraint("run_id", "agent_user_id", "other_user_id", name="uq_memory_social_card"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    run_id = db.Column(db.String(64), nullable=False, index=True)
+    agent_user_id = db.Column(db.Integer, nullable=False, index=True)
+    other_user_id = db.Column(db.Integer, nullable=False, index=True)
+    affinity = db.Column(db.Float, default=0.0)
+    conflict = db.Column(db.Float, default=0.0)
+    humor = db.Column(db.Float, default=0.0)
+    trust = db.Column(db.Float, default=0.0)
+    last_relation_label = db.Column(db.String(16), nullable=True)
+    last_round_id = db.Column(db.Integer, nullable=True, index=True)
+    last_thread_root_id = db.Column(db.Integer, nullable=True, index=True)
+    last_updated_round = db.Column(db.Integer, nullable=True, index=True)
+    event_count = db.Column(db.Integer, default=0)
+    summary_text = db.Column(db.Text, nullable=True)
+    evidence_tail_json = db.Column(db.Text, nullable=True)
+
+
+class MemoryThreadCard(db.Model):
+    __tablename__ = "memory_thread_cards"
+    __table_args__ = (
+        db.UniqueConstraint("run_id", "agent_user_id", "thread_root_id", name="uq_memory_thread_card"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    run_id = db.Column(db.String(64), nullable=False, index=True)
+    agent_user_id = db.Column(db.Integer, nullable=False, index=True)
+    thread_root_id = db.Column(db.Integer, nullable=False, index=True)
+    gist_text = db.Column(db.Text, nullable=True)
+    my_role = db.Column(db.String(16), nullable=True)
+    participants_top_json = db.Column(db.Text, nullable=True)
+    entry_points_json = db.Column(db.Text, nullable=True)
+    last_seen_round_id = db.Column(db.Integer, nullable=True, index=True)
+
+
+class MemoryCommunityDigest(db.Model):
+    __tablename__ = "memory_community_digests"
+    __table_args__ = (db.UniqueConstraint("run_id", name="uq_memory_community_digest"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    run_id = db.Column(db.String(64), nullable=False, index=True)
+    round_id = db.Column(db.Integer, nullable=True, index=True)
+    digest_text = db.Column(db.Text, nullable=True)
+    top_topics_json = db.Column(db.Text, nullable=True)
+    norms_json = db.Column(db.Text, nullable=True)
+    memes_json = db.Column(db.Text, nullable=True)
+    polarizing_issues_json = db.Column(db.Text, nullable=True)
+
+
+class MemoryItem(db.Model):
+    __tablename__ = "memory_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    run_id = db.Column(db.String(64), nullable=False, index=True)
+    agent_user_id = db.Column(db.Integer, nullable=False, index=True)
+    item_type = db.Column(db.String(16), nullable=False, index=True)
+    text = db.Column(db.Text, nullable=False)
+    metadata_json = db.Column(db.Text, nullable=True)
+    source_event_id = db.Column(db.Integer, nullable=True, index=True)
+    thread_root_id = db.Column(db.Integer, nullable=True, index=True)
+    other_user_id = db.Column(db.Integer, nullable=True, index=True)
+    topic_tags_json = db.Column(db.Text, nullable=True)
+    round_id = db.Column(db.Integer, nullable=True, index=True)
+    importance = db.Column(db.Float, default=0.0, index=True)
+    recency_anchor_round = db.Column(db.Integer, nullable=True, index=True)
+    last_accessed_round = db.Column(db.Integer, nullable=True, index=True)
+    access_count = db.Column(db.Integer, default=0)
+    embedding_json = db.Column(db.Text, nullable=True)
+    embedding_model = db.Column(db.String(64), nullable=True)
+    embedding_dim = db.Column(db.Integer, nullable=True)
+    embedding_status = db.Column(db.String(16), default="pending", index=True)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())

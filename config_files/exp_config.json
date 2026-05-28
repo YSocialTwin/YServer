@@ -1,11 +1,1 @@
-{
-  "name": "small",
-  "host": "0.0.0.0",
-  "port": 5010,
-  "debug": "True",
-  "reset_db": "True",
-  "modules": ["news", "voting", "image"],
-  "perspective_api": null,
-  "sentiment_annotation": false,
-  "emotion_annotation": false
-}
+{"platform_type": "microblogging", "name": "test_md", "host": "127.0.0.1", "port": 5008, "debug": "False", "reset_db": "False", "modules": ["news", "voting", "image"], "perspective_api": null, "toxicity_annotation": true, "sentiment_annotation": true, "emotion_annotation": true, "opinion_dynamics_enabled": true, "database_uri": "/Users/rossetti/PycharmProjects/YWeb/y_web/experiments/235f7fd8_7779_441a_9443_5b5a624b1d94/database_server.db", "topics": ["war", "minority", "hate"], "data_path": "/Users/rossetti/PycharmProjects/YWeb/y_web/experiments/235f7fd8_7779_441a_9443_5b5a624b1d94/", "is_remote": 0, "experiment_configuration_confirmed": true, "memory": {"enabled": false}, "clock": {"mode": "simulated", "timezone": "Europe/Rome", "feed_refresh": "hourly"}}

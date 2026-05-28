@@ -5,6 +5,7 @@
   "reset_db": "False",
   "modules": ["news", "voting"],
   "perspective_api": null,
+  "toxicity_annotation": false,
   "sentiment_annotation": false,
   "emotion_annotation": false,
   "database_uri": "sqlite:////absolute/path/to/your/database.db"
