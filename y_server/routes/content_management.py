@@ -1,7 +1,7 @@
 import json
 
 from flask import current_app, request
-from sqlalchemy import desc, inspect, select
+from sqlalchemy import delete, update, desc, inspect, select
 from sqlalchemy.sql.expression import func
 from y_server import app, db
 from y_server.content_analysis import should_annotate_toxicity, toxicity, vader_sentiment
@@ -54,7 +54,7 @@ def _get_active_system_messages_for_user(user_id, round_id):
     if user_id is None:
         return []
 
-    messages = SysMessage.query.filter_by(to_uid=int(user_id)).all()
+    messages = db.session.scalars(select(SysMessage).filter_by(to_uid=int(user_id))).all()
     active = []
     for message in messages:
         if not _message_active_for_round(message, round_id):
@@ -137,7 +137,7 @@ def _resolve_thread_root_id(post):
             return current_id
         if comment_to == -1:
             return current_id
-        current = Post.query.filter_by(id=comment_to).first()
+        current = db.session.scalars(select(Post).filter_by(id=comment_to)).first()
     return None
 
 
@@ -151,7 +151,7 @@ def get_post_author():
     data = json.loads(request.get_data())
     post_id = data["post_id"]
 
-    post = Post.query.filter_by(id=post_id).first()
+    post = db.session.scalars(select(Post).filter_by(id=post_id)).first()
 
     if post is not None:
         return json.dumps({"user_id": post.user_id})
@@ -167,7 +167,7 @@ def get_active_system_messages():
     round_id = data.get("tid")
 
     if round_id is None:
-        current_round = Rounds.query.order_by(desc(Rounds.id)).first()
+        current_round = db.session.scalars(select(Rounds).order_by(desc(Rounds.id))).first()
         round_id = current_round.id if current_round is not None else None
 
     return json.dumps(_get_active_system_messages_for_user(user_id, round_id))
@@ -198,16 +198,16 @@ def read():
     if data.get("article") or data.get("articles"):
         articles = True
         # get the user
-        us = User_mgmt.query.filter_by(id=uid).first()
+        us = db.session.scalars(select(User_mgmt).filter_by(id=uid)).first()
         # get news pages ids having the same user leaning
-        pages = User_mgmt.query.filter_by(is_page=1, leaning=us.leaning).all()
+        pages = db.session.scalars(select(User_mgmt).filter_by(is_page=1, leaning=us.leaning)).all()
         if pages is not None:
             pages = [x.id for x in pages]
         else:
             pages = []
 
     # visibility
-    current_round = Rounds.query.order_by(desc(Rounds.id)).first()
+    current_round = db.session.scalars(select(Rounds).order_by(desc(Rounds.id))).first()
     visibility = current_round.id - vround
 
     if fratio < 1:
@@ -270,47 +270,45 @@ def read():
             additional_posts_limit = 0
 
         # get followers
-        follower = Follow.query.filter_by(action="follow", user_id=uid)
+        follower = db.session.scalars(select(Follow).filter_by(action="follow", user_id=uid)).all()
         follower_ids = [f.follower_id for f in follower if f.follower_id != uid]
 
         # get posts from followers in reverse chronological order
         if articles:
             posts = (
-                Post.query.filter(
-                    Post.round >= visibility,
-                    Post.news_id != -1,
-                    Post.user_id.in_(pages),
-                    Post.user_id.in_(follower_ids),
-                )
-                .order_by(desc(Post.id))
-                .limit(follower_posts_limit)
-            ).all()
+                db.session.scalars(
+                    select(Post).filter(
+                        Post.round >= visibility,
+                        Post.news_id != -1,
+                        Post.user_id.in_(pages),
+                        Post.user_id.in_(follower_ids),
+                    ).order_by(desc(Post.id)).limit(follower_posts_limit)
+                ).all()
         else:
             posts = (
-                Post.query.filter(
-                    Post.round >= visibility, Post.user_id.in_(follower_ids)
-                )
-                .order_by(desc(Post.id))
-                .limit(follower_posts_limit)
-            ).all()
+                db.session.scalars(
+                    select(Post).filter(
+                        Post.round >= visibility, Post.user_id.in_(follower_ids)
+                    ).order_by(desc(Post.id)).limit(follower_posts_limit)
+                ).all()
 
         if additional_posts_limit != 0:
             if articles:
                 additional_posts = (
-                    Post.query.filter(
-                        Post.round >= visibility,
-                        Post.news_id != -1,
-                        Post.user_id != uid,
-                    )
-                    .order_by(desc(Post.id))
-                    .limit(additional_posts_limit)
-                ).all()
+                    db.session.scalars(
+                        select(Post).filter(
+                            Post.round >= visibility,
+                            Post.news_id != -1,
+                            Post.user_id != uid,
+                        ).order_by(desc(Post.id)).limit(additional_posts_limit)
+                    ).all()
             else:
                 additional_posts = (
-                    Post.query.filter(Post.round >= visibility, Post.user_id != uid)
-                    .order_by(desc(Post.id))
-                    .limit(additional_posts_limit)
-                ).all()
+                    db.session.scalars(
+                        select(Post).filter(
+                            Post.round >= visibility, Post.user_id != uid
+                        ).order_by(desc(Post.id)).limit(additional_posts_limit)
+                    ).all()
 
             posts = [posts, additional_posts]
 
@@ -323,7 +321,7 @@ def read():
             additional_posts_limit = 0
 
         # get followers
-        follower = Follow.query.filter_by(action="follow", user_id=uid)
+        follower = db.session.scalars(select(Follow).filter_by(action="follow", user_id=uid)).all()
         follower_ids = [f.follower_id for f in follower if f.follower_id != uid]
 
         # get posts from followers ordered by likes and reverse chronologically
@@ -349,23 +347,22 @@ def read():
         if additional_posts_limit != 0:
             if articles:
                 additional_posts = (
-                    Post.query.filter(
-                        Post.round >= visibility,
-                        Post.news_id != -1,
-                        Post.user_id.in_(pages),
-                    )
-                    .order_by(
-                        desc(Post.id),
-                        desc(Post.reaction_count),
-                    )
-                    .limit(additional_posts_limit)
-                ).all()
+                    db.session.scalars(
+                        select(Post).filter(
+                            Post.round >= visibility,
+                            Post.news_id != -1,
+                            Post.user_id.in_(pages),
+                        ).order_by(desc(Post.id), desc(Post.reaction_count))
+                        .limit(additional_posts_limit)
+                    ).all()
             else:
                 additional_posts = (
-                    Post.query.filter(Post.round >= visibility, Post.user_id != uid)
-                    .order_by(desc(Post.reaction_count), desc(Post.id))
-                    .limit(additional_posts_limit)
-                ).all()
+                    db.session.scalars(
+                        select(Post).filter(
+                            Post.round >= visibility, Post.user_id != uid
+                        ).order_by(desc(Post.reaction_count), desc(Post.id))
+                        .limit(additional_posts_limit)
+                    ).all()
 
             posts = [posts, additional_posts]
 
@@ -450,21 +447,21 @@ def read():
         # get posts in random order
         if articles:
             posts = (
-                Post.query.filter(
-                    Post.round >= visibility,
-                    Post.news_id != -1,
-                    Post.user_id.in_(pages),
-                )
-                .order_by(func.random())
-                .limit(limit)
-            ).all()
+                db.session.scalars(
+                    select(Post).filter(
+                        Post.round >= visibility,
+                        Post.news_id != -1,
+                        Post.user_id.in_(pages),
+                    ).order_by(func.random()).limit(limit)
+                ).all()
 
         else:
             posts = (
-                Post.query.filter(Post.round >= visibility, Post.user_id != uid)
-                .order_by(func.random())
-                .limit(limit)
-            ).all()
+                db.session.scalars(
+                    select(Post).filter(
+                        Post.round >= visibility, Post.user_id != uid
+                    ).order_by(func.random()).limit(limit)
+                ).all()
 
     res = []
 
@@ -486,7 +483,7 @@ def read():
                     res.append(post_type.id)
 
     # save recommendations
-    current_round = Rounds.query.order_by(desc(Rounds.id)).first()
+    current_round = db.session.scalars(select(Rounds).order_by(desc(Rounds.id))).first()
     current_round_id = current_round.id if current_round is not None else None
     res = _filter_shadow_banned_post_ids(res, current_round_id)
     if len(res) > 0:
@@ -512,10 +509,10 @@ def search():
     vround = int(data["visibility_rounds"])
 
     # visibility
-    current_round = Rounds.query.order_by(desc(Rounds.id)).first()
+    current_round = db.session.scalars(select(Rounds).order_by(desc(Rounds.id))).first()
     visibility = current_round.id - vround
 
-    recent_user_hashtags = Hashtags.query.filter(
+    recent_user_hashtags = db.session.scalars(select(Hashtags).filter(
         Hashtags.id
         == db.session.query(Post_hashtags.hashtag_id)
         .filter(
@@ -535,14 +532,14 @@ def search():
         hashtag_ids = list(set(hashtag_ids))
 
         recent_posts_with_hashtags = (
-            Post_hashtags.query.filter(Post_hashtags.hashtag_id.in_(hashtag_ids))
-            .filter(
-                Post.id == Post_hashtags.post_id,
-                Post.user_id != uid,
-                Post.round >= visibility,
-            )
-            .order_by(func.random())
-            .limit(10)
+            db.session.scalars(
+                select(Post_hashtags)
+                .filter(Post_hashtags.hashtag_id.in_(hashtag_ids))
+                .join(Post, Post.id == Post_hashtags.post_id)
+                .filter(Post.user_id != uid, Post.round >= visibility)
+                .order_by(func.random())
+                .limit(10)
+            ).all()
         )
 
         res = []
@@ -566,18 +563,18 @@ def read_mention():
     vround = int(data["visibility_rounds"])
 
     # Calcola la visibilità
-    current_round = Rounds.query.order_by(desc(Rounds.id)).first()
+    current_round = db.session.scalars(select(Rounds).order_by(desc(Rounds.id))).first()
     visibility = current_round.id - vround
 
     # Trova una mention non ancora letta per l'utente
     mention_candidates = (
-        Mentions.query.filter(
-            Mentions.user_id == uid,
-            Mentions.round >= visibility,
-            Mentions.answered == 0,
-        )
-        .order_by(func.random())
-        .all()
+        db.session.scalars(
+            select(Mentions).filter(
+                Mentions.user_id == uid,
+                Mentions.round >= visibility,
+                Mentions.answered == 0,
+            ).order_by(func.random())
+        ).all()
     )
 
     mention = None
@@ -627,7 +624,7 @@ def add_post():
     topics = data["topics"]
     tid = int(data["tid"])
 
-    user = User_mgmt.query.filter_by(id=account_id).first()
+    user = db.session.scalars(select(User_mgmt).filter_by(id=account_id)).first()
 
     text = text.strip("-")
 
@@ -680,7 +677,7 @@ def add_post():
             if len(emotion) < 1:
                 continue
 
-            em = Emotions.query.filter_by(emotion=emotion).first()
+            em = db.session.scalars(select(Emotions).filter_by(emotion=emotion)).first()
             if em is not None:
                 post_emotion = Post_emotions(post_id=post_id, emotion_id=em.id)
                 db.session.add(post_emotion)
@@ -692,12 +689,12 @@ def add_post():
             if len(tag) < 4:
                 continue
 
-            ht = Hashtags.query.filter_by(hashtag=tag).first()
+            ht = db.session.scalars(select(Hashtags).filter_by(hashtag=tag)).first()
             if ht is None:
                 ht = Hashtags(hashtag=tag)
                 db.session.add(ht)
                 db.session.commit()
-                ht = Hashtags.query.filter_by(hashtag=tag).first()
+                ht = db.session.scalars(select(Hashtags).filter_by(hashtag=tag)).first()
 
             post_tag = Post_hashtags(post_id=post_id, hashtag_id=ht.id)
             db.session.add(post_tag)
@@ -708,7 +705,7 @@ def add_post():
             if len(mention) < 1:
                 continue
 
-            us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
+            us = db.session.scalars(select(User_mgmt).filter_by(username=mention.strip("@"))).first()
 
             # existing user and not self
             if us is not None and us.id != user.id:
@@ -719,7 +716,7 @@ def add_post():
                 text = text.replace(mention, "")
 
                 # update post
-                Post.query.filter_by(id=post_id).update({"tweet": text.lstrip().rstrip()})
+                db.session.execute(update(Post).filter_by(id=post_id).values(tweet=text.lstrip().rstrip()))
                 db.session.commit()
 
     return json.dumps({"status": 200})
@@ -744,8 +741,8 @@ def add_comment():
     mentions = data["mentions"]
     tid = int(data["tid"])
 
-    user = User_mgmt.query.filter_by(id=account_id).first()
-    post = Post.query.filter_by(id=post_id).first()
+    user = db.session.scalars(select(User_mgmt).filter_by(id=account_id)).first()
+    post = db.session.scalars(select(Post).filter_by(id=post_id)).first()
 
     text = text.strip("-")
 
@@ -762,7 +759,7 @@ def add_comment():
     db.session.commit()
     new_post_id = new_post.id
     # add to the comment the topics of the parent post
-    parent_post_topics = Post_topics.query.filter_by(post_id=thread_id).all()
+    parent_post_topics = db.session.scalars(select(Post_topics).filter_by(post_id=thread_id)).all()
     for topic in parent_post_topics:
         tp = Post_topics(post_id=new_post_id, topic_id=topic.topic_id)
         db.session.add(tp)
@@ -772,7 +769,7 @@ def add_comment():
     # get sentiment of the post is responding to
 
     if current_app.config.get("sentiment_annotation", False):
-        sentiment_parent = Post_Sentiment.query.filter_by(post_id=post_id).first()
+        sentiment_parent = db.session.scalars(select(Post_Sentiment).filter_by(post_id=post_id)).first()
         if sentiment_parent is not None:
             sentiment_parent = sentiment_parent.compound
             # thresholding
@@ -788,7 +785,7 @@ def add_comment():
         sentiment = vader_sentiment(text)
 
         # get topics associated to post.id
-        post_topics = Post_topics.query.filter_by(post_id=thread_id).all()
+        post_topics = db.session.scalars(select(Post_topics).filter_by(post_id=thread_id)).all()
         for topic in post_topics:
             post_sentiment = Post_Sentiment(
                 post_id=new_post_id,
@@ -816,7 +813,7 @@ def add_comment():
             if len(emotion) < 1:
                 continue
 
-            em = Emotions.query.filter_by(emotion=emotion).first()
+            em = db.session.scalars(select(Emotions).filter_by(emotion=emotion)).first()
             if em is not None:
                 post_emotion = Post_emotions(post_id=new_post_id, emotion_id=em.id)
                 db.session.add(post_emotion)
@@ -829,12 +826,12 @@ def add_comment():
             if len(tag) < 1:
                 continue
 
-            ht = Hashtags.query.filter_by(hashtag=tag).first()
+            ht = db.session.scalars(select(Hashtags).filter_by(hashtag=tag)).first()
             if ht is None:
                 ht = Hashtags(hashtag=tag)
                 db.session.add(ht)
                 db.session.commit()
-                ht = Hashtags.query.filter_by(hashtag=tag).first()
+                ht = db.session.scalars(select(Hashtags).filter_by(hashtag=tag)).first()
 
             post_tag = Post_hashtags(post_id=new_post_id, hashtag_id=ht.id)
             db.session.add(post_tag)
@@ -845,7 +842,7 @@ def add_comment():
             if len(mention) < 1:
                 continue
 
-            us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
+            us = db.session.scalars(select(User_mgmt).filter_by(username=mention.strip("@"))).first()
             if us is not None:
                 mn = Mentions(user_id=us.id, post_id=new_post_id, round=tid)
                 db.session.add(mn)
@@ -854,13 +851,13 @@ def add_comment():
                 text = text.replace(mention, "")
 
                 # update post
-                Post.query.filter_by(id=new_post_id).update({"tweet": text.lstrip().rstrip()})
+                db.session.execute(update(Post).filter_by(id=new_post_id).values(tweet=text.lstrip().rstrip()))
 
                 # more than one word
                 if len(text.lstrip().rstrip().split(" ")) > 1:
                     db.session.commit()
                 else:
-                    Post.query.filter_by(id=new_post_id).delete()
+                    db.session.execute(delete(Post).filter_by(id=new_post_id))
                     db.session.commit()
 
     return json.dumps({"status": 200})
@@ -879,19 +876,19 @@ def post_thread():
     data = json.loads(request.get_data())
     post_id = data["post_id"]
 
-    post = Post.query.filter_by(id=post_id).first()
+    post = db.session.scalars(select(Post).filter_by(id=post_id)).first()
     if post is None:
         return json.dumps({"status": 404, "error": "Post not found"})
 
     thread_root_id = _resolve_thread_root_id(post)
-    thread_id = Post.query.filter_by(thread_id=thread_root_id)
+    thread_id = db.session.scalars(select(Post).filter_by(thread_id=thread_root_id)).all()
 
     res = []
 
     for post in thread_id:
         user = post.user_id
         res.append(
-            f"@{User_mgmt.query.filter_by(id=user).first().username} - {post.tweet}\n"
+            f"@{db.session.scalars(select(User_mgmt).filter_by(id=user)).first().username} - {post.tweet}\n"
         )
     return json.dumps(res)
 
@@ -906,11 +903,11 @@ def get_post_topics_name():
     data = json.loads(request.get_data())
     post_id = data["post_id"]
 
-    post_topics = Post_topics.query.filter_by(post_id=post_id).all()
+    post_topics = db.session.scalars(select(Post_topics).filter_by(post_id=post_id)).all()
 
     res = []
     for topic in post_topics:
-        tp = Interests.query.filter_by(iid=topic.topic_id).first()
+        tp = db.session.scalars(select(Interests).filter_by(iid=topic.topic_id)).first()
         if tp is not None:
             res.append(tp.interest)
 
@@ -931,11 +928,12 @@ def get_sentiment():
     res = []
 
     for interest in interests:
-        topic = Interests.query.filter_by(interest=interest).first()
+        topic = db.session.scalars(select(Interests).filter_by(interest=interest)).first()
         post_sentiment = (
-            Post_Sentiment.query.filter_by(user_id=user_id, topic_id=topic.iid)
+            db.session.scalars(
+            select(Post_Sentiment).filter_by(user_id=user_id, topic_id=topic.iid)
             .order_by(desc(Post_Sentiment.id))
-            .first()
+        ).first()
         )
         if post_sentiment is not None:
             # thresholding compound
@@ -963,7 +961,7 @@ def get_post():
     data = json.loads(request.get_data())
     post_id = data["post_id"]
 
-    post = Post.query.filter_by(id=post_id).first()
+    post = db.session.scalars(select(Post).filter_by(id=post_id)).first()
 
     return json.dumps(post.tweet)
 
@@ -984,7 +982,7 @@ def add_reaction():
     rtype = data["type"]
     tid = int(data["tid"])
 
-    user = User_mgmt.query.filter_by(id=account_id).first()
+    user = db.session.scalars(select(User_mgmt).filter_by(id=account_id)).first()
 
     react = Reactions(post_id=post_id, user_id=user.id, round=tid, type=rtype)
 
@@ -997,7 +995,7 @@ def add_reaction():
     # allow disabling sentiment analysis for reactions
     if current_app.config.get("sentiment_annotation", False):
         # get compound sentiment of post
-        post_sentiment = Post_Sentiment.query.filter_by(post_id=int(post_id)).all()
+        post_sentiment = db.session.scalars(select(Post_Sentiment).filter_by(post_id=int(post_id))).all()
         for topic_sentiment in post_sentiment:
             topic_id = topic_sentiment.topic_id
             compound = topic_sentiment.compound
@@ -1028,7 +1026,7 @@ def add_reaction():
     #########
 
     # increment the post's reaction count
-    post = Post.query.filter_by(id=post_id).first()
+    post = db.session.scalars(select(Post).filter_by(id=post_id)).first()
     if post is not None:
         post.reaction_count += 1
         db.session.commit()
@@ -1052,8 +1050,8 @@ def report_post():
     if report_type not in {"offensive", "toxic"}:
         return json.dumps({"status": 400, "error": "invalid report type"})
 
-    user = User_mgmt.query.filter_by(id=account_id).first()
-    post = Post.query.filter_by(id=post_id).first()
+    user = db.session.scalars(select(User_mgmt).filter_by(id=account_id)).first()
+    post = db.session.scalars(select(Post).filter_by(id=post_id)).first()
 
     if user is None or post is None:
         return json.dumps({"status": 404})
@@ -1080,7 +1078,7 @@ def get_post_topics():
     """
     data = json.loads(request.get_data())
     post_id = int(data["post_id"])
-    post_topics = Post_topics.query.filter_by(post_id=post_id).all()
+    post_topics = db.session.scalars(select(Post_topics).filter_by(post_id=post_id)).all()
 
     res = []
     for topic in post_topics:
@@ -1088,10 +1086,10 @@ def get_post_topics():
 
     # if len(res) == 0 get the topics of the parent post (if comment the root post is thread_id)
     if len(res) == 0:
-        post = Post.query.filter_by(id=post_id).first()
+        post = db.session.scalars(select(Post).filter_by(id=post_id)).first()
         if post is not None:
             thread_root_id = _resolve_thread_root_id(post)
-            parent_post_topics = Post_topics.query.filter_by(post_id=thread_root_id).all()
+            parent_post_topics = db.session.scalars(select(Post_topics).filter_by(post_id=thread_root_id)).all()
             for topic in parent_post_topics:
                 res.append(topic.topic_id)
 
@@ -1108,7 +1106,7 @@ def get_thread_root():
     data = json.loads(request.get_data())
     post_id = data["post_id"]
 
-    post = Post.query.filter_by(id=post_id).first()
+    post = db.session.scalars(select(Post).filter_by(id=post_id)).first()
 
     if post is None:
         return json.dumps({"status": 404})

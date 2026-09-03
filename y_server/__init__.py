@@ -15,7 +15,7 @@ from flask import Flask, g, request
 from flask_sqlalchemy import SQLAlchemy
 import sqlalchemy
 import sqlalchemy.orm
-from sqlalchemy import desc
+from sqlalchemy import select, desc
 from sqlalchemy.pool import NullPool
 
 
@@ -470,7 +470,7 @@ try:
             
             # Add current round information from the database (main process)
             try:
-                current_round = Rounds.query.order_by(desc(Rounds.id)).first()
+                current_round = db.session.scalars(select(Rounds).order_by(desc(Rounds.id))).first()
                 if current_round:
                     log_data["tid"] = current_round.id
                     log_data["day"] = current_round.day
@@ -661,7 +661,7 @@ except Exception as init_exception:  # Y Web subprocess
             
             # Add current round information from the database (Y Web subprocess)
             try:
-                current_round = Rounds.query.order_by(desc(Rounds.id)).first()
+                current_round = db.session.scalars(select(Rounds).order_by(desc(Rounds.id))).first()
                 if current_round:
                     log_data["tid"] = current_round.id
                     log_data["day"] = current_round.day
