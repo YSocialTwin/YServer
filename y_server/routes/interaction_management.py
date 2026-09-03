@@ -2,10 +2,9 @@ import json
 
 import numpy as np
 from flask import request
-from sqlalchemy.sql.expression import func
+from sqlalchemy import func, select
 from y_server import app, db
 from y_server.modals import (
-from sqlalchemy import func, select
     Follow,
     User_mgmt,
 )

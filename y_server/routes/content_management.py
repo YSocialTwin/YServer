@@ -284,6 +284,7 @@ def read():
                         Post.user_id.in_(follower_ids),
                     ).order_by(desc(Post.id)).limit(follower_posts_limit)
                 ).all()
+            )
         else:
             posts = (
                 db.session.scalars(
@@ -291,6 +292,7 @@ def read():
                         Post.round >= visibility, Post.user_id.in_(follower_ids)
                     ).order_by(desc(Post.id)).limit(follower_posts_limit)
                 ).all()
+            )
 
         if additional_posts_limit != 0:
             if articles:
@@ -302,6 +304,7 @@ def read():
                             Post.user_id != uid,
                         ).order_by(desc(Post.id)).limit(additional_posts_limit)
                     ).all()
+                )
             else:
                 additional_posts = (
                     db.session.scalars(
@@ -309,6 +312,7 @@ def read():
                             Post.round >= visibility, Post.user_id != uid
                         ).order_by(desc(Post.id)).limit(additional_posts_limit)
                     ).all()
+                )
 
             posts = [posts, additional_posts]
 
@@ -355,6 +359,7 @@ def read():
                         ).order_by(desc(Post.id), desc(Post.reaction_count))
                         .limit(additional_posts_limit)
                     ).all()
+                )
             else:
                 additional_posts = (
                     db.session.scalars(
@@ -363,6 +368,7 @@ def read():
                         ).order_by(desc(Post.reaction_count), desc(Post.id))
                         .limit(additional_posts_limit)
                     ).all()
+                )
 
             posts = [posts, additional_posts]
 
@@ -454,6 +460,7 @@ def read():
                         Post.user_id.in_(pages),
                     ).order_by(func.random()).limit(limit)
                 ).all()
+            )
 
         else:
             posts = (
@@ -462,6 +469,7 @@ def read():
                         Post.round >= visibility, Post.user_id != uid
                     ).order_by(func.random()).limit(limit)
                 ).all()
+            )
 
     res = []
 
@@ -522,7 +530,7 @@ def search():
             .scalar_subquery()  # Explicit scalar subquery
         )
         .scalar_subquery()  # Explicit scalar subquery
-    ).limit(10)
+    ).limit(10)).all()
 
     if recent_user_hashtags is not None:
         hashtag_ids = []

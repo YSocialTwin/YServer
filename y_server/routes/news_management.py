@@ -4,7 +4,6 @@ from flask import request
 from y_server import app, db
 from y_server.content_analysis import should_annotate_toxicity, toxicity, vader_sentiment
 from y_server.modals import (
-from sqlalchemy import func, select
     Article_topics,
     Articles,
     Emotions,
