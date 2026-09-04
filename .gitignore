@@ -163,3 +163,4 @@ cython_debug/
 
 # Experiments folder (contains database files)
 experiments/
+.playwright-cli
