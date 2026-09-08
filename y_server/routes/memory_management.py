@@ -3,7 +3,7 @@ import math
 import re
 
 from flask import request
-from sqlalchemy import desc, inspect, text
+from sqlalchemy import delete, desc, inspect, select, text
 
 from y_server import app, db
 from y_server.memory_embedding import MemoryEmbeddingService, cosine_similarity, lexical_relevance
@@ -235,7 +235,7 @@ def _build_user_map(user_ids):
             ids.append(uid)
     if not ids:
         return {}
-    rows = User_mgmt.query.filter(User_mgmt.id.in_(sorted(set(ids)))).all()
+    rows = db.session.scalars(select(User_mgmt).filter(User_mgmt.id.in_(sorted(set(ids))))).all()
     return {int(row.id): _normalize_username(row.username) for row in rows if _normalize_username(row.username)}
 
 
@@ -291,11 +291,11 @@ def memory_reset():
     run_id = str(data.get("run_id") or "").strip()
     if not run_id:
         return json.dumps({"status": 400, "error": "run_id required"}), 400
-    MemoryInteractionEvent.query.filter_by(run_id=run_id).delete()
-    MemoryItem.query.filter_by(run_id=run_id).delete()
-    MemorySocialCard.query.filter_by(run_id=run_id).delete()
-    MemoryThreadCard.query.filter_by(run_id=run_id).delete()
-    MemoryCommunityDigest.query.filter_by(run_id=run_id).delete()
+    db.session.execute(delete(MemoryInteractionEvent).filter_by(run_id=run_id))
+    db.session.execute(delete(MemoryItem).filter_by(run_id=run_id))
+    db.session.execute(delete(MemorySocialCard).filter_by(run_id=run_id))
+    db.session.execute(delete(MemoryThreadCard).filter_by(run_id=run_id))
+    db.session.execute(delete(MemoryCommunityDigest).filter_by(run_id=run_id))
     db.session.commit()
     return json.dumps({"status": 200})
 
@@ -415,7 +415,7 @@ def memory_social_upsert():
     other_user_id = _to_int_or_none(data.get("other_user_id"))
     if not run_id or agent_user_id is None or other_user_id is None:
         return json.dumps({"status": 400, "error": "run_id, agent_user_id and other_user_id required"}), 400
-    card = MemorySocialCard.query.filter_by(run_id=run_id, agent_user_id=agent_user_id, other_user_id=other_user_id).first()
+    card = db.session.scalars(select(MemorySocialCard).filter_by(run_id=run_id, agent_user_id=agent_user_id, other_user_id=other_user_id)).first()
     if card is None:
         card = MemorySocialCard(run_id=run_id, agent_user_id=agent_user_id, other_user_id=other_user_id)
         db.session.add(card)
@@ -447,7 +447,7 @@ def memory_thread_upsert():
     thread_root_id = _to_int_or_none(data.get("thread_root_id"))
     if not run_id or agent_user_id is None or thread_root_id is None:
         return json.dumps({"status": 400, "error": "run_id, agent_user_id and thread_root_id required"}), 400
-    card = MemoryThreadCard.query.filter_by(run_id=run_id, agent_user_id=agent_user_id, thread_root_id=thread_root_id).first()
+    card = db.session.scalars(select(MemoryThreadCard).filter_by(run_id=run_id, agent_user_id=agent_user_id, thread_root_id=thread_root_id)).first()
     if card is None:
         card = MemoryThreadCard(run_id=run_id, agent_user_id=agent_user_id, thread_root_id=thread_root_id)
         db.session.add(card)
@@ -471,7 +471,7 @@ def memory_community_get():
     run_id = str(data.get("run_id") or "").strip()
     if not run_id:
         return json.dumps({"status": 400, "error": "run_id required"}), 400
-    digest = MemoryCommunityDigest.query.filter_by(run_id=run_id).order_by(desc(MemoryCommunityDigest.id)).first()
+    digest = db.session.scalars(select(MemoryCommunityDigest).filter_by(run_id=run_id).order_by(desc(MemoryCommunityDigest.id))).first()
     if digest is None:
         return json.dumps({"status": 404}), 404
     return json.dumps({
@@ -493,7 +493,7 @@ def memory_community_update():
     run_id = str(data.get("run_id") or "").strip()
     if not run_id:
         return json.dumps({"status": 400, "error": "run_id required"}), 400
-    digest = MemoryCommunityDigest.query.filter_by(run_id=run_id).order_by(desc(MemoryCommunityDigest.id)).first()
+    digest = db.session.scalars(select(MemoryCommunityDigest).filter_by(run_id=run_id).order_by(desc(MemoryCommunityDigest.id))).first()
     if digest is None:
         digest = MemoryCommunityDigest(run_id=run_id)
         db.session.add(digest)
@@ -533,7 +533,7 @@ def memory_item_upsert():
     if not text_value:
         return json.dumps({"status": 400, "error": "text required"}), 400
     item_id = _to_int_or_none(data.get("id"))
-    item = MemoryItem.query.filter_by(id=item_id, run_id=run_id, agent_user_id=agent_user_id).first() if item_id else None
+    item = db.session.scalars(select(MemoryItem).filter_by(id=item_id, run_id=run_id, agent_user_id=agent_user_id)).first() if item_id else None
     if item is None:
         item = MemoryItem(run_id=run_id, agent_user_id=agent_user_id, item_type=item_type, text=text_value)
         db.session.add(item)
@@ -586,7 +586,7 @@ def memory_search():
         types = ["event", "reflection", "summary"]
     types = [str(value).strip().lower() for value in types if str(value).strip()]
 
-    query = MemoryItem.query.filter(
+    query = select(MemoryItem).filter(
         MemoryItem.run_id == run_id,
         MemoryItem.agent_user_id == agent_user_id,
         MemoryItem.item_type.in_(types),
@@ -597,7 +597,7 @@ def memory_search():
         query = query.filter(MemoryItem.thread_root_id == thread_root_id)
     if current_round is not None and time_window_rounds is not None and time_window_rounds > 0:
         query = query.filter((MemoryItem.round_id == None) | (MemoryItem.round_id >= (current_round - time_window_rounds)))  # noqa: E711
-    candidates = query.order_by(desc(MemoryItem.round_id), desc(MemoryItem.id)).limit(300).all()
+    candidates = db.session.scalars(query.order_by(desc(MemoryItem.round_id), desc(MemoryItem.id)).limit(300)).all()
 
     query_variants = _build_memory_query_variants(query_text)
     query_embedding = _MEMORY_EMBEDDING.embed_text(query_text) if _MEMORY_EMBEDDING and _MEMORY_EMBEDDING.available else None
@@ -714,20 +714,22 @@ def memory_get_context():
     pair_rows = []
     if other_user_id is not None:
         pair_rows = (
-            MemoryInteractionEvent.query.filter(MemoryInteractionEvent.run_id == run_id)
-            .filter(
-                (
-                    (MemoryInteractionEvent.actor_user_id == agent_user_id)
-                    & (MemoryInteractionEvent.target_user_id == other_user_id)
+            db.session.scalars(
+                select(MemoryInteractionEvent)
+                .filter(MemoryInteractionEvent.run_id == run_id)
+                .filter(
+                    (
+                        (MemoryInteractionEvent.actor_user_id == agent_user_id)
+                        & (MemoryInteractionEvent.target_user_id == other_user_id)
+                    )
+                    | (
+                        (MemoryInteractionEvent.actor_user_id == other_user_id)
+                        & (MemoryInteractionEvent.target_user_id == agent_user_id)
+                    )
                 )
-                | (
-                    (MemoryInteractionEvent.actor_user_id == other_user_id)
-                    & (MemoryInteractionEvent.target_user_id == agent_user_id)
-                )
-            )
-            .order_by(desc(MemoryInteractionEvent.id))
-            .limit(pair_limit)
-            .all()[::-1]
+                .order_by(desc(MemoryInteractionEvent.id))
+                .limit(pair_limit)
+            ).all()[::-1]
         )
 
     username_ids = {agent_user_id}
@@ -742,7 +744,7 @@ def memory_get_context():
 
     social_card = None
     if other_user_id is not None:
-        sc = MemorySocialCard.query.filter_by(run_id=run_id, agent_user_id=agent_user_id, other_user_id=other_user_id).first()
+        sc = db.session.scalars(select(MemorySocialCard).filter_by(run_id=run_id, agent_user_id=agent_user_id, other_user_id=other_user_id)).first()
         if sc is not None:
             social_card = {
                 "affinity": sc.affinity,
@@ -761,7 +763,7 @@ def memory_get_context():
 
     thread_card = None
     if thread_root_id is not None:
-        tc = MemoryThreadCard.query.filter_by(run_id=run_id, agent_user_id=agent_user_id, thread_root_id=thread_root_id).first()
+        tc = db.session.scalars(select(MemoryThreadCard).filter_by(run_id=run_id, agent_user_id=agent_user_id, thread_root_id=thread_root_id)).first()
         if tc is not None:
             thread_card = {
                 "gist_text": tc.gist_text,
@@ -772,7 +774,7 @@ def memory_get_context():
             }
 
     community_digest = None
-    dg = MemoryCommunityDigest.query.filter_by(run_id=run_id).order_by(desc(MemoryCommunityDigest.id)).first()
+    dg = db.session.scalars(select(MemoryCommunityDigest).filter_by(run_id=run_id).order_by(desc(MemoryCommunityDigest.id))).first()
     if dg is not None:
         community_digest = {
             "round_id": dg.round_id,
@@ -822,7 +824,7 @@ def memory_events_recent():
     if not run_id:
         return json.dumps({"status": 400, "error": "run_id required"}), 400
     limit = max(1, min(_to_int_or_none(data.get("limit")) or 80, 200))
-    rows = MemoryInteractionEvent.query.filter(MemoryInteractionEvent.run_id == run_id).order_by(desc(MemoryInteractionEvent.id)).limit(limit).all()[::-1]
+    rows = db.session.scalars(select(MemoryInteractionEvent).filter(MemoryInteractionEvent.run_id == run_id).order_by(desc(MemoryInteractionEvent.id)).limit(limit)).all()[::-1]
     return json.dumps(
         {
             "status": 200,

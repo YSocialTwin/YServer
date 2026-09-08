@@ -2,7 +2,7 @@ import json
 import sys
 
 from flask import request
-from sqlalchemy import desc
+from sqlalchemy import delete, desc, func, select
 from y_server import app, db
 from y_server.modals import (
     Agent_Custom_Feature,
@@ -65,9 +65,10 @@ def _normalize_stubborn_topics(raw_stubborn_topics):
 
 def _latest_agent_opinion(agent_id, topic_id):
     return (
-        Agent_Opinion.query.filter_by(agent_id=agent_id, topic_id=topic_id)
-        .order_by(Agent_Opinion.tid.desc(), Agent_Opinion.id.desc())
-        .first()
+        db.session.scalars(
+            select(Agent_Opinion).filter_by(agent_id=agent_id, topic_id=topic_id)
+            .order_by(Agent_Opinion.tid.desc(), Agent_Opinion.id.desc())
+        ).first()
     )
 
 
@@ -85,7 +86,7 @@ def get_user_id():
     else:
         username = request.args.get("username")
 
-    user = User_mgmt.query.filter_by(username=username).first()
+    user = db.session.scalars(select(User_mgmt).filter_by(username=username)).first()
     if user is None:
         return json.dumps({"id": None})
 
@@ -103,7 +104,7 @@ def get_user():
     username = data["username"]
     # email = data["email"]
 
-    user = User_mgmt.query.filter_by(username=username).first()
+    user = db.session.scalars(select(User_mgmt).filter_by(username=username)).first()
 
     if user is None:
         return json.dumps({"error": "User not found", "status": 404, "username": username})
@@ -179,7 +180,7 @@ def register():
     else:
         is_page = 0
 
-    user = User_mgmt.query.filter_by(username=data["name"]).first()
+    user = db.session.scalars(select(User_mgmt).filter_by(username=data["name"])).first()
 
     if user is None:
         user = User_mgmt(
@@ -231,7 +232,7 @@ def churn_agents():
 
     user_id = data.get("user_id")
     if user_id is not None:
-        user = User_mgmt.query.filter_by(id=int(user_id)).first()
+        user = db.session.scalars(select(User_mgmt).filter_by(id=int(user_id))).first()
         if user is None:
             return json.dumps({"status": 404, "removed": {}})
         user.left_on = left_on
@@ -256,7 +257,7 @@ def churn_agents():
 
     removed = {}
     for user_id, _ in results:
-        user = User_mgmt.query.filter_by(id=user_id).first()
+        user = db.session.scalars(select(User_mgmt).filter_by(id=user_id)).first()
         user.left_on = left_on
         db.session.commit()
         removed[user_id] = None
@@ -273,9 +274,9 @@ def update_user():
     """
     data = json.loads(request.get_data())
 
-    user = User_mgmt.query.filter_by(
+    user = db.session.scalars(select(User_mgmt).filter_by(
         username=data["username"], email=data["email"]
-    ).first()
+    )).first()
 
     if user is not None:
         if "recsys_type" in data:
@@ -299,7 +300,7 @@ def user_exists():
     :return: a json object with the status of the user
     """
     data = json.loads(request.get_data())
-    user = User_mgmt.query.filter_by(username=data["name"], email=data["email"]).first()
+    user = db.session.scalars(select(User_mgmt).filter_by(username=data["name"], email=data["email"])).first()
 
     if user is None:
         return json.dumps({"status": 404})
@@ -319,7 +320,7 @@ def get_user_from_post():
     """
     data = json.loads(request.get_data())
     post_id = data["post_id"]
-    post = Post.query.filter_by(id=post_id).first()
+    post = db.session.scalars(select(Post).filter_by(id=post_id)).first()
 
     if post is None:
         return json.dumps({"error": "Post not found", "status": 404})
@@ -337,13 +338,13 @@ def get_timeline():
     data = json.loads(request.get_data())
     user_id = data["user_id"]
 
-    all_posts = Post.query.filter_by(user_id=user_id).order_by(desc(Post.id))
+    all_posts = db.session.scalars(select(Post).filter_by(user_id=user_id).order_by(desc(Post.id))).all()
     res = []
     for post in all_posts:
-        reposts = Post.query.filter_by(shared_from=post.id).count()
-        likes = Reactions.query.filter_by(post_id=post.id, type="like").count()
-        dislikes = Reactions.query.filter_by(post_id=post.id, type="dislike").count()
-        comments = Post.query.filter_by(comment_to=post.id).count()
+        reposts = db.session.scalar(select(func.count()).select_from(Post).filter_by(shared_from=post.id))
+        likes = db.session.scalar(select(func.count()).select_from(Reactions).filter_by(post_id=post.id, type="like"))
+        dislikes = db.session.scalar(select(func.count()).select_from(Reactions).filter_by(post_id=post.id, type="dislike"))
+        comments = db.session.scalar(select(func.count()).select_from(Post).filter_by(comment_to=post.id))
         res.append(
             {
                 "post_id": post.id,
@@ -369,7 +370,7 @@ def set_interests():
     data = json.loads(request.get_data())
 
     for interest in data:
-        existing = Interests.query.filter_by(interest=interest).first()
+        existing = db.session.scalars(select(Interests).filter_by(interest=interest)).first()
         if existing is None:
             ints = Interests(
                 interest=interest,
@@ -398,7 +399,7 @@ def set_user_interests():
         iid = None
         if isinstance(interest, str):
             try:
-                iid = Interests.query.filter_by(interest=interest).first().iid
+                iid = db.session.scalars(select(Interests).filter_by(interest=interest)).first().iid
             except:
                 # add interest to the interest table
                 ints = Interests(
@@ -406,7 +407,7 @@ def set_user_interests():
                 )
                 db.session.add(ints)
                 db.session.commit()
-                iid = Interests.query.filter_by(interest=interest).first().iid
+                iid = db.session.scalars(select(Interests).filter_by(interest=interest)).first().iid
 
         else:
             iid = interest
@@ -514,13 +515,13 @@ def get_users_opinions():
     topic = data["topic"]
 
     # get topic id from Interests table
-    interest = Interests.query.filter_by(interest=topic).first()
+    interest = db.session.scalars(select(Interests).filter_by(interest=topic)).first()
     if interest is not None:
         target_topic_id = int(interest.iid)
     else:
         return []
 
-    followee_ids = [f.follower_id for f in Follow.query.filter_by(user_id=user_id, action="follow").all()]
+    followee_ids = [f.follower_id for f in db.session.scalars(select(Follow).filter_by(user_id=user_id, action="follow")).all()]
 
     # ---------------------------------------------------------
     # Subquery: Get the latest tid per AGENT for this specific TOPIC
@@ -591,11 +592,11 @@ def set_user_opinions():
                 try:
                     topic_id = int(topic_id)
                     # check if the topic_id exists in the Interests table
-                    interest = Interests.query.filter_by(iid=topic_id).first()
+                    interest = db.session.scalars(select(Interests).filter_by(iid=topic_id)).first()
                     if interest is None:
                         raise ValueError(f"Interest ID {topic_id} does not exist.")
                 except:
-                    interest = Interests.query.filter_by(interest=topic_id).first()
+                    interest = db.session.scalars(select(Interests).filter_by(interest=topic_id)).first()
                     if interest is None:
                         # create the interest
                         new_interest = Interests(interest=topic_id)
@@ -609,7 +610,7 @@ def set_user_opinions():
             is_stubborn = bool(latest_opinion.stubborn) if latest_opinion is not None else False
             if isinstance(topic_id, int):
                 interest_name = (
-                    Interests.query.filter_by(iid=topic_id).with_entities(Interests.interest).scalar()
+                    db.session.scalar(select(Interests.interest).filter_by(iid=topic_id))
                 )
             else:
                 interest_name = str(topic_id)
@@ -648,7 +649,7 @@ def set_user_custom_features():
     features = _normalize_custom_features_payload(data.get("custom_features"))
 
     try:
-        Agent_Custom_Feature.query.filter_by(user_id=user_id).delete()
+        db.session.execute(delete(Agent_Custom_Feature).filter_by(user_id=user_id))
         for feature in features:
             db.session.add(
                 Agent_Custom_Feature(
@@ -670,7 +671,7 @@ def set_user_custom_features():
 def get_user_custom_features():
     data = json.loads(request.get_data())
     user_id = int(data.get("user_id"))
-    rows = Agent_Custom_Feature.query.filter_by(user_id=user_id).all()
+    rows = db.session.scalars(select(Agent_Custom_Feature).filter_by(user_id=user_id)).all()
     return json.dumps(
         [
             {

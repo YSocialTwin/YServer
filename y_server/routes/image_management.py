@@ -35,7 +35,7 @@ def post_image():
         article_id = None
 
     # check if image exists
-    image = Images.query.filter_by(url=image_url).first()
+    image = db.session.scalars(select(Images).filter_by(url=image_url)).first()
     if image is None:
         image = Images(
             url=image_url,
@@ -46,7 +46,7 @@ def post_image():
         db.session.commit()
 
     # get image id
-    image_id = Images.query.filter_by(url=image_url).first()
+    image_id = db.session.scalars(select(Images).filter_by(url=image_url)).first()
 
     post = Post(
         tweet=text,
@@ -86,7 +86,7 @@ def post_image():
         if len(emotion) < 1:
             continue
 
-        em = Emotions.query.filter_by(emotion=emotion).first()
+        em = db.session.scalars(select(Emotions).filter_by(emotion=emotion)).first()
         if em is not None:
             post_emotion = Post_emotions(post_id=post_id, emotion_id=em.id)
             db.session.add(post_emotion)
@@ -97,12 +97,12 @@ def post_image():
             if len(tag) < 1:
                 continue
 
-            ht = Hashtags.query.filter_by(hashtag=tag).first()
+            ht = db.session.scalars(select(Hashtags).filter_by(hashtag=tag)).first()
             if ht is None:
                 ht = Hashtags(hashtag=tag)
                 db.session.add(ht)
                 db.session.commit()
-                ht = Hashtags.query.filter_by(hashtag=tag).first()
+                ht = db.session.scalars(select(Hashtags).filter_by(hashtag=tag)).first()
 
             post_tag = Post_hashtags(post_id=post_id, hashtag_id=ht.id)
             db.session.add(post_tag)

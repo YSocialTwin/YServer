@@ -6,7 +6,7 @@ import traceback
 from functools import wraps
 
 from flask import request
-from sqlalchemy import desc
+from sqlalchemy import desc, select
 from sqlalchemy.exc import OperationalError
 from y_server import app, db
 from y_server.error_logging import log_error
@@ -40,22 +40,22 @@ def _compute_next_time(day, hour, slots_per_day=24):
 
 
 def _get_current_round_locked():
-    cround = Rounds.query.order_by(desc(Rounds.id)).first()
+    cround = db.session.scalars(select(Rounds).order_by(desc(Rounds.id))).first()
     if cround is None:
         cround = Rounds(day=0, hour=0)
         db.session.add(cround)
         db.session.commit()
-        cround = Rounds.query.order_by(desc(Rounds.id)).first()
+        cround = db.session.scalars(select(Rounds).order_by(desc(Rounds.id))).first()
     return cround
 
 
 def _get_or_create_round_locked(day, hour):
-    cround = Rounds.query.filter_by(day=int(day), hour=int(hour)).first()
+    cround = db.session.scalars(select(Rounds).filter_by(day=int(day), hour=int(hour))).first()
     if cround is None:
         cround = Rounds(day=int(day), hour=int(hour))
         db.session.add(cround)
         db.session.commit()
-        cround = Rounds.query.filter_by(day=int(day), hour=int(hour)).first()
+        cround = db.session.scalars(select(Rounds).filter_by(day=int(day), hour=int(hour))).first()
     return cround
 
 
@@ -63,9 +63,11 @@ def _cleanup_stale_clients_locked(now_ts=None):
     timeout_s = _sync_timeout_seconds()
     now_ts = float(now_ts if now_ts is not None else pytime.time())
     stale_clients = (
-        SimulationClient.query.filter_by(status="active")
-        .filter(SimulationClient.last_heartbeat < (now_ts - timeout_s))
-        .all()
+        db.session.scalars(
+            select(SimulationClient)
+            .filter_by(status="active")
+            .filter(SimulationClient.last_heartbeat < (now_ts - timeout_s))
+        ).all()
     )
     for client in stale_clients:
         client.status = "stale"
@@ -77,7 +79,7 @@ def _cleanup_stale_clients_locked(now_ts=None):
 
 
 def _active_clients_locked():
-    return list(SimulationClient.query.filter_by(status="active").all())
+    return list(db.session.scalars(select(SimulationClient).filter_by(status="active")).all())
 
 
 def _try_advance_round_locked():
@@ -394,7 +396,7 @@ def register_client():
         with _SYNC_LOCK:
             current_round = _get_current_round_locked()
             now_ts = pytime.time()
-            client = SimulationClient.query.filter_by(client_id=client_id).first()
+            client = db.session.scalars(select(SimulationClient).filter_by(client_id=client_id)).first()
             if client is None:
                 client = SimulationClient(
                     client_id=client_id,
@@ -427,7 +429,7 @@ def heartbeat():
 
         _ensure_sync_schema()
         with _SYNC_LOCK:
-            client = SimulationClient.query.filter_by(client_id=client_id).first()
+            client = db.session.scalars(select(SimulationClient).filter_by(client_id=client_id)).first()
             if client is None:
                 return json.dumps({"status": 404, "error": "client_not_registered"}), 404
             client.last_heartbeat = pytime.time()
@@ -455,7 +457,7 @@ def submit_round():
         with _SYNC_LOCK:
             _cleanup_stale_clients_locked()
             current_round = _get_current_round_locked()
-            client = SimulationClient.query.filter_by(client_id=client_id).first()
+            client = db.session.scalars(select(SimulationClient).filter_by(client_id=client_id)).first()
             if client is None:
                 return json.dumps(_round_payload(current_round, status=404, error="client_not_registered")), 404
             if client.status != "active":
@@ -501,7 +503,7 @@ def complete_client():
         _ensure_sync_schema()
         with _SYNC_LOCK:
             current_round = _get_current_round_locked()
-            client = SimulationClient.query.filter_by(client_id=client_id).first()
+            client = db.session.scalars(select(SimulationClient).filter_by(client_id=client_id)).first()
             if client is None:
                 return json.dumps(_round_payload(current_round, status=404, error="client_not_registered")), 404
             now_ts = pytime.time()
@@ -536,7 +538,7 @@ def deregister_client():
         _ensure_sync_schema()
         with _SYNC_LOCK:
             current_round = _get_current_round_locked()
-            client = SimulationClient.query.filter_by(client_id=client_id).first()
+            client = db.session.scalars(select(SimulationClient).filter_by(client_id=client_id)).first()
             if client is not None:
                 db.session.delete(client)
                 db.session.commit()
