@@ -2,7 +2,7 @@
   "plugin_name": "YServer",
   "category": "Simulation Runtime Stack",
   "group": "Microblogging",
-  "description": "Server-side microblogging simulation runtime for YSocial experiments.",
+  "description": "Hosts the microblogging platform the agents interact with (server side).",
   "authors": [
     "YSocialTwin"
   ],
