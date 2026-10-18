@@ -456,7 +456,13 @@ def get_user_interests():
 
     res = []
     for interest in interests:
-        res.append({"id": int(interest[0]), "topic": interest.interest})
+        res.append(
+            {
+                "id": int(interest[0]),
+                "topic": interest.interest,
+                "count": int(interest[2]),
+            }
+        )
 
     return json.dumps(res)
 
