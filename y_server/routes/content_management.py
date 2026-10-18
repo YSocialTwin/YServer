@@ -1,7 +1,8 @@
 import json
 
 from flask import current_app, request
-from sqlalchemy import delete, update, desc, inspect, select
+from y_server.hashtag_text import normalize_hashtag
+from sqlalchemy import delete, update, desc, inspect, select, func
 from sqlalchemy.sql.expression import func
 from y_server import app, db
 from y_server.content_analysis import should_annotate_toxicity, toxicity, vader_sentiment
@@ -694,15 +695,16 @@ def add_post():
 
     if hastags is not None:
         for tag in hastags:
-            if len(tag) < 4:
+            tag = normalize_hashtag(tag)
+            if len(tag) < 3:
                 continue
 
-            ht = db.session.scalars(select(Hashtags).filter_by(hashtag=tag)).first()
+            ht = db.session.scalars(select(Hashtags).filter(func.lower(Hashtags.hashtag) == tag.lower())).first()
             if ht is None:
                 ht = Hashtags(hashtag=tag)
                 db.session.add(ht)
                 db.session.commit()
-                ht = db.session.scalars(select(Hashtags).filter_by(hashtag=tag)).first()
+                ht = db.session.scalars(select(Hashtags).filter(func.lower(Hashtags.hashtag) == tag.lower())).first()
 
             post_tag = Post_hashtags(post_id=post_id, hashtag_id=ht.id)
             db.session.add(post_tag)
@@ -831,15 +833,16 @@ def add_comment():
 
     if hastags is not None:
         for tag in hastags:
+            tag = normalize_hashtag(tag)
             if len(tag) < 1:
                 continue
 
-            ht = db.session.scalars(select(Hashtags).filter_by(hashtag=tag)).first()
+            ht = db.session.scalars(select(Hashtags).filter(func.lower(Hashtags.hashtag) == tag.lower())).first()
             if ht is None:
                 ht = Hashtags(hashtag=tag)
                 db.session.add(ht)
                 db.session.commit()
-                ht = db.session.scalars(select(Hashtags).filter_by(hashtag=tag)).first()
+                ht = db.session.scalars(select(Hashtags).filter(func.lower(Hashtags.hashtag) == tag.lower())).first()
 
             post_tag = Post_hashtags(post_id=new_post_id, hashtag_id=ht.id)
             db.session.add(post_tag)
