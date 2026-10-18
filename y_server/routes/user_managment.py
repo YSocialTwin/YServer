@@ -435,7 +435,8 @@ def get_user_interests():
     time_window = int(data["time_window"])
     base_rounds = max(0, round_id - time_window)
 
-    # get the top n_interests interests of the user in the time window
+    # all the interests of the user in the (moving) time window, with their counts;
+    # n_interests is accepted for backward compatibility but no longer truncates
     interests = (
         db.session.query(
             User_interest.interest_id,
@@ -450,7 +451,6 @@ def get_user_interests():
         )
         .group_by(User_interest.interest_id, Interests.interest)
         .order_by(db.desc(db.func.count(User_interest.interest_id)))
-        .limit(n_interests)
         .all()
     )
 
