@@ -28,7 +28,7 @@ def test_wsgi_loads_toxicity_annotation_flag(tmp_path, monkeypatch):
     monkeypatch.setitem(sys.modules, "y_server", fake_y_server)
     monkeypatch.setenv("YSERVER_CONFIG", str(config_path))
 
-    module_path = Path("/Users/rossetti/PycharmProjects/YWeb/external/YServer/wsgi.py")
+    module_path = (Path(__file__).resolve().parents[1] / "wsgi.py")
     spec = importlib.util.spec_from_file_location("yserver_wsgi_test", module_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

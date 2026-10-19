@@ -6,5 +6,6 @@
   "authors": [
     "YSocialTwin"
   ],
-  "repository_url": "https://github.com/YSocialTwin/YServer"
+  "repository_url": "https://github.com/YSocialTwin/YServer",
+  "license": "GPL-3.0-only"
 }
