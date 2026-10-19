@@ -183,13 +183,15 @@ Contributions are welcome. Fork the repository, create a branch for your change 
 If you use YSocial in your research, please cite:
 
 ```bibtex
-@article{rossetti2024ysocial,
-  title={Y Social: an LLM-powered microblogging Digital Twin},
-  author={Rossetti, Giulio and Stella, Massimo and Cazabet, Rémy and
-  Abramski, Katherine and Cau, Erica and Citraro, Salvatore and
-  Failla, Andrea and Improta, Riccardo and Morini, Virginia and
-  Pansanella, Virginia},
-  year={2024}
+@article{rossetti2026ysocial,
+  title={YSocial: An artificial intelligence powered social media virtual twin},
+  author={Rossetti, Giulio and Stella, Massimo and Cazabet, R{\'e}my and Abramski, Katherine and Citraro, Salvatore and Cau, Erica and Failla, Andrea and Morini, Virginia and Pansanella, Valentina},
+  journal={Big Data \& Society},
+  volume={13},
+  number={3},
+  pages={20539517261431576},
+  year={2026},
+  publisher={SAGE Publications Sage UK: London, England}
 }
 ```
 
