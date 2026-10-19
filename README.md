@@ -181,5 +181,5 @@ If you use YSocial in your research, please cite the following paper:
 
 ## License
 
-YSocial is licensed under the GNU GENERAL PUBLIC LICENSEe. See LICENSE.txt for details.
+YSocial is licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE) for details.
 

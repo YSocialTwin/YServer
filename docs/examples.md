@@ -6,7 +6,7 @@
 python y_server_run.py
 ```
 
-This uses [`config_files/exp_config.json`](/Users/rossetti/PycharmProjects/YServer/config_files/exp_config.json).
+This uses [`config_files/exp_config.json`](../config_files/exp_config.json).
 
 ## 2. Start With A Specific Config File
 
