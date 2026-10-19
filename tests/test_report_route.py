@@ -6,26 +6,32 @@ from y_server.modals import Post, User_mgmt
 from y_server.routes.content_management import report_post
 
 
-class _FakeQuery:
+class _Result:
     def __init__(self, obj):
         self._obj = obj
 
-    def filter_by(self, **kwargs):
-        return self
-
     def first(self):
         return self._obj
+
+
+def _scalars(user, post):
+    """``db.session.scalars`` stand-in: answers by the entity being selected."""
+
+    def scalars(statement):
+        entity = statement.column_descriptions[0]["entity"]
+        return _Result(user if entity is User_mgmt else post if entity is Post else None)
+
+    return scalars
 
 
 def test_report_route_persists_report(monkeypatch):
     added = []
 
     with app.app_context():
-        monkeypatch.setattr(User_mgmt, "query", _FakeQuery(SimpleNamespace(id=5)))
-        monkeypatch.setattr(Post, "query", _FakeQuery(SimpleNamespace(id=9, user_id=14)))
         monkeypatch.setattr(
             "y_server.routes.content_management.db.session",
             SimpleNamespace(
+                scalars=_scalars(SimpleNamespace(id=5), SimpleNamespace(id=9, user_id=14)),
                 add=lambda obj: added.append(obj),
                 commit=lambda: None,
                 remove=lambda: None,
