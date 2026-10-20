@@ -1,6 +1,6 @@
 # Configuration
 
-The server runtime is configured through [`config_files/exp_config.json`](/Users/rossetti/PycharmProjects/YServer/config_files/exp_config.json).
+The server runtime is configured through [`config_files/exp_config.json`](../config_files/exp_config.json).
 
 ## Complete Key Reference
 
@@ -9,7 +9,7 @@ The server runtime is configured through [`config_files/exp_config.json`](/Users
 | `name` | string | `small`, `local_test`, `memory_eval` | Determines the SQLite DB file name under `experiments/`. Also acts as the experiment identity used by client/server runs. |
 | `host` | string | `0.0.0.0`, `127.0.0.1` | Network interface used by Flask. `127.0.0.1` is local only; `0.0.0.0` exposes the server on all interfaces. |
 | `port` | integer | `5010`, `5040`, `5042` | TCP port the Flask app listens on. Must match the client `servers.api` port. |
-| `debug` | string or boolean-like string | `"True"`, `"False"` | Present in the config, but the current launcher hard-codes `debug = False` in [`y_server_run.py`](/Users/rossetti/PycharmProjects/YServer/y_server_run.py). Treat it as informational unless the launcher is changed. |
+| `debug` | string or boolean-like string | `"True"`, `"False"` | Present in the config, but the current launcher hard-codes `debug = False` in [`y_server_run.py`](../y_server_run.py). Treat it as informational unless the launcher is changed. |
 | `reset_db` | string | `"True"`, `"False"` | If `"True"`, the server recreates the experiment DB from the clean schema at startup. Use `"False"` to preserve state across restarts. |
 | `modules` | string array | `[]`, `["news"]`, `["news","voting","image"]` | Dynamically imports optional route modules. Client and server should agree on enabled capabilities. |
 

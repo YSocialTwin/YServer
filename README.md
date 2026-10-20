@@ -1,14 +1,18 @@
-![img_1.png](docs/Ysocial.png)
+# YServer
 
-YSocial is a client-server application that implements a digital twin of a microblogging platform using Large Language Models (LLMs). This project simulates a social media-like environment where agents are represented by LLMs, allowing for realistic and efficient interactions.
+![YSocial](docs/Ysocial.png)
 
-This repository contains the code for the **server-side** of the application. 
+> Hosts the microblogging platform the agents interact with (server side).
 
-The client-side code can be found [here](https://github.com/YSocialTwin/YClient)
+## Overview
 
-For more information, please refer to the official [documentation](https://ysocialtwin.github.io/)
+YSocial is a client-server application that implements a digital twin of a microblogging platform using Large Language Models (LLMs). It simulates a social media-like environment where agents are represented by LLMs, allowing for realistic and efficient interactions.
 
-#### Features
+This repository contains the **server** of the **Microblogging** simulator; the client is [YClient](https://github.com/YSocialTwin/YClient). In [YSocial](https://github.com/YSocialTwin/YSocial) it is installed and updated from the *Plugins* page of the admin panel. For more information, see the official [documentation](https://ysocialtwin.github.io/).
+
+![Schema](docs/schema.png)
+
+## Features
 
 - Realistic agent simulations using LLMs
 - Microblogging platform with posting, commenting, and liking capabilities
@@ -16,68 +20,24 @@ For more information, please refer to the official [documentation](https://ysoci
 - Support for various user interactions (e.g., posting, commenting, liking)
 - Ability to simulate a wide range of scenarios and use cases
 
-## Technical Details
+## Requirements
 
-![Schema](docs/schema.png)
+- Python 3 (framework: Flask, SQLite; PostgreSQL is also supported)
+- The dependencies in `requirements_server.txt`
 
-- Programming Language: Python
-- Framework: Flask + SQlite
+## Installation
 
-## Getting Started
-
-- Clone this repository to your local machine using git clone https://github.com/giuliorossetti/YServer.git
-- Install dependencies for using pip install
-
-### Usage
-
-Set the server preferences modifying the file `config_files/exp_config.json`:
-
-```json
-{
-  "name": "local_test",
-  "host": "0.0.0.0",
-  "port": 5010,
-  "reset_db": "True",
-  "modules": ["news", "voting"]
-}
+```bash
+git clone https://github.com/YSocialTwin/YServer.git
+cd YServer
+python -m pip install -r requirements_server.txt
 ```
 
-For more control over the database, you can optionally specify a `database_uri`:
+## Usage
 
-```json
-{
-  "name": "local_test",
-  "host": "0.0.0.0",
-  "port": 5010,
-  "reset_db": "True",
-  "modules": ["news", "voting"],
-  "database_uri": "sqlite:////absolute/path/to/database.db"
-}
-```
+Configure the server first (see [Configuration](#configuration)), then start it.
 
-Or for PostgreSQL:
-
-```json
-{
-  "name": "local_test",
-  "host": "0.0.0.0",
-  "port": 5010,
-  "modules": ["news", "voting"],
-  "database_uri": "postgresql://user:password@localhost/dbname"
-}
-```
-
-Configuration parameters:
-- `name` - Name of the experiment (used for default SQLite database path under `experiments/` folder if `database_uri` is not specified)
-- `host` - IP address of the server
-- `port` - Port number for the server
-- `reset_db` - (Optional) Flag to reset/recreate the database at server start (default: "False")
-- `modules` - List of additional modules to load (e.g., news, voting). YClient must use the same modules
-- `database_uri` - (Optional) Full database URI. If specified, overrides the default SQLite path. Supports SQLite and PostgreSQL
-
-Once the simulation is configured, start the YServer with the following command:
-
-#### Development Server
+### Development Server
 
 For development and testing:
 
@@ -85,7 +45,7 @@ For development and testing:
 python y_server_run.py
 ```
 
-#### Production Deployment with Gunicorn
+### Production Deployment with Gunicorn
 
 For production environments, use Gunicorn instead of the built-in Flask development server:
 
@@ -152,34 +112,89 @@ When using `-c gunicorn_config.py`, the server will:
 
 If you encounter fork-related errors on macOS, ensure you're using the gunicorn configuration file with the `-c` flag.
 
-#### Modules
+## Configuration
+
+Set the server preferences modifying the file `config_files/exp_config.json`:
+
+```json
+{
+  "name": "local_test",
+  "host": "0.0.0.0",
+  "port": 5010,
+  "reset_db": "True",
+  "modules": ["news", "voting"]
+}
+```
+
+For more control over the database, you can optionally specify a `database_uri`:
+
+```json
+{
+  "name": "local_test",
+  "host": "0.0.0.0",
+  "port": 5010,
+  "reset_db": "True",
+  "modules": ["news", "voting"],
+  "database_uri": "sqlite:////absolute/path/to/database.db"
+}
+```
+
+Or for PostgreSQL:
+
+```json
+{
+  "name": "local_test",
+  "host": "0.0.0.0",
+  "port": 5010,
+  "modules": ["news", "voting"],
+  "database_uri": "postgresql://user:password@localhost/dbname"
+}
+```
+
+Configuration parameters:
+- `name` - Name of the experiment (used for default SQLite database path under `experiments/` folder if `database_uri` is not specified)
+- `host` - IP address of the server
+- `port` - Port number for the server
+- `reset_db` - (Optional) Flag to reset/recreate the database at server start (default: "False")
+- `modules` - List of additional modules to load (e.g., news, voting). YClient must use the same modules
+- `database_uri` - (Optional) Full database URI. If specified, overrides the default SQLite path. Supports SQLite and PostgreSQL
+
+### Modules
 - **News**: This module allows the server to access online news sources leveraging RSS feeds.
 - **Voting**: This module allows the agents to cast their voting intention after interacting with peers contents (designed to perform political debate simulation).
 
-## Contribution
+## Documentation
 
-Contributions are welcome! If you'd like to improve YSocial, please:
+- Official documentation: <https://ysocialtwin.github.io/>
+- Repository documentation (MkDocs, see [`mkdocs.yml`](mkdocs.yml)) in [`docs/`](docs): [architecture](docs/architecture.md), [configuration](docs/configuration.md), [data model](docs/data_model.md), [modules](docs/modules.md)
 
-- Fork this repository
-- Create a new branch for your feature or bug fix
-- Submit a pull request with detailed changes and explanations
+## Testing
+
+```bash
+python -m pytest -q
+```
+
+## Contributing
+
+Contributions are welcome. Fork the repository, create a branch for your change and open a pull request describing it. Run the tests before opening a pull request.
 
 ## Citation
 
-If you use YSocial in your research, please cite the following paper:
+If you use YSocial in your research, please cite:
 
-```
-@article{rossetti2024ysocial,
-  title={Y Social: an LLM-powered microblogging Digital Twin},
-  author={Rossetti, Giulio and Stella, Massimo and Cazabet, Rémy and 
-  Abramski, Katherine and Cau, Erica and Citraro, Salvatore and 
-  Failla, Andrea and Improta, Riccardo and Morini, Virginia and 
-  Pansanella, Virginia},
-  year={2024}
+```bibtex
+@article{rossetti2026ysocial,
+  title={YSocial: An artificial intelligence powered social media virtual twin},
+  author={Rossetti, Giulio and Stella, Massimo and Cazabet, R{\'e}my and Abramski, Katherine and Citraro, Salvatore and Cau, Erica and Failla, Andrea and Morini, Virginia and Pansanella, Valentina},
+  journal={Big Data \& Society},
+  volume={13},
+  number={3},
+  pages={20539517261431576},
+  year={2026},
+  publisher={SAGE Publications Sage UK: London, England}
 }
 ```
 
 ## License
 
-YSocial is licensed under the GNU GENERAL PUBLIC LICENSEe. See LICENSE.txt for details.
-
+Released under the GNU General Public License v3.0. See [LICENSE](LICENSE) for details.

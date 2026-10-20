@@ -1,4 +1,4 @@
-from sqlalchemy import case, desc, func
+from sqlalchemy import case, desc, func, select
 from y_server.modals import (
     Follow,
     Post,
@@ -21,14 +21,16 @@ def get_follows(uid):
     :return: a list of followers
     """
     # Get the latest round for each follower-user relationship
-    # res = Follow_status.query.filter_by(user_id=uid).all()
+    # res = db.session.scalars(select(Follow_status).filter_by(user_id=uid)).all()
 
     # get the followers of the user with the given uid
     res = (
-        Follow.query.filter(Follow.user_id == uid, Follow.follower_id != uid)
-        .group_by(Follow.follower_id)
-        .having(func.count().op("%")(2) == 1)
-        .all()
+        db.session.scalars(
+            select(Follow)
+            .filter(Follow.user_id == uid, Follow.follower_id != uid)
+            .group_by(Follow.follower_id)
+            .having(func.count().op("%")(2) == 1)
+        ).all()
     )
 
     res = [x.follower_id for x in res]
@@ -255,11 +257,13 @@ def get_posts_by_author(
     :param user_ids: the user ids
     :return: the posts query result
     """
-    posts = Post.query.filter(
-        Post.user_id.in_(user_ids),
-        Post.round >= visibility,
-        Post.news_id != -1 if articles else True,
-    ).limit(limit)
+    posts = db.session.scalars(
+        select(Post).filter(
+            Post.user_id.in_(user_ids),
+            Post.round >= visibility,
+            Post.news_id != -1 if articles else True,
+        ).limit(limit)
+    ).all()
 
     return posts
 

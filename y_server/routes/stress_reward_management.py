@@ -4,6 +4,7 @@ import uuid
 from flask import current_app, request
 from y_server import app, config as server_config, db
 from y_server.modals import StressReward
+from sqlalchemy import func, select
 
 
 def clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
@@ -45,14 +46,14 @@ def get_stress_reward():
 
     for variable in ("stress", "reward"):
         latest_aggregate = (
-            StressReward.query.filter(
-                StressReward.uid == user_id,
-                StressReward.variable == variable,
-                StressReward.type == "aggregate",
-                StressReward.tid < end_tid,
-            )
-            .order_by(StressReward.tid.desc())
-            .first()
+            db.session.scalars(
+                select(StressReward).filter(
+                    StressReward.uid == user_id,
+                    StressReward.variable == variable,
+                    StressReward.type == "aggregate",
+                    StressReward.tid < end_tid,
+                ).order_by(StressReward.tid.desc())
+            ).first()
         )
 
         anchor_value = 0.0
@@ -76,12 +77,12 @@ def get_stress_reward():
         response_payload[variable] = current_value
 
         existing = (
-            StressReward.query.filter_by(
+            db.session.scalars(select(StressReward).filter_by(
                 uid=user_id,
                 variable=variable,
                 type="aggregate",
                 tid=end_tid,
-            ).first()
+            )).first()
         )
         if existing is None:
             existing = StressReward(

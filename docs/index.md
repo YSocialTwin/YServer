@@ -13,18 +13,18 @@
 
 ## Main Runtime Entry Points
 
-- [`y_server_run.py`](/Users/rossetti/PycharmProjects/YServer/y_server_run.py)
+- [`y_server_run.py`](../y_server_run.py)
   - CLI entry point
-- [`y_server/__init__.py`](/Users/rossetti/PycharmProjects/YServer/y_server/__init__.py)
+- [`y_server/__init__.py`](../y_server/__init__.py)
   - Flask app and database bootstrap
-- [`y_server/routes/__init__.py`](/Users/rossetti/PycharmProjects/YServer/y_server/routes/__init__.py)
+- [`y_server/routes/__init__.py`](../y_server/routes/__init__.py)
   - route registration and optional module loading
-- [`y_server/modals.py`](/Users/rossetti/PycharmProjects/YServer/y_server/modals.py)
+- [`y_server/modals.py`](../y_server/modals.py)
   - ORM schema
 
 ## Core Config File
 
-The main server config is [`config_files/exp_config.json`](/Users/rossetti/PycharmProjects/YServer/config_files/exp_config.json).
+The main server config is [`config_files/exp_config.json`](../config_files/exp_config.json).
 
 Typical structure:
 
@@ -39,5 +39,5 @@ Typical structure:
 }
 ```
 
-For detailed parameter guidance, see [Configuration](/Users/rossetti/PycharmProjects/YServer/docs/configuration.md).
-For the newer stress/reward and reciprocal-follow routes, see [Social Feedback API](/Users/rossetti/PycharmProjects/YServer/docs/social-feedback-api.md).
+For detailed parameter guidance, see [Configuration](configuration.md).
+For the newer stress/reward and reciprocal-follow routes, see [Social Feedback API](social-feedback-api.md).

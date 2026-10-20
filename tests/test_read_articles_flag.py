@@ -1,34 +1,34 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
 from y_server import app
+from y_server.modals import Rounds, User_mgmt
 from y_server.routes import content_management
 
 
-class _FakeColumn:
-    def __ge__(self, other):
-        return ("ge", other)
-
-    def __ne__(self, other):
-        return ("ne", other)
-
-    def in_(self, other):
-        return ("in", tuple(other))
-
-
-class _FakeQuery:
-    def filter_by(self, **kwargs):
-        return self
+class _Result:
+    def __init__(self, rows):
+        self._rows = rows
 
     def first(self):
-        return type("User", (), {"id": 1, "leaning": "center"})()
+        return self._rows[0] if self._rows else None
 
     def all(self):
-        return []
+        return list(self._rows)
 
-    def order_by(self, *args, **kwargs):
-        return self
+
+def _scalars(statement):
+    """``db.session.scalars`` stand-in: one user (no news pages) and a current round."""
+    entity = statement.column_descriptions[0]["entity"]
+    if entity is User_mgmt:
+        # the user lookup (filter_by id) yields the user; the news pages lookup nothing
+        is_page_lookup = "is_page" in str(statement.whereclause)
+        return _Result([] if is_page_lookup else [SimpleNamespace(id=1, leaning="center")])
+    if entity is Rounds:
+        return _Result([SimpleNamespace(id=10)])
+    return _Result([])
 
 
 def test_read_treats_plural_articles_flag_as_article_mode(monkeypatch):
@@ -40,19 +40,9 @@ def test_read_treats_plural_articles_flag_as_article_mode(monkeypatch):
         lambda **kwargs: captured.update(kwargs) or [],
     )
     monkeypatch.setattr(
-        content_management,
-        "User_mgmt",
-        type("UserMgmt", (), {"query": _FakeQuery()}),
-    )
-    monkeypatch.setattr(content_management, "desc", lambda value: value)
-    monkeypatch.setattr(
-        content_management,
-        "Rounds",
-        type(
-            "Rounds",
-            (),
-            {"id": _FakeColumn(), "query": type("Q", (), {"order_by": lambda self, *a, **k: self, "first": lambda self: type('Round', (), {'id': 10})()})()},
-        ),
+        content_management.db,
+        "session",
+        SimpleNamespace(scalars=_scalars, remove=lambda: None),
     )
 
     with app.test_request_context(

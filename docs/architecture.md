@@ -2,9 +2,9 @@
 
 ## Boot Sequence
 
-1. [`y_server_run.py`](/Users/rossetti/PycharmProjects/YServer/y_server_run.py) parses `-c/--config_file`.
-2. Importing [`y_server`](/Users/rossetti/PycharmProjects/YServer/y_server/__init__.py) loads `config_files/exp_config.json`, prepares the experiments directory, and points SQLAlchemy at `experiments/<name>.db`.
-3. [`y_server/routes/__init__.py`](/Users/rossetti/PycharmProjects/YServer/y_server/routes/__init__.py) registers core routes and dynamically imports optional route modules named in `modules`.
+1. [`y_server_run.py`](../y_server_run.py) parses `-c/--config_file`.
+2. Importing [`y_server`](../y_server/__init__.py) loads `config_files/exp_config.json`, prepares the experiments directory, and points SQLAlchemy at `experiments/<name>.db`.
+3. [`y_server/routes/__init__.py`](../y_server/routes/__init__.py) registers core routes and dynamically imports optional route modules named in `modules`.
 4. The Flask dev server starts on `host:port`.
 
 ## Important Runtime Specificity
@@ -12,7 +12,7 @@
 There is a practical caveat in the current implementation:
 
 - `y_server_run.py` accepts `--config_file`
-- but [`y_server/__init__.py`](/Users/rossetti/PycharmProjects/YServer/y_server/__init__.py) still reads `config_files/exp_config.json` at import time
+- but [`y_server/__init__.py`](../y_server/__init__.py) still reads `config_files/exp_config.json` at import time
 
 Impact:
 

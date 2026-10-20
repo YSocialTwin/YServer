@@ -6,14 +6,14 @@ These route groups are always available in the current branch.
 
 ### Time Management
 
-Defined in [`time_management.py`](/Users/rossetti/PycharmProjects/YServer/y_server/routes/time_management.py):
+Defined in [`time_management.py`](../y_server/routes/time_management.py):
 
 - `/current_time`
 - `/update_time`
 
 ### Experiment Management
 
-Defined in [`experiment_management.py`](/Users/rossetti/PycharmProjects/YServer/y_server/routes/experiment_management.py):
+Defined in [`experiment_management.py`](../y_server/routes/experiment_management.py):
 
 - `/change_db`
 - `/shutdown`
@@ -21,7 +21,7 @@ Defined in [`experiment_management.py`](/Users/rossetti/PycharmProjects/YServer/
 
 ### User Management
 
-Defined in [`user_managment.py`](/Users/rossetti/PycharmProjects/YServer/y_server/routes/user_managment.py):
+Defined in [`user_managment.py`](../y_server/routes/user_managment.py):
 
 - `/get_user_id`
 - `/get_user`
@@ -38,7 +38,7 @@ Defined in [`user_managment.py`](/Users/rossetti/PycharmProjects/YServer/y_serve
 
 ### Content Management
 
-Defined in [`content_management.py`](/Users/rossetti/PycharmProjects/YServer/y_server/routes/content_management.py):
+Defined in [`content_management.py`](../y_server/routes/content_management.py):
 
 - `/read`
 - `/search`
@@ -52,7 +52,7 @@ Defined in [`content_management.py`](/Users/rossetti/PycharmProjects/YServer/y_s
 
 ### Interaction Management
 
-Defined in [`interaction_management.py`](/Users/rossetti/PycharmProjects/YServer/y_server/routes/interaction_management.py):
+Defined in [`interaction_management.py`](../y_server/routes/interaction_management.py):
 
 - follow/unfollow endpoints
 - follow suggestion endpoint
@@ -60,7 +60,7 @@ Defined in [`interaction_management.py`](/Users/rossetti/PycharmProjects/YServer
 
 ## Social Feedback Routes
 
-Defined in [`stress_reward_management.py`](/Users/rossetti/PycharmProjects/YServer/y_server/routes/stress_reward_management.py):
+Defined in [`stress_reward_management.py`](../y_server/routes/stress_reward_management.py):
 
 - `/get_stress_reward`
 - `/set_stress_reward_variations`
@@ -71,7 +71,7 @@ These routes are enabled only when stress/reward is active in the server config.
 
 ### `news`
 
-Defined in [`news_management.py`](/Users/rossetti/PycharmProjects/YServer/y_server/routes/news_management.py).
+Defined in [`news_management.py`](../y_server/routes/news_management.py).
 
 Representative routes:
 
@@ -83,7 +83,7 @@ Use this when the client creates RSS-backed page agents or news sharing behavior
 
 ### `image`
 
-Defined in [`image_management.py`](/Users/rossetti/PycharmProjects/YServer/y_server/routes/image_management.py).
+Defined in [`image_management.py`](../y_server/routes/image_management.py).
 
 Representative route:
 
@@ -93,7 +93,7 @@ Use this when the client is allowed to react to image content.
 
 ### `voting`
 
-Defined in [`voting_management.py`](/Users/rossetti/PycharmProjects/YServer/y_server/routes/voting_management.py).
+Defined in [`voting_management.py`](../y_server/routes/voting_management.py).
 
 Representative route:
 
@@ -103,7 +103,7 @@ Use this only when the simulation explicitly includes political-preference behav
 
 ## Memory API
 
-Defined in [`memory_management.py`](/Users/rossetti/PycharmProjects/YServer/y_server/routes/memory_management.py).
+Defined in [`memory_management.py`](../y_server/routes/memory_management.py).
 
 Routes:
 

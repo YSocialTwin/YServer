@@ -1,6 +1,6 @@
 # Data Model Notes
 
-The ORM schema lives in [`modals.py`](/Users/rossetti/PycharmProjects/YServer/y_server/modals.py).
+The ORM schema lives in [`modals.py`](../y_server/modals.py).
 
 ## Core Tables
 
