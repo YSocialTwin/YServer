@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-10-22
+
+### Fixed
+- SQLite URIs on Windows: `sqlite:///` plus the absolute path (the previous `sqlite:////` form produced "unable to open database file").
+
 ## [2.1.0] - 2026-10-20
 
 ### Added
@@ -20,5 +25,6 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Fixed
 - Tests run on an isolated temporary database and with SQLAlchemy 2 compatible fakes.
 
-[Unreleased]: https://github.com/YSocialTwin/YServer/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/YSocialTwin/YServer/compare/v2.1.1...HEAD
+[2.1.1]: https://github.com/YSocialTwin/YServer/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/YSocialTwin/YServer/compare/v2.0.0...v2.1.0
