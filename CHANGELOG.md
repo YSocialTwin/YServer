@@ -6,6 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 - Federation (opt-in): `y_server/federation/` (adapter, gate wrapper) and a clock gate in `_try_advance_round_locked`; off unless the `federation` section of the configuration is enabled, in which case standalone behaviour is unchanged.
+- Federation bus and membership (opt-in): tables `federation_membership`, `federation_ref`, `federation_export`, `federation_state` (created only with the federation on); `export_outbox` (posts the agent marked with the optional `crosspost` field of `/post`, or every root post with `federation.export_policy = "all"`), `ingest_inbox` (cross-posts become posts of the author, once per message), `apply_membership`; accounts that are not active are left out of `/read`, `/search`, `/read_mentions` and `/follow_suggestions`, and `GET /federation/inactive_users` lists them for the clients. `federation.accounts` maps global agent ids to local user ids (default: the same number).
 
 ## [2.1.1] - 2026-10-22
 

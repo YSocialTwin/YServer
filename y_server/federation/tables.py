@@ -1,0 +1,52 @@
+"""Tables of the federation inside the YServer database (all new, additive; created only when federation is on).
+
+federation_membership: state of each local account as the coordinator told it (dormant, active, left).
+federation_ref:        every content materialised from a cross-post (origin = federation) with its source.
+federation_export:     posts handed to the bus, with the tick and the sequence number they were exported with, so that
+                       exporting the same tick again gives the same messages (INV-05).
+federation_state:      small key/value store (watermark of the posts that existed before the federation started)."""
+
+from y_server import db
+
+
+class FederationMembership(db.Model):
+    __tablename__ = "federation_membership"
+
+    user_id = db.Column(db.Integer, primary_key=True)
+    global_agent_id = db.Column(db.String(64), nullable=False, unique=True)
+    state = db.Column(db.String(10), nullable=False)
+    since_tick = db.Column(db.Integer, nullable=False, default=0)
+    reason = db.Column(db.String(16), nullable=False, default="initial")
+
+
+class FederationRef(db.Model):
+    __tablename__ = "federation_ref"
+
+    local_kind = db.Column(db.String(16), primary_key=True)
+    local_id = db.Column(db.Integer, primary_key=True)
+    source_ref = db.Column(db.String(200), nullable=False)
+    fed_msg_id = db.Column(db.String(200), nullable=False, unique=True)
+
+
+class FederationExport(db.Model):
+    __tablename__ = "federation_export"
+
+    post_id = db.Column(db.Integer, primary_key=True)
+    tick = db.Column(db.Integer, nullable=True)
+    seq = db.Column(db.Integer, nullable=True)
+
+
+class FederationState(db.Model):
+    __tablename__ = "federation_state"
+
+    key = db.Column(db.String(32), primary_key=True)
+    value = db.Column(db.String(64), nullable=False)
+
+
+TABLES = (FederationMembership, FederationRef, FederationExport, FederationState)
+
+
+def ensure_tables():
+    """CREATE TABLE IF NOT EXISTS for the four tables on the current database."""
+    for model in TABLES:
+        model.__table__.create(bind=db.engine, checkfirst=True)

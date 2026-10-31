@@ -26,13 +26,21 @@ def init_federation(config):
 
     section = dict(section)
     section.setdefault("exp_id", os.path.basename(str(config.get("name", ""))) or None)
-    adapter = YServerAdapter(section["member"], int(section.get("federation_id", 1)))
+    adapter = YServerAdapter(section["member"], int(section.get("federation_id", 1)),
+                             accounts=section.get("accounts"), export_policy=section.get("export_policy", "marked"))
+    from . import visibility
     gate = SafeGate(FederationGate(adapter, section))
     with app.app_context():
         with tm._SYNC_LOCK:
             current = tm._get_current_round_locked()
             gate.start((current.day, current.hour))
     tm._federation_gate = gate
+    app.config["federation_adapter"] = adapter
+    with app.app_context():
+        from .tables import ensure_tables
+
+        ensure_tables()
+    visibility.install(app)
     return gate
 
 
@@ -42,3 +50,9 @@ def reset_federation():
 
     tm._federation_gate = None
     tm._federation_pending = False
+    from y_server import app
+
+    app.config.pop("federation_adapter", None)
+    from . import visibility
+
+    visibility.uninstall()
