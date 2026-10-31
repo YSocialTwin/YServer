@@ -206,6 +206,18 @@ def test_affective_report_reads_native_stress_reward(client, adapter):
     assert adapter.affective_report(7) == []
 
 
+def test_attention_multipliers_are_stored_per_account_and_served_to_the_clients(client, adapter):
+    from y_server.federation import visibility  # noqa: F401  (registers the route)
+    adapter.apply_attention(1, {"g1": 1.5, "g2": 1.0, "g3": 0.4, "nobody": 3.0})
+    assert adapter.attention_multipliers() == {1: 1.5, 3: 0.4}  # 1.0 needs no row, unknown agents are ignored
+    body = json.loads(client.get("/federation/attention").data)
+    assert body == {"multipliers": {"1": 1.5, "3": 0.4}}
+    adapter.apply_attention(2, {"g2": 2.0})  # a new day replaces the previous multipliers
+    assert adapter.attention_multipliers() == {2: 2.0}
+    adapter.apply_attention(3, {})
+    assert adapter.attention_multipliers() == {} and json.loads(client.get("/federation/attention").data) == {"multipliers": {}}
+
+
 def test_adapter_conformance_suite(client):
     from ysocial_federation.testing.conformance import ConformanceCase, run_all
 

@@ -49,6 +49,13 @@ def _register_route(app):
         def _inactive_users():
             return jsonify({"inactive": inactive_user_ids()})
 
+    if "federation_attention" not in app.view_functions:
+        @app.route("/federation/attention", methods=["GET"], endpoint="federation_attention")
+        def _attention():
+            adapter = app.config.get("federation_adapter")
+            multipliers = adapter.attention_multipliers() if adapter is not None else {}
+            return jsonify({"multipliers": {str(k): v for k, v in multipliers.items()}})
+
 
 def install(app):
     """Register the listener (the route that tells the clients which accounts must not act exists from the import)."""

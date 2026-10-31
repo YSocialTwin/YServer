@@ -8,7 +8,7 @@ Bus and membership (F3.4a):
   root posts of active authors with export_policy = "all", into content.v1 for the coordinator.
 - ingest_inbox materialises crosspost.v1 as a post of the author on this platform, once per fed_msg_id (INV-05), and records it in
   federation_ref.
-Affective report (F4.1): native stress/reward read from the stress_reward table. Attention: F4.3."""
+Affective report (F4.1): native stress/reward read from the stress_reward table. Attention (F4.3): multipliers stored per account, read by the clients."""
 
 import logging
 
@@ -233,4 +233,26 @@ class YServerAdapter(PlatformAdapter):
         return out
 
     def apply_attention(self, day, multipliers):
-        return None  # F4
+        """Store the multipliers of the day (F4.3): accounts that are not in the dictionary go back to 1; unknown agents are
+        ignored. The clients read them with GET /federation/attention and apply them where they choose how much an agent acts."""
+        from y_server import db
+        from .tables import FederationAttention, ensure_tables
+
+        ensure_tables()
+        wanted = {}
+        for gid, value in (multipliers or {}).items():
+            uid = self.user_of(gid)
+            if uid is not None and float(value) != 1.0:
+                wanted[uid] = float(value)
+        db.session.query(FederationAttention).delete()
+        for uid, value in sorted(wanted.items()):
+            db.session.add(FederationAttention(user_id=uid, day=int(day), multiplier=value))
+        db.session.commit()
+
+    def attention_multipliers(self):
+        """{local user id: multiplier} of the current day (accounts not listed: 1)."""
+        from y_server import db
+        from .tables import FederationAttention, ensure_tables
+
+        ensure_tables()
+        return {r.user_id: r.multiplier for r in db.session.scalars(select(FederationAttention)).all()}

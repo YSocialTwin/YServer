@@ -36,6 +36,16 @@ class FederationExport(db.Model):
     seq = db.Column(db.Integer, nullable=True)
 
 
+class FederationAttention(db.Model):
+    """Attention multiplier of the day for each account (F4.3); an account without a row has multiplier 1."""
+
+    __tablename__ = "federation_attention"
+
+    user_id = db.Column(db.Integer, primary_key=True)
+    day = db.Column(db.Integer, nullable=False)
+    multiplier = db.Column(db.Float, nullable=False)
+
+
 class FederationState(db.Model):
     __tablename__ = "federation_state"
 
@@ -43,10 +53,10 @@ class FederationState(db.Model):
     value = db.Column(db.String(64), nullable=False)
 
 
-TABLES = (FederationMembership, FederationRef, FederationExport, FederationState)
+TABLES = (FederationMembership, FederationRef, FederationExport, FederationState, FederationAttention)
 
 
 def ensure_tables():
-    """CREATE TABLE IF NOT EXISTS for the four tables on the current database."""
+    """CREATE TABLE IF NOT EXISTS for the five tables on the current database."""
     for model in TABLES:
         model.__table__.create(bind=db.engine, checkfirst=True)
