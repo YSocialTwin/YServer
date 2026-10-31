@@ -22,7 +22,7 @@ from y_server import app, db  # noqa: E402
 from y_server.federation import reset_federation  # noqa: E402
 from y_server.federation.adapter import YServerAdapter  # noqa: E402
 from y_server.federation import visibility  # noqa: E402
-from y_server.modals import Follow, Post, Rounds, User_mgmt  # noqa: E402
+from y_server.modals import Follow, Post, Reactions, Recommendations, Rounds, User_mgmt  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 
 
@@ -216,6 +216,49 @@ def test_attention_multipliers_are_stored_per_account_and_served_to_the_clients(
     assert adapter.attention_multipliers() == {2: 2.0}
     adapter.apply_attention(3, {})
     assert adapter.attention_multipliers() == {} and json.loads(client.get("/federation/attention").data) == {"multipliers": {}}
+
+
+def test_exposures_are_emitted_only_when_asked_and_only_for_materialised_crossposts(client):
+    a = YServerAdapter("micro", 1, accounts={"g1": 1, "g2": 2, "g3": 3}, emit_exposures=True)
+    app.config["federation_adapter"] = a
+    try:
+        with app.app_context():
+            a.ingest_inbox(1, [_crosspost(0, 1, "from the forum")])  # a post of g1 on this platform, source forum/post/0
+            ref_post = db.session.scalars(select(Post)).first()
+            db.session.add(Post(tweet="native", round=1, user_id=1, comment_to=-1, thread_id=99))
+            db.session.add(Follow(user_id=2, follower_id=1, round=0, action="follow"))
+            db.session.add(Follow(user_id=3, follower_id=1, round=0, action="follow"))
+            db.session.add(Follow(user_id=1, follower_id=3, round=0, action="follow"))
+            db.session.add(Recommendations(user_id=2, post_ids=f"{ref_post.id},77", round=1))
+            db.session.add(Recommendations(user_id=1, post_ids=f"{ref_post.id}", round=1))  # the author: not a viewer
+            db.session.add(Recommendations(user_id=3, post_ids="77", round=1))  # not a cross-post
+            db.session.add(Reactions(round=1, user_id=3, post_id=ref_post.id, type="like"))
+            db.session.commit()
+            db.session.add(Rounds(day=0, hour=1))
+            db.session.commit()
+            rnd = db.session.scalars(select(Rounds).where(Rounds.hour == 1)).first()
+            for r in db.session.scalars(select(Recommendations)).all():
+                r.round = rnd.id
+            db.session.execute(Reactions.__table__.update().values(round=rnd.id))
+            db.session.commit()
+            out = [e for e in a.export_outbox(1) if e.payload_type == "exposure.v1"]
+            got = [(e.payload["viewer_global_agent_id"], e.payload["kind"], e.payload["tie"], e.payload["exact"]) for e in out]
+            assert got == [("g2", "view", "follow", False), ("g3", "interact", "mutual", True)]
+            assert all(e.payload["source_ref"] == "ysocial://1/forum/post/0" and e.payload["tick"] == 1 and e.target_member == "coordinator" for e in out)
+            assert [e.fed_msg_id for e in a.export_outbox(1) if e.payload_type == "exposure.v1"] == [e.fed_msg_id for e in out]  # retry: same
+            assert a.export_outbox(2) == []  # nothing new in the next round
+            a.apply_membership([MembershipChange("g2", "dormant", 0, "initial")])
+            assert a._exposure_rows(1)  # fixed log: a retry does not recompute
+    finally:
+        app.config.pop("federation_adapter", None)
+
+
+def test_exposures_off_by_default(client, adapter):
+    adapter.ingest_inbox(1, [_crosspost(0, 1)])
+    with app.app_context():
+        db.session.add(Recommendations(user_id=2, post_ids="1", round=1))
+        db.session.commit()
+    assert adapter.export_outbox(0) == [] and adapter.emit_exposures is False
 
 
 def test_adapter_conformance_suite(client):

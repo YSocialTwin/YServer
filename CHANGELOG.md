@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- Federation exposures (F4.4b, opt-in `federation.exposures`): with `federation.exposures` the adapter also hands `exposure.v1` to the bus: posts recommended in the round that are materialised cross-posts are views (approximate, `exact = false`), reactions, comments and shares on them are interactions (exact); tie from the follow table; table `federation_exposure_log`, fixed per tick so a retry sends the same messages.
 - Federation attention (opt-in): `apply_attention` stores the multiplier of the day per account (table `federation_attention`) and `GET /federation/attention`; the client scales the number of actions of each agent in the slot; with the federation off or multiplier 1 nothing changes.
 - Federation affective report (opt-in): `affective_report(day)` of the adapter gives the native stress/reward of the active accounts at the end of the day, read from the runtime's own tables without writing.
 - Federation (opt-in): `y_server/federation/` (adapter, gate wrapper) and a clock gate in `_try_advance_round_locked`; off unless the `federation` section of the configuration is enabled, in which case standalone behaviour is unchanged.

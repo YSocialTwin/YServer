@@ -46,6 +46,20 @@ class FederationAttention(db.Model):
     multiplier = db.Column(db.Float, nullable=False)
 
 
+class FederationExposure(db.Model):
+    """exposure.v1 handed to the bus for a tick (F4.4b), fixed on the first export so that a retry sends the same messages."""
+
+    __tablename__ = "federation_exposure_log"
+
+    tick = db.Column(db.Integer, primary_key=True)
+    seq = db.Column(db.Integer, primary_key=True)
+    viewer_uid = db.Column(db.Integer, nullable=False)
+    source_ref = db.Column(db.String(200), nullable=False)
+    kind = db.Column(db.String(10), nullable=False)
+    tie = db.Column(db.String(10), nullable=False)
+    exact = db.Column(db.Boolean, nullable=False)
+
+
 class FederationState(db.Model):
     __tablename__ = "federation_state"
 
@@ -53,10 +67,10 @@ class FederationState(db.Model):
     value = db.Column(db.String(64), nullable=False)
 
 
-TABLES = (FederationMembership, FederationRef, FederationExport, FederationState, FederationAttention)
+TABLES = (FederationMembership, FederationRef, FederationExport, FederationState, FederationAttention, FederationExposure)
 
 
 def ensure_tables():
-    """CREATE TABLE IF NOT EXISTS for the five tables on the current database."""
+    """CREATE TABLE IF NOT EXISTS for the tables on the current database."""
     for model in TABLES:
         model.__table__.create(bind=db.engine, checkfirst=True)

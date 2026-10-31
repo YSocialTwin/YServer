@@ -8,6 +8,7 @@ Bus and membership (F3.4a):
   root posts of active authors with export_policy = "all", into content.v1 for the coordinator.
 - ingest_inbox materialises crosspost.v1 as a post of the author on this platform, once per fed_msg_id (INV-05), and records it in
   federation_ref.
+Exposures (F4.4b, option emit_exposures): views and interactions with materialised cross-posts as exposure.v1.
 Affective report (F4.1): native stress/reward read from the stress_reward table. Attention (F4.3): multipliers stored per account, read by the clients."""
 
 import logging
@@ -25,13 +26,14 @@ log = logging.getLogger("y_server.federation")
 class YServerAdapter(PlatformAdapter):
     platform = "microblogging"
 
-    def __init__(self, member, federation_id=1, accounts=None, export_policy="marked"):
+    def __init__(self, member, federation_id=1, accounts=None, export_policy="marked", emit_exposures=False):
         """accounts: {global_agent_id: local user id}; without an entry the global id is the local user id."""
         if export_policy not in ("marked", "all"):
             raise ValueError("export_policy must be 'marked' or 'all'")
         self.member = member
         self.federation_id = federation_id
         self.export_policy = export_policy
+        self.emit_exposures = bool(emit_exposures)
         self._accounts = {str(k): int(v) for k, v in (accounts or {}).items()}
         self._by_user = {v: k for k, v in self._accounts.items()}
 
@@ -134,7 +136,66 @@ class YServerAdapter(PlatformAdapter):
         for row in already:
             post = db.session.get(Post, row.post_id)
             out.append(Envelope.create(self.federation_id, self.member, COORDINATOR, tick, row.seq, "content.v1", self._content(post)))
+        if self.emit_exposures:
+            for row in self._exposure_rows(tick):
+                out.append(Envelope.create(self.federation_id, self.member, COORDINATOR, tick, len(out), "exposure.v1", {
+                    "viewer_global_agent_id": self.agent_of(row.viewer_uid), "source_ref": row.source_ref, "tick": tick,
+                    "exact": bool(row.exact), "kind": row.kind, "tie": row.tie}))
         return out
+
+    def _tie(self, viewer, author):
+        """none / follow / mutual between a viewer and the author of a post, from the latest follow rows."""
+        from y_server import db
+        from y_server.modals import Follow
+
+        def follows(a, b):
+            row = db.session.scalars(select(Follow).filter_by(user_id=a, follower_id=b).order_by(Follow.round.desc(), Follow.id.desc())).first()
+            return row is not None and row.action == "follow"
+        if not follows(viewer, author):
+            return "none"
+        return "mutual" if follows(author, viewer) else "follow"
+
+    def _exposure_rows(self, tick):
+        """Views (posts recommended in the round: approximate, exact = false) and interactions (reaction, comment or share:
+        exact) of active accounts with the materialised cross-posts of the round of the tick, in a stable order."""
+        from y_server import db
+        from y_server.modals import Post, Reactions, Recommendations, Rounds
+        from .tables import FederationExposure, FederationRef, FederationState
+
+        done = db.session.get(FederationState, "exposure_tick")
+        if done is not None and int(done.value) >= tick:
+            return list(db.session.scalars(select(FederationExposure).where(FederationExposure.tick == tick)
+                                           .order_by(FederationExposure.seq)).all())
+        day, hour = self.from_tick(tick)
+        rnd = db.session.scalars(select(Rounds).where(Rounds.day == day, Rounds.hour == hour)).first()
+        found = {}
+        refs = {r.local_id: r.source_ref for r in db.session.scalars(
+            select(FederationRef).where(FederationRef.local_kind == "post")).all()} if rnd is not None else {}
+        if refs:
+            author = {pid: uid for pid, uid in db.session.execute(select(Post.id, Post.user_id).where(Post.id.in_(list(refs)))).all()}
+
+            def add(viewer, pid, kind, exact):
+                if viewer is None or viewer == author.get(pid) or not self._active(viewer):
+                    return
+                found.setdefault((viewer, refs[pid], kind), exact)
+            for rec in db.session.scalars(select(Recommendations).where(Recommendations.round == rnd.id)).all():
+                for raw in (rec.post_ids or "").split(","):
+                    if raw.strip().isdigit() and int(raw) in refs:
+                        add(rec.user_id, int(raw), "view", False)
+            for r in db.session.scalars(select(Reactions).where(Reactions.round == rnd.id, Reactions.post_id.in_(list(refs)))).all():
+                add(r.user_id, r.post_id, "interact", True)
+            for c in db.session.scalars(select(Post).where(Post.round == rnd.id, (Post.comment_to.in_(list(refs))) | (Post.shared_from.in_(list(refs))))).all():
+                add(c.user_id, c.comment_to if c.comment_to in refs else c.shared_from, "interact", True)
+            by_ref = {v: k for k, v in refs.items()}
+            for seq, ((viewer, ref, kind), exact) in enumerate(sorted(found.items(), key=lambda kv: (kv[0][0], kv[0][1], kv[0][2]))):
+                db.session.add(FederationExposure(tick=tick, seq=seq, viewer_uid=viewer, source_ref=ref, kind=kind,
+                                                  tie=self._tie(viewer, author[by_ref[ref]]), exact=exact))
+        if done is None:
+            db.session.add(FederationState(key="exposure_tick", value=str(tick)))
+        else:
+            done.value = str(tick)
+        db.session.commit()
+        return list(db.session.scalars(select(FederationExposure).where(FederationExposure.tick == tick).order_by(FederationExposure.seq)).all())
 
     def _marked(self, post_id):
         from y_server import db
