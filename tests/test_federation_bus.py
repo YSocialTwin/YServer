@@ -261,6 +261,18 @@ def test_exposures_off_by_default(client, adapter):
     assert adapter.export_outbox(0) == [] and adapter.emit_exposures is False
 
 
+def test_local_churn_is_reported_for_accounts_the_federation_sees_as_active(client, adapter):
+    adapter.apply_membership([MembershipChange("g1", "active", 0, "initial"), MembershipChange("g2", "active", 0, "initial"),
+                              MembershipChange("g3", "dormant", 0, "initial")])
+    assert adapter.churned_agents(0) == []
+    rid = db.session.scalars(select(Rounds)).first().id
+    for uid in (1, 3):
+        db.session.get(User_mgmt, uid).left_on = rid
+    db.session.commit()
+    assert adapter.churned_agents(0) == ["g1"]  # g3 is dormant for the federation: not reported
+    assert adapter.churned_agents(9) == ["g1"] and adapter.churned_agents(-1) == []
+
+
 def test_adapter_conformance_suite(client):
     from ysocial_federation.testing.conformance import ConformanceCase, run_all
 

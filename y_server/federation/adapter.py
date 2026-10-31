@@ -293,6 +293,24 @@ class YServerAdapter(PlatformAdapter):
                                        int(posts or 0) + int(reacts or 0), int(exposures)))
         return out
 
+    def churned_agents(self, day):
+        """Agents of this platform that left on their own (users.left_on set at a round up to the end of the day, F4.5): the
+        coordinator records them as left with reason churn. Only accounts the federation still sees as active."""
+        from y_server import db
+        from y_server.modals import Rounds, User_mgmt
+        from .tables import FederationMembership, ensure_tables
+
+        ensure_tables()
+        last = db.session.scalar(select(db.func.max(Rounds.id)).where(Rounds.day <= int(day)))
+        if last is None:
+            return []
+        out = []
+        for row in db.session.scalars(select(FederationMembership).where(FederationMembership.state == "active")).all():
+            user = db.session.get(User_mgmt, row.user_id)
+            if user is not None and user.left_on is not None and int(user.left_on) <= last:
+                out.append(row.global_agent_id)
+        return sorted(out)
+
     def apply_attention(self, day, multipliers):
         """Store the multipliers of the day (F4.3): accounts that are not in the dictionary go back to 1; unknown agents are
         ignored. The clients read them with GET /federation/attention and apply them where they choose how much an agent acts."""
