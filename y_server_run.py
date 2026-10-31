@@ -64,6 +64,9 @@ def start_server(config):
             )
         )
         app.config["sync_timeout_seconds"] = config.get("sync_timeout_seconds", 300)
+        from y_server.federation import init_federation
+
+        init_federation(config)  # no-op unless the "federation" section is enabled
         app.config["memory_enabled"] = bool(
             (config.get("memory") or {}).get("enabled", config.get("memory_enabled", False))
         )

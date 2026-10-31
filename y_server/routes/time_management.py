@@ -16,6 +16,8 @@ from y_server.modals import (
 )
 
 _SYNC_LOCK = threading.RLock()
+_federation_gate = None  # installed by y_server.federation.init_federation; None = standalone (INV-01)
+_federation_pending = False  # the gate held the round back: current_time asks again
 
 
 def _sync_timeout_seconds():
@@ -83,6 +85,7 @@ def _active_clients_locked():
 
 
 def _try_advance_round_locked():
+    global _federation_pending
     current_round = _get_current_round_locked()
     _cleanup_stale_clients_locked()
     active_clients = _active_clients_locked()
@@ -105,8 +108,19 @@ def _try_advance_round_locked():
             "submitted_clients": len(submitted_clients),
         }
 
+    if _federation_gate is not None and not _federation_gate.on_barrier_ready((current_round.day, current_round.hour)):
+        _federation_pending = True
+        return {
+            "advanced": False,
+            "round": current_round,
+            "active_clients": len(active_clients),
+            "submitted_clients": len(submitted_clients),
+        }
+    _federation_pending = False
     next_day, next_hour = _compute_next_time(current_round.day, current_round.hour)
     next_round = _get_or_create_round_locked(next_day, next_hour)
+    if _federation_gate is not None:
+        _federation_gate.on_round_opened((next_day, next_hour))
     now_ts = pytime.time()
     for client in active_clients:
         client.submitted_round_id = None
@@ -282,6 +296,8 @@ def current_time():
             "thread_id": thread_id
         })
         with _SYNC_LOCK:
+            if _federation_pending:
+                _try_advance_round_locked()  # the gate held the round back: ask again
             return _get_current_round_locked()
 
     try:
@@ -514,6 +530,8 @@ def complete_client():
             db.session.commit()
             result = _try_advance_round_locked()
             active_clients = len(_active_clients_locked())
+            if _federation_gate is not None and active_clients == 0:
+                _federation_gate.on_finished()
         return json.dumps(
             _round_payload(
                 result["round"],
