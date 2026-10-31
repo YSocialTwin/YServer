@@ -174,6 +174,38 @@ def test_dormant_accounts_are_invisible_and_clients_get_their_ids(client, adapte
         visibility.uninstall()
 
 
+def test_affective_report_reads_native_stress_reward(client, adapter):
+    from y_server.modals import Reactions, Recommendations, StressReward
+    adapter.apply_membership([MembershipChange("g1", "active", 0, "initial"), MembershipChange("g2", "active", 0, "initial"),
+                              MembershipChange("g3", "dormant", 0, "initial")])
+    _post(client, 1, "one")
+    with app.app_context():
+        db.session.add(Rounds(day=0, hour=1))
+        db.session.add(Rounds(day=1, hour=0))
+        db.session.commit()
+        r0 = [r.id for r in db.session.scalars(select(Rounds).where(Rounds.day == 0).order_by(Rounds.id)).all()]
+        d1 = db.session.scalars(select(Rounds).where(Rounds.day == 1)).first().id
+        rows = [("stress", 0.4, "aggregate", r0[0]), ("stress", 0.3, "variation", r0[1]), ("stress", -0.1, "variation", r0[1]),
+                ("reward", 0.9, "variation", r0[1]), ("reward", 0.5, "variation", r0[1]),  # clamped to 1
+                ("stress", 0.7, "variation", d1)]  # next day: not in the report of day 0
+        for i, (var, val, typ, tid) in enumerate(rows):
+            db.session.add(StressReward(id=f"s{i}", uid=1, variable=var, value=val, type=typ, tid=tid))
+        for post in db.session.scalars(select(Post)).all():
+            post.round = r0[0]
+        db.session.add(Reactions(round=r0[0], user_id=1, post_id=1, type="like"))
+        db.session.add(Recommendations(user_id=1, post_ids="1,2,3", round=r0[0]))
+        db.session.commit()
+        before = db.session.query(StressReward).count()
+        samples = {s.global_agent_id: s for s in adapter.affective_report(0)}
+        assert db.session.query(StressReward).count() == before  # read only
+    assert set(samples) == {"g1", "g2"}  # the dormant account is not reported
+    s1, s2 = samples["g1"], samples["g2"]
+    assert (s1.stress, s1.reward, s1.day) == (pytest.approx(0.6), 1.0, 0)
+    assert s1.actions == 2 and s1.exposures == 3
+    assert (s2.stress, s2.reward, s2.actions, s2.exposures) == (0.0, 0.0, 0, 0)
+    assert adapter.affective_report(7) == []
+
+
 def test_adapter_conformance_suite(client):
     from ysocial_federation.testing.conformance import ConformanceCase, run_all
 

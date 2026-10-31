@@ -8,7 +8,7 @@ Bus and membership (F3.4a):
   root posts of active authors with export_policy = "all", into content.v1 for the coordinator.
 - ingest_inbox materialises crosspost.v1 as a post of the author on this platform, once per fed_msg_id (INV-05), and records it in
   federation_ref.
-Attention and affective reports are filled in by F4."""
+Affective report (F4.1): native stress/reward read from the stress_reward table. Attention: F4.3."""
 
 import logging
 
@@ -194,7 +194,43 @@ class YServerAdapter(PlatformAdapter):
         return report
 
     def affective_report(self, day):
-        return []  # F4
+        """Native stress/reward of the active accounts at the end of the canonical day (F4.1), read from the runtime's
+        stress_reward table with the rule of /get_stress_reward (latest aggregate + later variations, clamped), without
+        writing; actions = posts and reactions of the account in the day, exposures = posts recommended to it."""
+        from y_server import db
+        from y_server.modals import Post, Reactions, Recommendations, Rounds, StressReward
+        from ysocial_federation.schemas import AffectiveSample
+        from .tables import FederationMembership, ensure_tables
+
+        ensure_tables()
+        rounds = list(db.session.scalars(select(Rounds.id).where(Rounds.day == int(day)).order_by(Rounds.id)).all())
+        if not rounds:
+            return []
+        lo, hi = rounds[0], rounds[-1]
+
+        def value(uid, variable):
+            anchor = db.session.scalars(select(StressReward).where(
+                StressReward.uid == uid, StressReward.variable == variable, StressReward.type == "aggregate",
+                StressReward.tid < hi).order_by(StressReward.tid.desc())).first()
+            base, anchor_tid = (float(anchor.value), int(anchor.tid)) if anchor is not None else (0.0, lo - 1)
+            total = db.session.query(db.func.coalesce(db.func.sum(StressReward.value), 0.0)).filter(
+                StressReward.uid == uid, StressReward.variable == variable, StressReward.type == "variation",
+                StressReward.tid > anchor_tid, StressReward.tid <= hi).scalar()
+            return max(0.0, min(1.0, base + float(total or 0.0)))
+
+        out = []
+        for row in db.session.scalars(select(FederationMembership).where(FederationMembership.state == "active")
+                                      .order_by(FederationMembership.user_id)).all():
+            uid = row.user_id
+            posts = db.session.query(db.func.count(Post.id)).filter(Post.user_id == uid, Post.round >= lo, Post.round <= hi).scalar()
+            reacts = db.session.query(db.func.count(Reactions.id)).filter(Reactions.user_id == uid, Reactions.round >= lo,
+                                                                         Reactions.round <= hi).scalar()
+            exposures = sum(len([p for p in (r.post_ids or "").split(",") if p.strip()]) for r in db.session.scalars(
+                select(Recommendations).where(Recommendations.user_id == uid, Recommendations.round >= lo,
+                                              Recommendations.round <= hi)).all())
+            out.append(AffectiveSample(self.agent_of(uid), int(day), value(uid, "stress"), value(uid, "reward"),
+                                       int(posts or 0) + int(reacts or 0), int(exposures)))
+        return out
 
     def apply_attention(self, day, multipliers):
         return None  # F4
