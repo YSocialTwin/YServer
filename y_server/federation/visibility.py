@@ -49,6 +49,17 @@ def _register_route(app):
         def _inactive_users():
             return jsonify({"inactive": inactive_user_ids()})
 
+    if "federation_destinations" not in app.view_functions:
+        @app.route("/federation/destinations", methods=["GET"], endpoint="federation_destinations")
+        def _destinations():
+            adapter = app.config.get("federation_adapter")
+            try:
+                uid = int(request.args.get("user_id"))
+            except (TypeError, ValueError):
+                return jsonify({"error": "user_id must be an integer"}), 422
+            members = adapter.destination_members(uid) if adapter is not None and hasattr(adapter, "destination_members") else []
+            return jsonify({"destinations": members})
+
     if "federation_attention" not in app.view_functions:
         @app.route("/federation/attention", methods=["GET"], endpoint="federation_attention")
         def _attention():

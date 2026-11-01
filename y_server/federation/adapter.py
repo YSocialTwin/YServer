@@ -26,7 +26,8 @@ log = logging.getLogger("y_server.federation")
 class YServerAdapter(PlatformAdapter):
     platform = "microblogging"
 
-    def __init__(self, member, federation_id=1, accounts=None, export_policy="marked", emit_exposures=False):
+    def __init__(self, member, federation_id=1, accounts=None, export_policy="marked", emit_exposures=False,
+                 crosspost_mode="coordinator_rule"):
         """accounts: {global_agent_id: local user id}; without an entry the global id is the local user id."""
         if export_policy not in ("marked", "all"):
             raise ValueError("export_policy must be 'marked' or 'all'")
@@ -34,6 +35,10 @@ class YServerAdapter(PlatformAdapter):
         self.federation_id = federation_id
         self.export_policy = export_policy
         self.emit_exposures = bool(emit_exposures)
+        if crosspost_mode not in ("coordinator_rule", "agent_action"):
+            raise ValueError("crosspost_mode must be 'coordinator_rule' or 'agent_action'")
+        self.crosspost_mode = crosspost_mode
+        self._destinations = {}  # {global_agent_id: [{"member", "local_account_id"}]}, set by the gate before each export
         self._accounts = {str(k): int(v) for k, v in (accounts or {}).items()}
         self._by_user = {v: k for k, v in self._accounts.items()}
 
@@ -130,15 +135,28 @@ class YServerAdapter(PlatformAdapter):
             for seq, post in enumerate(pending):
                 db.session.merge(FederationExport(post_id=post.id, tick=tick, seq=seq))
             db.session.commit()
+            if self.crosspost_mode == "agent_action":
+                self._fix_crossposts(tick, [p for p in pending], len(pending))
             already = db.session.scalars(select(FederationExport).where(FederationExport.tick == tick)
                                          .order_by(FederationExport.seq)).all()
         out = []
+        asked = self._crossposts_of(tick) if self.crosspost_mode == "agent_action" else []
+        by_post = {r.post_id for r in asked}
         for row in already:
+            if row.post_id in by_post:  # the agent chose where to post it: the cross-posts are the message
+                continue
             post = db.session.get(Post, row.post_id)
             out.append(Envelope.create(self.federation_id, self.member, COORDINATOR, tick, row.seq, "content.v1", self._content(post)))
+        for req in asked:
+            post = db.session.get(Post, req.post_id)
+            content = self._content(post)
+            if req.text:
+                content["text_excerpt"] = req.text[:TEXT_EXCERPT_MAX]
+            out.append(Envelope.create(self.federation_id, self.member, req.member, tick, req.seq, "crosspost.v1",
+                                       dict(content, target_account_id=req.account_id)))
         if self.emit_exposures:
             for row in self._exposure_rows(tick):
-                out.append(Envelope.create(self.federation_id, self.member, COORDINATOR, tick, len(out), "exposure.v1", {
+                out.append(Envelope.create(self.federation_id, self.member, COORDINATOR, tick, max((e.seq for e in out), default=-1) + 1, "exposure.v1", {
                     "viewer_global_agent_id": self.agent_of(row.viewer_uid), "source_ref": row.source_ref, "tick": tick,
                     "exact": bool(row.exact), "kind": row.kind, "tie": row.tie}))
         return out
@@ -204,15 +222,59 @@ class YServerAdapter(PlatformAdapter):
         row = db.session.get(FederationExport, post_id)
         return row is not None and row.tick is None
 
-    def mark_for_export(self, post_id):
-        """The agent chose to cross-post this post (D-07): it will be exported at the next barrier."""
+    def mark_for_export(self, post_id, targets=None):
+        """The agent chose to cross-post this post (D-07): it will be exported at the next barrier.
+
+        targets (crosspost.mode = agent_action): [{"member", "text"}], where the agent wants it and with which text."""
         from y_server import db
-        from .tables import FederationExport, ensure_tables
+        from .tables import FederationCrosspost, FederationExport, ensure_tables
 
         ensure_tables()
         if db.session.get(FederationExport, int(post_id)) is None:
             db.session.add(FederationExport(post_id=int(post_id), tick=None, seq=None))
-            db.session.commit()
+        if self.crosspost_mode == "agent_action":
+            for target in targets or []:
+                member = str(target.get("member") or "")
+                if member and member != self.member and db.session.get(FederationCrosspost, (int(post_id), member)) is None:
+                    db.session.add(FederationCrosspost(post_id=int(post_id), member=member, text=str(target.get("text") or "")))
+        db.session.commit()
+
+    # -- agent-action cross-posts (F6.2) -------------------------------------------------
+    def set_destinations(self, destinations):
+        self._destinations = {str(k): list(v) for k, v in (destinations or {}).items()}
+
+    def destination_members(self, user_id):
+        """Members where this account's agent could cross-post now (as of the last barrier)."""
+        return sorted(d["member"] for d in self._destinations.get(self.agent_of(user_id), []))
+
+    def _fix_crossposts(self, tick, posts, first_seq):
+        """First export of the tick: give each requested cross-post its account, tick and sequence number (a request
+        for a platform where the author has no active account is dropped)."""
+        from y_server import db
+        from .tables import FederationCrosspost
+
+        seq = first_seq
+        for post in posts:
+            wanted = self._destinations.get(self.agent_of(post.user_id), [])
+            rows = db.session.scalars(select(FederationCrosspost).where(FederationCrosspost.post_id == post.id,
+                                                                        FederationCrosspost.tick.is_(None))
+                                      .order_by(FederationCrosspost.member)).all()
+            for row in rows:
+                account = next((d["local_account_id"] for d in wanted if d["member"] == row.member), None)
+                row.tick = tick
+                if account is None:
+                    log.info("federation: cross-post of post %s to %s dropped: no active account", post.id, row.member)
+                    continue
+                row.account_id, row.seq = str(account), seq
+                seq += 1
+        db.session.commit()
+
+    def _crossposts_of(self, tick):
+        from y_server import db
+        from .tables import FederationCrosspost
+
+        return list(db.session.scalars(select(FederationCrosspost).where(FederationCrosspost.tick == tick, FederationCrosspost.seq.is_not(None))
+                                       .order_by(FederationCrosspost.seq)).all())
 
     # -- bus: ingest -------------------------------------------------------------------
     def ingest_inbox(self, tick, envelopes):

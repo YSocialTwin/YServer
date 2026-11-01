@@ -36,6 +36,21 @@ class FederationExport(db.Model):
     seq = db.Column(db.Integer, nullable=True)
 
 
+class FederationCrosspost(db.Model):
+    """The agent chose to cross-post a post to another platform with this text (F6.2, crosspost.mode = agent_action).
+
+    account_id, tick and seq are fixed at the first export of the post, so that a retry sends the same message."""
+
+    __tablename__ = "federation_crosspost"
+
+    post_id = db.Column(db.Integer, primary_key=True)
+    member = db.Column(db.String(64), primary_key=True)
+    text = db.Column(db.Text, nullable=False, default="")
+    account_id = db.Column(db.String(64), nullable=True)
+    tick = db.Column(db.Integer, nullable=True)
+    seq = db.Column(db.Integer, nullable=True)
+
+
 class FederationAttention(db.Model):
     """Attention multiplier of the day for each account (F4.3); an account without a row has multiplier 1."""
 
@@ -67,7 +82,8 @@ class FederationState(db.Model):
     value = db.Column(db.String(64), nullable=False)
 
 
-TABLES = (FederationMembership, FederationRef, FederationExport, FederationState, FederationAttention, FederationExposure)
+TABLES = (FederationMembership, FederationRef, FederationExport, FederationState, FederationAttention, FederationExposure,
+          FederationCrosspost)
 
 
 def ensure_tables():
