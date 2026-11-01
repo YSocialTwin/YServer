@@ -184,11 +184,58 @@ class YServerAdapter(PlatformAdapter):
                 body["quoted"] = quoted
             out.append(Envelope.create(self.federation_id, self.member, req.member, tick, req.seq, "crosspost.v1", body))
         if self.emit_exposures:
-            for row in self._exposure_rows(tick):
-                out.append(Envelope.create(self.federation_id, self.member, COORDINATOR, tick, max((e.seq for e in out), default=-1) + 1, "exposure.v1", {
+            quoting = self._quote_pairs(asked)
+            rows = self._exposure_rows(tick)
+            if quoting:
+                rows = rows + self._ensure_quote_exposures(tick, rows, quoting)
+            front = []
+            for row in rows:
+                env = Envelope.create(self.federation_id, self.member, COORDINATOR, tick, max((e.seq for e in out + front), default=-1) + 1, "exposure.v1", {
                     "viewer_global_agent_id": self.agent_of(row.viewer_uid), "source_ref": row.source_ref, "tick": tick,
-                    "exact": bool(row.exact), "kind": row.kind, "tie": row.tie}))
+                    "exact": bool(row.exact), "kind": row.kind, "tie": row.tie})
+                (front if (row.viewer_uid, row.source_ref) in quoting else out).append(env)
+            # P3: the exposure of the agent to the foreign content it quotes leaves before the cross-post that quotes it
+            first = min((i for i, e in enumerate(out) if e.payload_type == "crosspost.v1" and e.payload.get("quoted")), default=len(out))
+            out[first:first] = front
         return out
+
+    def _quote_pairs(self, asked):
+        """P3: {(viewer account, source_ref)} of the cross-posts that quote content materialised on this platform (seen here
+        by the quoting agent, who is neither a person nor inactive)."""
+        from y_server import db
+        from y_server.modals import Post
+        from .tables import FederationRef
+
+        humans = self._human_uids()
+        pairs = set()
+        for req in asked:
+            post = db.session.get(Post, req.post_id)
+            quoted = self._quoted(post)
+            if quoted is None or post.user_id in humans or not self._active(post.user_id):
+                continue
+            if db.session.scalar(select(FederationRef.local_id).where(FederationRef.local_kind == "post", FederationRef.source_ref == quoted["source_ref"])) is not None:
+                pairs.add((post.user_id, quoted["source_ref"]))
+        return pairs
+
+    def _ensure_quote_exposures(self, tick, rows, pairs):
+        """P3: an interact exposure (exact) for each (viewer, ref) pair with no exposure of that viewer to that content yet
+        (this tick or an earlier one). Stored in federation_exposure after the rows of the tick, so a retry gives the same."""
+        from y_server import db
+        from y_server.modals import Post
+        from .tables import FederationExposure, FederationRef
+
+        have = {(r.viewer_uid, r.source_ref) for r in db.session.scalars(select(FederationExposure).where(FederationExposure.tick <= tick)).all()}
+        seq = max((r.seq for r in rows), default=-1) + 1
+        added = []
+        for viewer, ref in sorted(pairs - have):
+            local = db.session.scalar(select(FederationRef.local_id).where(FederationRef.local_kind == "post", FederationRef.source_ref == ref))
+            author = db.session.get(Post, local).user_id
+            row = FederationExposure(tick=tick, seq=seq, viewer_uid=viewer, source_ref=ref, kind="interact", tie=self._tie(viewer, author), exact=True)
+            db.session.add(row)
+            added.append(row)
+            seq += 1
+        db.session.commit()
+        return added
 
     def _quoted(self, post):
         """F8: `quoted` of a post that shares another one (None for any other post): the original author, this platform

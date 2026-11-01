@@ -263,3 +263,79 @@ def test_topic_migration_off_attaches_and_creates_nothing(client):  # noqa: F811
         assert _topics_of_last_post() == []
         assert db.session.scalar(db.select(db.func.count()).select_from(Interests)) == before
     app.config.pop("federation_adapter", None)
+
+
+# -- P3: the exposure of the agent to the foreign content it quotes -----------------------------------------
+@pytest.fixture()
+def appctx(client):  # noqa: F811
+    with app.app_context():
+        yield
+
+
+def _foreign_share_setup(client, emit=True):  # noqa: F811
+    from y_server.modals import Post
+    from ysocial_federation.envelope import Envelope
+
+    a = YServerAdapter("micro", 1, accounts={"g1": 1, "g2": 2, "g3": 3}, crosspost_mode="agent_action", export_policy="marked", emit_exposures=emit)
+    app.config["federation_adapter"] = a
+    a.set_destinations(DEST)
+    env = Envelope.create(1, "forum", "micro", 2, 0, "crosspost.v1",
+                          {"global_agent_id": "g1", "source_ref": "ysocial://1/forum/post/7", "kind": "post", "text_excerpt": "from the forum",
+                           "image_ref": None, "topics": [], "lang": "en", "target_account_id": 1})
+    a.ingest_inbox(3, [env])
+    foreign = db.session.scalars(db.select(Post).order_by(Post.id.desc())).first().id
+    a.export_outbox(0)
+    _share(client, 2, foreign, "worth reading", to=[{"member": "forum", "text": "worth reading"}])
+    return a
+
+
+def test_quoting_foreign_content_sends_the_exposure_first_and_a_retry_is_identical(client, appctx):  # noqa: F811
+    a = _foreign_share_setup(client)
+    try:
+        out = a.export_outbox(3)
+        kinds = [e.payload_type for e in out]
+        assert kinds.index("exposure.v1") < kinds.index("crosspost.v1")
+        exp = next(e for e in out if e.payload_type == "exposure.v1")
+        assert (exp.payload["viewer_global_agent_id"], exp.payload["source_ref"], exp.payload["kind"], exp.payload["exact"]) == (
+            "g2", "ysocial://1/forum/post/7", "interact", True)
+        assert exp.payload["tick"] == 3 and exp.target_member == "coordinator"
+        assert len({e.seq for e in out}) == len(out)  # no sequence number reused
+        again = a.export_outbox(3)
+        assert [e.fed_msg_id for e in again] == [e.fed_msg_id for e in out] and [e.payload for e in again] == [e.payload for e in out]
+        assert [e.payload_type for e in a.export_outbox(4)] == []
+    finally:
+        app.config.pop("federation_adapter", None)
+
+
+def test_the_exposure_is_not_repeated_when_the_agent_already_has_one(client, appctx):  # noqa: F811
+    from y_server.federation.tables import FederationExposure
+
+    a = _foreign_share_setup(client)
+    try:
+        db.session.add(FederationExposure(tick=2, seq=0, viewer_uid=2, source_ref="ysocial://1/forum/post/7", kind="view", tie="none", exact=False))
+        db.session.commit()
+        out = a.export_outbox(3)
+        assert [e for e in out if e.payload_type == "exposure.v1"] == []
+    finally:
+        app.config.pop("federation_adapter", None)
+
+
+def test_without_emit_exposures_nothing_changes(client, appctx):  # noqa: F811
+    a = _foreign_share_setup(client, emit=False)
+    try:
+        assert [e.payload_type for e in a.export_outbox(3)] == ["crosspost.v1"]
+    finally:
+        app.config.pop("federation_adapter", None)
+
+
+def test_quoting_native_content_sends_no_exposure(client, appctx):  # noqa: F811
+    b = YServerAdapter("micro", 1, accounts={"g1": 1, "g2": 2, "g3": 3}, crosspost_mode="agent_action", emit_exposures=True)
+    app.config["federation_adapter"] = b
+    b.set_destinations(DEST)
+    try:
+        b.export_outbox(0)
+        _post(client, 2, "native words", crosspost=False)
+        _share(client, 1, _last_post_id(), "so true", to=[{"member": "forum", "text": "so true"}])
+        assert [e.payload_type for e in b.export_outbox(3) if e.payload_type == "exposure.v1"] == []
+    finally:
+        app.config.pop("federation_adapter", None)
