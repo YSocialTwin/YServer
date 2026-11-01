@@ -13,7 +13,7 @@ Affective report (F4.1): native stress/reward read from the stress_reward table.
 
 import logging
 
-from sqlalchemy import desc, false, or_, select
+from sqlalchemy import desc, false, func, or_, select
 
 from ysocial_federation.adapter import IngestReport, PlatformAdapter
 from ysocial_federation.envelope import COORDINATOR, Envelope
@@ -107,9 +107,13 @@ class YServerAdapter(PlatformAdapter):
         from y_server.modals import Images, Interests, Post_topics, User_mgmt
 
         user = db.session.get(User_mgmt, post.user_id)
+        # a share has no topics of its own: it carries the ones of the post it shares
+        topic_post = post.id
+        if post.shared_from not in (None, -1) and db.session.scalar(select(Post_topics.id).where(Post_topics.post_id == post.id)) is None:
+            topic_post = post.shared_from
         topics = [i.interest for i in db.session.scalars(
             select(Interests).join(Post_topics, Post_topics.topic_id == Interests.iid)
-            .where(Post_topics.post_id == post.id).order_by(Interests.iid)).all()]
+            .where(Post_topics.post_id == topic_post).order_by(Interests.iid)).all()]
         image = db.session.get(Images, post.image_id) if post.image_id else None
         return {"global_agent_id": self.agent_of(post.user_id),
                 "source_ref": f"ysocial://{self.federation_id}/{self.member}/post/{post.id}",
@@ -303,8 +307,8 @@ class YServerAdapter(PlatformAdapter):
     # -- bus: ingest -------------------------------------------------------------------
     def ingest_inbox(self, tick, envelopes):
         from y_server import db
-        from y_server.modals import Post, Rounds, User_mgmt
-        from .tables import FederationQuoted, FederationRef, ensure_tables
+        from y_server.modals import Interests, Post, Post_topics, Rounds, User_mgmt
+        from .tables import FederationQuoted, FederationRef, FederationTopic, ensure_tables
 
         ensure_tables()
         report = IngestReport()
@@ -339,6 +343,20 @@ class YServerAdapter(PlatformAdapter):
                 db.session.add(FederationQuoted(post_id=post.id, author_name=quoted["author_name"], global_agent_id=quoted["global_agent_id"],
                                                 member=quoted["member"], source_ref=quoted["source_ref"], text_excerpt=quoted["text_excerpt"]))
             post.thread_id = post.id
+            seen = set()
+            for name in payload.get("topics") or []:  # topic migration: the topics travel with the content, new ones are created
+                name = " ".join(str(name).split())[:20]
+                if not name or name.lower() in seen:
+                    continue
+                seen.add(name.lower())
+                interest = db.session.scalars(select(Interests).where(func.lower(Interests.interest) == name.lower())
+                                              .order_by(Interests.iid)).first()
+                if interest is None:
+                    interest = Interests(interest=name)
+                    db.session.add(interest)
+                    db.session.flush()
+                    db.session.add(FederationTopic(name=name, interest_id=interest.iid, created_tick=tick, source_member=env.source_member))
+                db.session.add(Post_topics(post_id=post.id, topic_id=interest.iid))
             db.session.add(FederationRef(local_kind="post", local_id=post.id, source_ref=payload["source_ref"],
                                          fed_msg_id=env.fed_msg_id))
             db.session.commit()  # post and reference together: a crash leaves neither, so the message comes again

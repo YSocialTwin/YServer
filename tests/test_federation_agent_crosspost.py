@@ -166,3 +166,55 @@ def test_the_destination_writes_the_post_with_the_attribution_and_keeps_the_refe
     assert post.tweet == "agreed\n↪ ann @ forum: «original words»"
     row = db.session.get(FederationQuoted, post.id)
     assert (row.author_name, row.global_agent_id, row.member, row.source_ref) == ("ann", "gx", "forum", "ysocial://1/forum/post/4")
+
+
+# -- topic migration -------------------------------------------------------------------------------------
+def _xpost_env(topics, fed_id_seq=0, text="agreed"):
+    from ysocial_federation.envelope import Envelope
+
+    return Envelope.create(1, "forum", "micro", 2, fed_id_seq, "crosspost.v1",
+                           {"global_agent_id": "g1", "source_ref": f"ysocial://1/forum/post/{70 + fed_id_seq}", "kind": "post", "text_excerpt": text,
+                            "image_ref": None, "topics": topics, "lang": "en", "target_account_id": 1})
+
+
+def test_topics_travel_with_the_content_and_missing_ones_are_created_once(client, agent):  # noqa: F811
+    from y_server.modals import Interests, Post, Post_topics
+    from y_server.federation.tables import FederationTopic
+
+    existing = Interests(interest="Music")
+    db.session.add(existing)
+    db.session.commit()
+    agent.ingest_inbox(3, [_xpost_env(["music", "Climate", "climate", "  "])])
+    post = db.session.scalars(db.select(Post).order_by(Post.id.desc())).first()
+    names = sorted(i.interest for i in db.session.scalars(
+        db.select(Interests).join(Post_topics, Post_topics.topic_id == Interests.iid).where(Post_topics.post_id == post.id)).all())
+    assert names == ["Climate", "Music"]  # matched case-insensitively, one created, duplicates ignored
+    assert [(t.name, t.source_member, t.created_tick) for t in db.session.scalars(db.select(FederationTopic)).all()] == [("Climate", "forum", 3)]
+    assert db.session.scalar(db.select(db.func.count()).select_from(Interests).where(db.func.lower(Interests.interest) == "climate")) == 1
+    agent.ingest_inbox(3, [_xpost_env(["Climate"], 1)])  # a second post reuses the topic
+    assert db.session.scalar(db.select(db.func.count()).select_from(FederationTopic)) == 1
+
+
+def test_a_redelivered_message_adds_no_topic_twice(client, agent):  # noqa: F811
+    from y_server.modals import Post_topics
+
+    env = _xpost_env(["Gardening"])
+    agent.ingest_inbox(3, [env])
+    before = db.session.scalar(db.select(db.func.count()).select_from(Post_topics))
+    agent.ingest_inbox(4, [env])
+    assert db.session.scalar(db.select(db.func.count()).select_from(Post_topics)) == before
+
+
+def test_a_share_leaves_with_the_topics_of_the_original_post(client, agent):  # noqa: F811
+    from y_server.modals import Interests, Post_topics
+
+    agent.export_outbox(0)
+    i = Interests(interest="Space")
+    db.session.add(i)
+    db.session.commit()
+    _post(client, 2, "rockets", crosspost=False)
+    original = _last_post_id()
+    db.session.add(Post_topics(post_id=original, topic_id=i.iid))
+    db.session.commit()
+    _share(client, 1, original, "wow", to=[{"member": "forum", "text": "wow"}])
+    assert agent.export_outbox(3)[0].payload["topics"] == ["Space"]
