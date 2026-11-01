@@ -296,8 +296,8 @@ def current_time():
             "thread_id": thread_id
         })
         with _SYNC_LOCK:
-            if _federation_pending:
-                _try_advance_round_locked()  # the gate held the round back: ask again
+            if _federation_pending or _cleanup_stale_clients_locked():
+                _try_advance_round_locked()  # the gate held the round back, or a client that never answered was just dropped: ask again
             return _get_current_round_locked()
 
     try:
