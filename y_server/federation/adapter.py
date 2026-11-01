@@ -28,8 +28,12 @@ class YServerAdapter(PlatformAdapter):
     platform = "microblogging"
 
     def __init__(self, member, federation_id=1, accounts=None, export_policy="marked", emit_exposures=False,
-                 crosspost_mode="coordinator_rule", topic_migration=True):
-        """accounts: {global_agent_id: local user id}; without an entry the global id is the local user id."""
+                 crosspost_mode="coordinator_rule", topic_migration=True, bindings_file=None):
+        """accounts: {global_agent_id: local user id}; without an entry the global id is the local user id.
+
+        bindings_file (INV-17): agents are bound by username: the accounts are reported to the coordinator, which answers with the
+        global id of the agent it expected under that name; the answer is kept in this file. Then there is no fallback to the
+        local id: an account that is not bound belongs to no federation identity (it acts as usual and is not exported)."""
         if export_policy not in ("marked", "all"):
             raise ValueError("export_policy must be 'marked' or 'all'")
         self.member = member
@@ -43,6 +47,11 @@ class YServerAdapter(PlatformAdapter):
         self._destinations = {}  # {global_agent_id: [{"member", "local_account_id"}]}, set by the gate before each export
         self._accounts = {str(k): int(v) for k, v in (accounts or {}).items()}
         self._by_user = {v: k for k, v in self._accounts.items()}
+        self._bindings = None
+        if bindings_file:
+            from ysocial_federation.bindings import BindingBook
+
+            self._bindings = BindingBook(str(bindings_file), self._enumerate_accounts)
 
     # -- clock -------------------------------------------------------------------------
     def to_tick(self, local_round):
@@ -68,6 +77,9 @@ class YServerAdapter(PlatformAdapter):
             return self._accounts[gid]
         if gid.startswith("human:"):
             return next((uid for uid, hid in self._humans().items() if hid == gid), None)
+        if self._bindings is not None:
+            local = self._bindings.local_of(gid)
+            return int(local) if local is not None else None
         return int(gid) if gid.isdigit() else None
 
     def agent_of(self, user_id):
@@ -75,7 +87,34 @@ class YServerAdapter(PlatformAdapter):
         if uid in self._by_user:
             return self._by_user[uid]
         human = self._humans().get(uid)
-        return human if human is not None else str(uid)  # a person has no fallback to the local id (it could be an agent's)
+        if human is not None:
+            return human
+        if self._bindings is not None:  # INV-17: the global id comes from the coordinator, never from the local id
+            return self._bindings.gid_of(uid) or f"unbound:{uid}"
+        return str(uid)  # a person has no fallback to the local id (it could be an agent's)
+
+    def _federated(self, user_id):
+        """False for an account the coordinator does not know (not bound yet): it acts as usual but nothing of it is exported."""
+        return self._bindings is None or not self.agent_of(user_id).startswith("unbound:")
+
+    # -- accounts reported to the coordinator (protocol 1.2) -------------------------------
+    def _enumerate_accounts(self, after):
+        from y_server import db
+        from y_server.modals import User_mgmt
+
+        query = db.session.query(User_mgmt.username, User_mgmt.id)
+        if after is not None:
+            query = query.filter(User_mgmt.id > int(after))
+        rows = query.order_by(User_mgmt.id).all()
+        humans = self._human_uids()
+        return [(u, i) for u, i in rows if i not in humans], (rows[-1][1] if rows else after)
+
+    def account_bindings(self, retry=False):
+        return self._bindings.pending(retry) if self._bindings is not None else []
+
+    def bindings_reported(self, bindings, bound=()):
+        if self._bindings is not None:
+            self._bindings.reported(bindings, bound)
 
     def _human_uids(self):
         return set(self._humans())
@@ -157,7 +196,7 @@ class YServerAdapter(PlatformAdapter):
                                        or_(Post.shared_from == -1, Post.id.in_(marked_ids) if self.crosspost_mode == "agent_action" else false()),
                                        Post.moderated == 0, Post.id.not_in(exported), Post.id.not_in(materialised))
             pending = [p for p in db.session.scalars(query.order_by(Post.id)).all()
-                       if self._active(p.user_id) and (self.export_policy == "all" or self._marked(p.id))]
+                       if self._active(p.user_id) and self._federated(p.user_id) and (self.export_policy == "all" or self._marked(p.id))]
             for seq, post in enumerate(pending):
                 db.session.merge(FederationExport(post_id=post.id, tick=tick, seq=seq))
             db.session.commit()
@@ -190,6 +229,8 @@ class YServerAdapter(PlatformAdapter):
                 rows = rows + self._ensure_quote_exposures(tick, rows, quoting)
             front = []
             for row in rows:
+                if not self._federated(row.viewer_uid):
+                    continue
                 env = Envelope.create(self.federation_id, self.member, COORDINATOR, tick, max((e.seq for e in out + front), default=-1) + 1, "exposure.v1", {
                     "viewer_global_agent_id": self.agent_of(row.viewer_uid), "source_ref": row.source_ref, "tick": tick,
                     "exact": bool(row.exact), "kind": row.kind, "tie": row.tie})
