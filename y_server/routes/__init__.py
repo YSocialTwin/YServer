@@ -5,6 +5,7 @@ from .memory_management import *
 from .time_management import *
 from .user_managment import *
 from .stress_reward_management import *
+from .human_gateway import *
 
 try:
     config_file = os.environ.get("YSERVER_CONFIG", f"config_files{os.sep}exp_config.json")

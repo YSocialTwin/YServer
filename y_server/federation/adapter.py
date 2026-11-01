@@ -52,14 +52,32 @@ class YServerAdapter(PlatformAdapter):
         return ZERO_BASED.from_tick(tick)
 
     # -- identity ----------------------------------------------------------------------
+    def _humans(self):
+        """{local user id: identity "human:<id>"} of the accounts of people: the identity map entries with the reserved
+        prefix and the accounts the human gateway enrolled. A person never takes the identity of an agent."""
+        out = {uid: gid for uid, gid in self._by_user.items() if gid.startswith("human:")}
+        from y_server.gateway.tables import human_users
+
+        out.update({uid: hid for uid, hid in human_users().items() if hid})
+        return out
+
     def user_of(self, global_agent_id):
         gid = str(global_agent_id)
         if gid in self._accounts:
             return self._accounts[gid]
+        if gid.startswith("human:"):
+            return next((uid for uid, hid in self._humans().items() if hid == gid), None)
         return int(gid) if gid.isdigit() else None
 
     def agent_of(self, user_id):
-        return self._by_user.get(int(user_id), str(int(user_id)))
+        uid = int(user_id)
+        if uid in self._by_user:
+            return self._by_user[uid]
+        human = self._humans().get(uid)
+        return human if human is not None else str(uid)  # a person has no fallback to the local id (it could be an agent's)
+
+    def _human_uids(self):
+        return set(self._humans())
 
     # -- membership --------------------------------------------------------------------
     def apply_membership(self, changes):
@@ -217,11 +235,12 @@ class YServerAdapter(PlatformAdapter):
         found = {}
         refs = {r.local_id: r.source_ref for r in db.session.scalars(
             select(FederationRef).where(FederationRef.local_kind == "post")).all()} if rnd is not None else {}
+        humans = self._human_uids()
         if refs:
             author = {pid: uid for pid, uid in db.session.execute(select(Post.id, Post.user_id).where(Post.id.in_(list(refs)))).all()}
 
             def add(viewer, pid, kind, exact):
-                if viewer is None or viewer == author.get(pid) or not self._active(viewer):
+                if viewer is None or viewer == author.get(pid) or not self._active(viewer) or viewer in humans:
                     return
                 found.setdefault((viewer, refs[pid], kind), exact)
             for rec in db.session.scalars(select(Recommendations).where(Recommendations.round == rnd.id)).all():
@@ -389,9 +408,12 @@ class YServerAdapter(PlatformAdapter):
             return max(0.0, min(1.0, base + float(total or 0.0)))
 
         out = []
+        humans = self._human_uids()  # people are not part of the group mechanisms (INV-15)
         for row in db.session.scalars(select(FederationMembership).where(FederationMembership.state == "active")
                                       .order_by(FederationMembership.user_id)).all():
             uid = row.user_id
+            if uid in humans:
+                continue
             posts = db.session.query(db.func.count(Post.id)).filter(Post.user_id == uid, Post.round >= lo, Post.round <= hi).scalar()
             reacts = db.session.query(db.func.count(Reactions.id)).filter(Reactions.user_id == uid, Reactions.round >= lo,
                                                                          Reactions.round <= hi).scalar()
@@ -414,7 +436,10 @@ class YServerAdapter(PlatformAdapter):
         if last is None:
             return []
         out = []
+        humans = self._human_uids()
         for row in db.session.scalars(select(FederationMembership).where(FederationMembership.state == "active")).all():
+            if row.user_id in humans:
+                continue
             user = db.session.get(User_mgmt, row.user_id)
             if user is not None and user.left_on is not None and int(user.left_on) <= last:
                 out.append(row.global_agent_id)
@@ -430,7 +455,7 @@ class YServerAdapter(PlatformAdapter):
         wanted = {}
         for gid, value in (multipliers or {}).items():
             uid = self.user_of(gid)
-            if uid is not None and float(value) != 1.0:
+            if uid is not None and uid not in self._human_uids() and float(value) != 1.0:
                 wanted[uid] = float(value)
         db.session.query(FederationAttention).delete()
         for uid, value in sorted(wanted.items()):
