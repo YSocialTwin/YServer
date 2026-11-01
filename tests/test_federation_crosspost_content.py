@@ -33,7 +33,7 @@ def test_the_link_travels_only_when_the_policy_asks_for_news(client):  # noqa: F
     assert news["link"] == "https://example.org/story" and "link" not in plain
 
 
-@pytest.mark.parametrize("policy", [None, ["all"], ["images"], ["own_posts"]])
+@pytest.mark.parametrize("policy", [None, ["all"], ["images"], ["own_content"]])
 def test_without_news_the_message_is_unchanged(client, policy):  # noqa: F811
     news, plain = _content(policy)
     assert "link" not in news and "link" not in plain
