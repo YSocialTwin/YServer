@@ -31,7 +31,8 @@ def init_federation(config):
                              emit_exposures=bool(section.get("exposures", False)),
                              crosspost_mode=section.get("crosspost_mode", "coordinator_rule"),
                              topic_migration=bool(section.get("topic_migration", True)),
-                             bindings_file=section.get("bindings_file"))
+                             bindings_file=section.get("bindings_file"),
+                             crosspost_content=(section.get("crosspost_content") or None))
     from . import visibility
     gate = SafeGate(FederationGate(adapter, section))
     with app.app_context():
