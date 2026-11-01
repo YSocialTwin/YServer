@@ -29,7 +29,8 @@ def init_federation(config):
     adapter = YServerAdapter(section["member"], int(section.get("federation_id", 1)),
                              accounts=section.get("accounts"), export_policy=section.get("export_policy", "marked"),
                              emit_exposures=bool(section.get("exposures", False)),
-                             crosspost_mode=section.get("crosspost_mode", "coordinator_rule"))
+                             crosspost_mode=section.get("crosspost_mode", "coordinator_rule"),
+                             topic_migration=bool(section.get("topic_migration", True)))
     from . import visibility
     gate = SafeGate(FederationGate(adapter, section))
     with app.app_context():

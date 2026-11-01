@@ -52,6 +52,18 @@ class FederationTopic(db.Model):
     source_member = db.Column(db.String(64), nullable=False)
 
 
+class FederationTopicOrigin(db.Model):
+    """P1.1: the full original name of a migrated topic (the Interests column holds 20 characters) and the topic it
+    resolved to here, so that two long names with the same first 20 characters never share a topic."""
+
+    __tablename__ = "federation_topic_origin"
+
+    original_key = db.Column(db.String(200), primary_key=True)  # lower-cased, spaces normalised
+    full_name = db.Column(db.String(200), nullable=False)
+    interest_id = db.Column(db.Integer, nullable=False)
+    resolved_name = db.Column(db.String(20), nullable=False)
+
+
 class FederationExport(db.Model):
     __tablename__ = "federation_export"
 
@@ -107,7 +119,7 @@ class FederationState(db.Model):
 
 
 TABLES = (FederationMembership, FederationRef, FederationExport, FederationState, FederationAttention, FederationExposure,
-          FederationCrosspost, FederationQuoted, FederationTopic)
+          FederationCrosspost, FederationQuoted, FederationTopic, FederationTopicOrigin)
 
 
 def ensure_tables():

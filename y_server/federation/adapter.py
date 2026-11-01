@@ -28,7 +28,7 @@ class YServerAdapter(PlatformAdapter):
     platform = "microblogging"
 
     def __init__(self, member, federation_id=1, accounts=None, export_policy="marked", emit_exposures=False,
-                 crosspost_mode="coordinator_rule"):
+                 crosspost_mode="coordinator_rule", topic_migration=True):
         """accounts: {global_agent_id: local user id}; without an entry the global id is the local user id."""
         if export_policy not in ("marked", "all"):
             raise ValueError("export_policy must be 'marked' or 'all'")
@@ -39,6 +39,7 @@ class YServerAdapter(PlatformAdapter):
         if crosspost_mode not in ("coordinator_rule", "agent_action"):
             raise ValueError("crosspost_mode must be 'coordinator_rule' or 'agent_action'")
         self.crosspost_mode = crosspost_mode
+        self.topic_migration = bool(topic_migration)  # False: received content attaches no topic and creates none
         self._destinations = {}  # {global_agent_id: [{"member", "local_account_id"}]}, set by the gate before each export
         self._accounts = {str(k): int(v) for k, v in (accounts or {}).items()}
         self._by_user = {v: k for k, v in self._accounts.items()}
@@ -363,24 +364,49 @@ class YServerAdapter(PlatformAdapter):
                                                 member=quoted["member"], source_ref=quoted["source_ref"], text_excerpt=quoted["text_excerpt"]))
             post.thread_id = post.id
             seen = set()
-            for name in payload.get("topics") or []:  # topic migration: the topics travel with the content, new ones are created
-                name = " ".join(str(name).split())[:20]
-                if not name or name.lower() in seen:
+            for full in (payload.get("topics") or []) if self.topic_migration else []:  # topics travel with the content
+                full = " ".join(str(full).split())[:200]
+                if not full or full.lower() in seen:
                     continue
-                seen.add(name.lower())
-                interest = db.session.scalars(select(Interests).where(func.lower(Interests.interest) == name.lower())
-                                              .order_by(Interests.iid)).first()
-                if interest is None:
-                    interest = Interests(interest=name)
-                    db.session.add(interest)
-                    db.session.flush()
-                    db.session.add(FederationTopic(name=name, interest_id=interest.iid, created_tick=tick, source_member=env.source_member))
+                seen.add(full.lower())
+                interest = self._topic_for(full, tick, env.source_member)
                 db.session.add(Post_topics(post_id=post.id, topic_id=interest.iid))
             db.session.add(FederationRef(local_kind="post", local_id=post.id, source_ref=payload["source_ref"],
                                          fed_msg_id=env.fed_msg_id))
             db.session.commit()  # post and reference together: a crash leaves neither, so the message comes again
             report.materialized += 1
         return report
+
+    def _topic_for(self, full, tick, source_member):
+        """The topic of a migrated name: an existing one (case-insensitive), or a new one created and recorded. The name is
+        cut to 20 characters; when that cut already belongs to a topic migrated under a different full name, a stable
+        suffix (`~` and 4 hex digits of the full name's hash) keeps the two apart. Same name, same topic, always."""
+        import hashlib
+
+        from y_server import db
+        from y_server.modals import Interests
+        from .tables import FederationTopic, FederationTopicOrigin
+
+        key = full.lower()
+        known = db.session.get(FederationTopicOrigin, key)
+        if known is not None:
+            return db.session.get(Interests, known.interest_id)
+        cut = full[:20]
+        interest = db.session.scalars(select(Interests).where(func.lower(Interests.interest) == cut.lower())
+                                      .order_by(Interests.iid)).first()
+        if interest is not None and len(full) > 20:
+            other = db.session.scalars(select(FederationTopicOrigin).where(FederationTopicOrigin.interest_id == interest.iid)).first()
+            if other is not None and other.original_key != key:  # the cut is taken by a different long name
+                cut = full[:15] + "~" + hashlib.sha1(key.encode("utf-8")).hexdigest()[:4]
+                interest = db.session.scalars(select(Interests).where(func.lower(Interests.interest) == cut.lower())
+                                              .order_by(Interests.iid)).first()
+        if interest is None:
+            interest = Interests(interest=cut)
+            db.session.add(interest)
+            db.session.flush()
+            db.session.add(FederationTopic(name=cut, interest_id=interest.iid, created_tick=tick, source_member=source_member))
+        db.session.add(FederationTopicOrigin(original_key=key, full_name=full, interest_id=interest.iid, resolved_name=interest.interest[:20]))
+        return interest
 
     def affective_report(self, day):
         """Native stress/reward of the active accounts at the end of the canonical day (F4.1), read from the runtime's

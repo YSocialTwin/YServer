@@ -218,3 +218,48 @@ def test_a_share_leaves_with_the_topics_of_the_original_post(client, agent):  # 
     db.session.commit()
     _share(client, 1, original, "wow", to=[{"member": "forum", "text": "wow"}])
     assert agent.export_outbox(3)[0].payload["topics"] == ["Space"]
+
+
+# -- P1.1: collision-aware topic names and the opt-out ---------------------------------------------------
+def _topics_of_last_post():
+    from y_server.modals import Interests, Post, Post_topics
+
+    post = db.session.scalars(db.select(Post).order_by(Post.id.desc())).first()
+    return sorted(i.interest for i in db.session.scalars(
+        db.select(Interests).join(Post_topics, Post_topics.topic_id == Interests.iid).where(Post_topics.post_id == post.id)).all())
+
+
+def test_two_long_names_with_the_same_first_20_characters_stay_apart_and_are_stable(client, agent):  # noqa: F811
+    from y_server.federation.tables import FederationTopicOrigin
+
+    a, b = "Renewable energy policy in Europe", "Renewable energy policy in Asia"
+    agent.ingest_inbox(3, [_xpost_env([a], 10)])
+    first = _topics_of_last_post()
+    agent.ingest_inbox(3, [_xpost_env([b], 11)])
+    second = _topics_of_last_post()
+    assert first == [a[:20]] and second != first and len(second[0]) == 20 and "~" in second[0]
+    agent.ingest_inbox(3, [_xpost_env([b], 12)])  # the same long name again: the same topic, nothing new
+    assert _topics_of_last_post() == second
+    assert db.session.get(FederationTopicOrigin, b.lower()).full_name == b
+
+
+def test_a_short_name_matching_a_local_topic_is_reused(client, agent):  # noqa: F811
+    from y_server.modals import Interests
+
+    db.session.add(Interests(interest="Space"))
+    db.session.commit()
+    agent.ingest_inbox(3, [_xpost_env(["space"], 20)])
+    assert _topics_of_last_post() == ["Space"]
+
+
+def test_topic_migration_off_attaches_and_creates_nothing(client):  # noqa: F811
+    from y_server.modals import Interests
+
+    a = YServerAdapter("micro", 1, accounts={"g1": 1}, crosspost_mode="agent_action", topic_migration=False)
+    app.config["federation_adapter"] = a
+    with app.app_context():
+        before = db.session.scalar(db.select(db.func.count()).select_from(Interests))
+        a.ingest_inbox(3, [_xpost_env(["Brand new topic"], 30)])
+        assert _topics_of_last_post() == []
+        assert db.session.scalar(db.select(db.func.count()).select_from(Interests)) == before
+    app.config.pop("federation_adapter", None)
