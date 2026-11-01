@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- Federation: sharing another agent's post on other platforms (F8, opt-in, `agent_action`): `/share` accepts `crosspost`/`crosspost_to`; the share leaves as `crosspost.v1` with `quoted` (original author, text and reference; null identity for an account outside the identity map) and the destination writes the post with an attribution line and keeps the structured reference in `federation_quoted`. Also fixes `/share`, which used `select` without importing it.
 - Federation local churn (F4.5, opt-in): `churned_agents(day)` gives the accounts whose `left_on` is set at a round up to the end of the day and that the federation still sees as active; the SDK sends them as local churn, so the coordinator records them as left with reason churn.
 - Federation exposures (F4.4b, opt-in `federation.exposures`): with `federation.exposures` the adapter also hands `exposure.v1` to the bus: posts recommended in the round that are materialised cross-posts are views (approximate, `exact = false`), reactions, comments and shares on them are interactions (exact); tie from the follow table; table `federation_exposure_log`, fixed per tick so a retry sends the same messages.
 - Federation attention (opt-in): `apply_attention` stores the multiplier of the day per account (table `federation_attention`) and `GET /federation/attention`; the client scales the number of actions of each agent in the slot; with the federation off or multiplier 1 nothing changes.

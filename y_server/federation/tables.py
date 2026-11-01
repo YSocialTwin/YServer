@@ -28,6 +28,19 @@ class FederationRef(db.Model):
     fed_msg_id = db.Column(db.String(200), nullable=False, unique=True)
 
 
+class FederationQuoted(db.Model):
+    """F8: structured reference of the content another agent wrote, shared by the post `post_id` (local kind "post")."""
+
+    __tablename__ = "federation_quoted"
+
+    post_id = db.Column(db.Integer, primary_key=True)
+    author_name = db.Column(db.String(200), nullable=False)
+    global_agent_id = db.Column(db.String(64), nullable=True)
+    member = db.Column(db.String(64), nullable=False)
+    source_ref = db.Column(db.String(200), nullable=True)
+    text_excerpt = db.Column(db.Text, nullable=False, default="")
+
+
 class FederationExport(db.Model):
     __tablename__ = "federation_export"
 
@@ -83,7 +96,7 @@ class FederationState(db.Model):
 
 
 TABLES = (FederationMembership, FederationRef, FederationExport, FederationState, FederationAttention, FederationExposure,
-          FederationCrosspost)
+          FederationCrosspost, FederationQuoted)
 
 
 def ensure_tables():

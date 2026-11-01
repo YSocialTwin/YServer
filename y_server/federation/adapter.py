@@ -13,10 +13,11 @@ Affective report (F4.1): native stress/reward read from the stress_reward table.
 
 import logging
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, false, or_, select
 
 from ysocial_federation.adapter import IngestReport, PlatformAdapter
 from ysocial_federation.envelope import COORDINATOR, Envelope
+from ysocial_federation import quoted as fed_quoted
 from ysocial_federation.schemas import TEXT_EXCERPT_MAX
 from ysocial_federation.timebase import ZERO_BASED
 
@@ -128,7 +129,9 @@ class YServerAdapter(PlatformAdapter):
         if not already:  # first call for this tick: choose the posts and fix their sequence numbers
             exported = select(FederationExport.post_id).where(FederationExport.tick.is_not(None))
             materialised = select(FederationRef.local_id).where(FederationRef.local_kind == "post")
-            query = select(Post).where(Post.id > watermark, Post.comment_to == -1, Post.shared_from == -1,
+            marked_ids = select(FederationExport.post_id)  # F8: a share leaves only when the agent marked it
+            query = select(Post).where(Post.id > watermark, Post.comment_to == -1,
+                                       or_(Post.shared_from == -1, Post.id.in_(marked_ids) if self.crosspost_mode == "agent_action" else false()),
                                        Post.moderated == 0, Post.id.not_in(exported), Post.id.not_in(materialised))
             pending = [p for p in db.session.scalars(query.order_by(Post.id)).all()
                        if self._active(p.user_id) and (self.export_policy == "all" or self._marked(p.id))]
@@ -152,14 +155,35 @@ class YServerAdapter(PlatformAdapter):
             content = self._content(post)
             if req.text:
                 content["text_excerpt"] = req.text[:TEXT_EXCERPT_MAX]
-            out.append(Envelope.create(self.federation_id, self.member, req.member, tick, req.seq, "crosspost.v1",
-                                       dict(content, target_account_id=req.account_id)))
+            body = dict(content, target_account_id=req.account_id)
+            quoted = self._quoted(post)
+            if quoted is not None:
+                body["quoted"] = quoted
+            out.append(Envelope.create(self.federation_id, self.member, req.member, tick, req.seq, "crosspost.v1", body))
         if self.emit_exposures:
             for row in self._exposure_rows(tick):
                 out.append(Envelope.create(self.federation_id, self.member, COORDINATOR, tick, max((e.seq for e in out), default=-1) + 1, "exposure.v1", {
                     "viewer_global_agent_id": self.agent_of(row.viewer_uid), "source_ref": row.source_ref, "tick": tick,
                     "exact": bool(row.exact), "kind": row.kind, "tie": row.tie}))
         return out
+
+    def _quoted(self, post):
+        """F8: `quoted` of a post that shares another one (None for any other post): the original author, this platform
+        and the original text. The author is a federation identity only when the account is in the identity map."""
+        if post.shared_from in (None, -1):
+            return None
+        from y_server import db
+        from y_server.modals import Post, User_mgmt
+        from .tables import FederationRef
+
+        original = db.session.get(Post, post.shared_from)
+        if original is None:
+            return None
+        author = db.session.get(User_mgmt, original.user_id)
+        gid = self._by_user.get(int(original.user_id))
+        ref = db.session.scalar(select(FederationRef.source_ref).where(FederationRef.local_kind == "post", FederationRef.local_id == original.id))
+        ref = ref or f"ysocial://{self.federation_id}/{self.member}/post/{original.id}"
+        return fed_quoted.build(author.username if author is not None else "unknown", gid, self.member, ref, original.tweet)
 
     def _tie(self, viewer, author):
         """none / follow / mutual between a viewer and the author of a post, from the latest follow rows."""
@@ -280,7 +304,7 @@ class YServerAdapter(PlatformAdapter):
     def ingest_inbox(self, tick, envelopes):
         from y_server import db
         from y_server.modals import Post, Rounds, User_mgmt
-        from .tables import FederationRef, ensure_tables
+        from .tables import FederationQuoted, FederationRef, ensure_tables
 
         ensure_tables()
         report = IngestReport()
@@ -306,9 +330,14 @@ class YServerAdapter(PlatformAdapter):
                 skip("skipped_ineligible")
                 continue
             current = db.session.scalars(select(Rounds).order_by(desc(Rounds.id))).first()
-            post = Post(tweet=payload["text_excerpt"], round=current.id if current else 0, user_id=uid, comment_to=-1)
+            quoted = payload.get("quoted")
+            post = Post(tweet=fed_quoted.render(payload["text_excerpt"], quoted) if quoted else payload["text_excerpt"],
+                        round=current.id if current else 0, user_id=uid, comment_to=-1)
             db.session.add(post)
             db.session.flush()
+            if quoted:
+                db.session.add(FederationQuoted(post_id=post.id, author_name=quoted["author_name"], global_agent_id=quoted["global_agent_id"],
+                                                member=quoted["member"], source_ref=quoted["source_ref"], text_excerpt=quoted["text_excerpt"]))
             post.thread_id = post.id
             db.session.add(FederationRef(local_kind="post", local_id=post.id, source_ref=payload["source_ref"],
                                          fed_msg_id=env.fed_msg_id))

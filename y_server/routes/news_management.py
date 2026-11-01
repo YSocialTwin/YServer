@@ -1,4 +1,4 @@
-from sqlalchemy import func
+from sqlalchemy import func, select
 from y_server.hashtag_text import normalize_hashtag
 import json
 
@@ -261,6 +261,12 @@ def share():
 
     post.thread_id = new_post_id
     db.session.commit()
+
+    # federation (opt-in, F8): the agent chose to share this post, quoting another agent's one, on other platforms
+    if data.get("crosspost") and app.config.get("federation_adapter") is not None:
+        targets = data.get("crosspost_to")
+        adapter = app.config["federation_adapter"]
+        adapter.mark_for_export(new_post_id, targets) if isinstance(targets, list) else adapter.mark_for_export(new_post_id)
 
     sentiment = vader_sentiment(text)
 

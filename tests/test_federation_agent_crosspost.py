@@ -105,3 +105,64 @@ def test_the_destinations_route(client, agent):  # noqa: F811
 def test_an_unknown_mode_is_refused():
     with pytest.raises(ValueError):
         YServerAdapter("micro", 1, crosspost_mode="nope")
+
+
+# -- F8: sharing the content of another agent ------------------------------------------------------------
+def _share(client, uid, post_id, text, to=None):  # noqa: F811
+    body = {"user_id": uid, "post_id": post_id, "text": text, "emotions": [], "hashtags": [], "mentions": [], "tid": 1}
+    if to is not None:
+        body.update(crosspost=True, crosspost_to=to)
+    assert _post_json(client, "/share", body).status_code == 200
+
+
+def _last_post_id():
+    from y_server.modals import Post
+
+    return db.session.scalars(db.select(Post).order_by(Post.id.desc())).first().id
+
+
+def test_a_share_with_targets_leaves_as_a_crosspost_quoting_the_original_author(client, agent):  # noqa: F811
+    agent.export_outbox(0)
+    _post(client, 2, "words of the second agent", crosspost=False)
+    original = _last_post_id()
+    _share(client, 1, original, "so true", to=[{"member": "forum", "text": "so true"}])
+    out = agent.export_outbox(3)
+    assert [(e.payload_type, e.target_member, e.payload["global_agent_id"], e.payload["text_excerpt"]) for e in out] == [
+        ("crosspost.v1", "forum", "g1", "so true")]
+    q = out[0].payload["quoted"]
+    assert q["global_agent_id"] == "g2" and q["member"] == "micro" and q["text_excerpt"] == "words of the second agent"
+    assert q["source_ref"] == f"ysocial://1/micro/post/{original}"
+
+
+def test_a_share_without_targets_and_an_unmarked_share_never_leave(client, agent):  # noqa: F811
+    agent.export_outbox(0)
+    _post(client, 2, "words", crosspost=False)
+    _share(client, 1, _last_post_id(), "plain share")
+    assert agent.export_outbox(3) == []
+
+
+def test_an_author_outside_the_federation_is_quoted_as_anonymous(client, agent):  # noqa: F811
+    agent.export_outbox(0)
+    _post(client, 3, "from a non member", crosspost=False)
+    agent._by_user.pop(3, None)  # account 3 is not in the identity map
+    agent._accounts.pop("g3", None)
+    _share(client, 1, _last_post_id(), "look", to=[{"member": "forum", "text": "look"}])
+    q = agent.export_outbox(3)[0].payload["quoted"]
+    assert q["global_agent_id"] is None and q["source_ref"] is None and q["text_excerpt"] == "from a non member"
+
+
+def test_the_destination_writes_the_post_with_the_attribution_and_keeps_the_reference(client, agent):  # noqa: F811
+    from y_server.modals import Post
+    from y_server.federation.tables import FederationQuoted
+    from ysocial_federation.envelope import Envelope
+
+    q = {"author_name": "ann", "global_agent_id": "gx", "member": "forum", "source_ref": "ysocial://1/forum/post/4",
+         "text_excerpt": "original words"}
+    env = Envelope.create(1, "forum", "micro", 2, 0, "crosspost.v1",
+                          {"global_agent_id": "g1", "source_ref": "ysocial://1/forum/post/7", "kind": "post", "text_excerpt": "agreed",
+                           "image_ref": None, "topics": [], "lang": "en", "target_account_id": 1, "quoted": q})
+    agent.ingest_inbox(3, [env])
+    post = db.session.scalars(db.select(Post).order_by(Post.id.desc())).first()
+    assert post.tweet == "agreed\n↪ ann @ forum: «original words»"
+    row = db.session.get(FederationQuoted, post.id)
+    assert (row.author_name, row.global_agent_id, row.member, row.source_ref) == ("ann", "gx", "forum", "ysocial://1/forum/post/4")
