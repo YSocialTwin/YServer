@@ -9,6 +9,7 @@ nav:
   - Modules And APIs: modules.md
   - Social Feedback API: social-feedback-api.md
   - Memory Integration: memory_integration.md
+  - Human Gateway: human-gateway.md
   - Usage Examples: examples.md
   - Data Model Notes: data_model.md
 markdown_extensions:
