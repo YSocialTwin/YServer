@@ -82,3 +82,22 @@ def test_without_a_bindings_file_nothing_changes(client):
     a = YServerAdapter("micro", 1)
     with app.app_context():
         assert a.account_bindings() == [] and a.agent_of(2) == "2" and a.user_of("2") == 2
+
+
+def test_provisioned_accounts_are_created_bound_and_offered_to_a_client_once(bound):
+    done = bound.provision_accounts([{"global_agent_id": "40", "username": "newcomer", "interests": ["jazz"]},
+                                     {"global_agent_id": "41", "username": "u1", "interests": []},  # already an account
+                                     {"global_agent_id": "42", "username": "x" * 16, "interests": []}])  # not a username
+    by = {d["global_agent_id"]: d["local_account_id"] for d in done}
+    assert set(by) == {"40", "41"} and by["41"] == "1"
+    assert bound.agent_of(int(by["40"])) == "40" and bound.user_of("40") == int(by["40"])
+    assert [(p["username"], p["interests"]) for p in bound.provisioned_accounts()] == [("newcomer", ["jazz"])]
+    assert all(o["username"] != "newcomer" for o in bound.account_bindings())  # known: never offered again
+    import y_server.federation.visibility  # noqa: F401  (registers the routes)
+
+    http = app.test_client()
+    assert [a["username"] for a in http.get("/federation/provisioned").get_json()["accounts"]] == ["newcomer"]
+    assert http.post("/federation/provisioned/adopted", json={"user_ids": [int(by["40"])]}).status_code == 200
+    assert http.get("/federation/provisioned").get_json()["accounts"] == []
+    bound.mark_adopted([int(by["40"])])
+    assert bound.provisioned_accounts() == []

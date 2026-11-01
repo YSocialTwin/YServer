@@ -119,6 +119,62 @@ class YServerAdapter(PlatformAdapter):
     def _human_uids(self):
         return set(self._humans())
 
+    # -- accounts created on request (protocol 1.2, INV-19) ---------------------------------
+    def provision_accounts(self, requests):
+        """Create the account of each agent that decided to join this platform (username = the agent's name) and tell which
+        were created. A name that is already an account here is bound as it is; one that cannot be a username is skipped."""
+        import json
+        import secrets
+
+        from y_server import db
+        from y_server.modals import Rounds, User_mgmt
+        from .tables import FederationProvisioned, ensure_tables
+
+        ensure_tables()
+        done = []
+        last = db.session.query(func.max(Rounds.id)).scalar() or 0
+        for req in requests:
+            gid, name = str(req["global_agent_id"]), str(req["username"])
+            user = db.session.query(User_mgmt).filter_by(username=name).first()
+            if user is None:
+                if not name or len(name) > 15:
+                    log.warning("federation: cannot create an account named %r (1-15 characters)", name)
+                    continue
+                user = User_mgmt(username=name, email=f"{name}@federation.local", password=secrets.token_hex(8), joined_on=int(last),
+                                 owner="federation", round_actions=3)
+                db.session.add(user)
+                db.session.flush()
+                db.session.add(FederationProvisioned(user_id=user.id, global_agent_id=gid, username=name,
+                                                     interests_json=json.dumps(list(req.get("interests") or []))[:1000]))
+            db.session.commit()
+            if self._bindings is not None:
+                self._bindings.record(str(user.id), name, gid)
+            done.append({"global_agent_id": gid, "local_account_id": str(user.id)})
+        return done
+
+    def provisioned_accounts(self):
+        """[{user_id, username, interests, global_agent_id}] created here and not adopted by a client yet."""
+        import json
+
+        from y_server import db
+        from .tables import FederationProvisioned, ensure_tables
+
+        ensure_tables()
+        return [{"user_id": r.user_id, "username": r.username, "global_agent_id": r.global_agent_id,
+                 "interests": json.loads(r.interests_json or "[]")}
+                for r in db.session.query(FederationProvisioned).filter_by(adopted=False).order_by(FederationProvisioned.user_id)]
+
+    def mark_adopted(self, user_ids):
+        from y_server import db
+        from .tables import FederationProvisioned, ensure_tables
+
+        ensure_tables()
+        for uid in user_ids:
+            row = db.session.get(FederationProvisioned, int(uid))
+            if row is not None:
+                row.adopted = True
+        db.session.commit()
+
     # -- membership --------------------------------------------------------------------
     def apply_membership(self, changes):
         from y_server import db

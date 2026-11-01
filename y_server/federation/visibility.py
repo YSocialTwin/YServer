@@ -60,6 +60,21 @@ def _register_route(app):
             members = adapter.destination_members(uid) if adapter is not None and hasattr(adapter, "destination_members") else []
             return jsonify({"destinations": members})
 
+    if "federation_provisioned" not in app.view_functions:
+        @app.route("/federation/provisioned", methods=["GET"], endpoint="federation_provisioned")
+        def _provisioned():
+            adapter = app.config.get("federation_adapter")
+            accounts = adapter.provisioned_accounts() if adapter is not None and hasattr(adapter, "provisioned_accounts") else []
+            return jsonify({"accounts": accounts})
+
+        @app.route("/federation/provisioned/adopted", methods=["POST"], endpoint="federation_provisioned_adopted")
+        def _provisioned_adopted():
+            adapter = app.config.get("federation_adapter")
+            ids = (request.get_json(silent=True) or {}).get("user_ids", [])
+            if adapter is not None and hasattr(adapter, "mark_adopted"):
+                adapter.mark_adopted(ids)
+            return jsonify({"ok": True})
+
     if "federation_attention" not in app.view_functions:
         @app.route("/federation/attention", methods=["GET"], endpoint="federation_attention")
         def _attention():

@@ -118,7 +118,20 @@ class FederationState(db.Model):
     value = db.Column(db.String(64), nullable=False)
 
 
-TABLES = (FederationMembership, FederationRef, FederationExport, FederationState, FederationAttention, FederationExposure,
+class FederationProvisioned(db.Model):
+    """Accounts created here because the coordinator asked for them (INV-19): the agent of a client of another platform
+    decided to join. A client of this platform adopts each one (gives it an agent that acts); `adopted` tells which."""
+
+    __tablename__ = "federation_provisioned"
+
+    user_id = db.Column(db.Integer, primary_key=True)
+    global_agent_id = db.Column(db.String(64), nullable=False, unique=True)
+    username = db.Column(db.String(50), nullable=False)
+    interests_json = db.Column(db.String(1000), nullable=False, default="[]")
+    adopted = db.Column(db.Boolean, nullable=False, default=False)
+
+
+TABLES = (FederationMembership, FederationProvisioned, FederationRef, FederationExport, FederationState, FederationAttention, FederationExposure,
           FederationCrosspost, FederationQuoted, FederationTopic, FederationTopicOrigin)
 
 
