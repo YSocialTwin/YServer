@@ -97,8 +97,10 @@ def test_targets_are_ignored_in_coordinator_rule_mode(client):  # noqa: F811
 
 
 def test_the_destinations_route(client, agent):  # noqa: F811
-    assert json.loads(client.get("/federation/destinations?user_id=1").data) == {"destinations": ["dating", "forum"]}
-    assert json.loads(client.get("/federation/destinations?user_id=3").data) == {"destinations": []}
+    assert json.loads(client.get("/federation/destinations?user_id=1").data)["destinations"] == ["dating", "forum"]
+    # P15: platform and name of each member, additive
+    assert [m["member"] for m in json.loads(client.get("/federation/destinations?user_id=1").data)["members"]] == ["dating", "forum"]
+    assert json.loads(client.get("/federation/destinations?user_id=3").data) == {"destinations": [], "members": []}
     assert client.get("/federation/destinations?user_id=x").status_code == 422
 
 

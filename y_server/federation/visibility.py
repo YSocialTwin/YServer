@@ -58,7 +58,8 @@ def _register_route(app):
             except (TypeError, ValueError):
                 return jsonify({"error": "user_id must be an integer"}), 422
             members = adapter.destination_members(uid) if adapter is not None and hasattr(adapter, "destination_members") else []
-            return jsonify({"destinations": members})
+            info = adapter.destination_info(uid) if adapter is not None and hasattr(adapter, "destination_info") else []
+            return jsonify({"destinations": members, "members": info})
 
     if "federation_provisioned" not in app.view_functions:
         @app.route("/federation/provisioned", methods=["GET"], endpoint="federation_provisioned")

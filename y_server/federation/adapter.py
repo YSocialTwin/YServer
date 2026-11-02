@@ -460,6 +460,12 @@ class YServerAdapter(PlatformAdapter):
         """Members where this account's agent could cross-post now (as of the last barrier)."""
         return sorted(d["member"] for d in self._destinations.get(self.agent_of(user_id), []))
 
+    def destination_info(self, user_id):
+        """P15: the same destinations with the platform type and the label of each: [{member, platform, name}], sorted by member.
+        Several members may share a platform type, so a client cannot read the type from the member name."""
+        return sorted(({"member": d["member"], "platform": d.get("platform") or d["member"], "name": d.get("name") or d["member"]}
+                       for d in self._destinations.get(self.agent_of(user_id), [])), key=lambda i: i["member"])
+
     def _fix_crossposts(self, tick, posts, first_seq):
         """First export of the tick: give each requested cross-post its account, tick and sequence number (a request
         for a platform where the author has no active account is dropped)."""
