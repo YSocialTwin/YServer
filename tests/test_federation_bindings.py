@@ -103,3 +103,17 @@ def test_provisioned_accounts_are_created_bound_and_offered_to_a_client_once(bou
     assert [x["username"] for x in http.get("/federation/provisioned?all=1").get_json()["accounts"]] == ["newcomer"]
     bound.mark_adopted([int(by["40"])])
     assert bound.provisioned_accounts() == []
+
+
+def test_a_provisioned_account_gets_the_recommenders_most_used_on_the_platform(bound):
+    """The model's placeholder "default" is not a recommender: the client could not read the account back on a restart."""
+    from sqlalchemy import func
+
+    for rec, frec, n in (("ReverseChronoPopularity", "Jaccard", 1), ("CommonInterests", "FollowRecSys", 3)):
+        for k in range(n):
+            db.session.add(User_mgmt(username=f"m{rec[:3]}{k}", email=f"m{rec[:3]}{k}@y.test", password="p", recsys_type=rec, frecsys_type=frec))
+    db.session.commit()
+    assert bound._majority_recsys() == {"recsys_type": "CommonInterests", "frecsys_type": "FollowRecSys"}
+    bound.provision_accounts([{"global_agent_id": "77", "username": "newcomer2", "interests": []}])
+    user = db.session.query(User_mgmt).filter_by(username="newcomer2").one()
+    assert (user.recsys_type, user.frecsys_type) == ("CommonInterests", "FollowRecSys")

@@ -122,6 +122,21 @@ class YServerAdapter(PlatformAdapter):
         return set(self._humans())
 
     # -- accounts created on request (protocol 1.2, INV-19) ---------------------------------
+    def _majority_recsys(self):
+        """{recsys_type, frecsys_type} most used by the accounts of this platform (never the placeholder "default"), so a
+        provisioned account gets the recommenders of the majority; {} when no account has one yet."""
+        from collections import Counter
+
+        from y_server import db
+        from y_server.modals import User_mgmt
+
+        out = {}
+        for column in ("recsys_type", "frecsys_type"):
+            counts = Counter(v for (v,) in db.session.query(getattr(User_mgmt, column)).all() if v and v != "default")
+            if counts:
+                out[column] = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
+        return out
+
     def provision_accounts(self, requests):
         """Create the account of each agent that decided to join this platform (username = the agent's name) and tell which
         were created. A name that is already an account here is bound as it is; one that cannot be a username is skipped."""
@@ -135,6 +150,7 @@ class YServerAdapter(PlatformAdapter):
         ensure_tables()
         done = []
         last = db.session.query(func.max(Rounds.id)).scalar() or 0
+        majority = self._majority_recsys()
         for req in requests:
             gid, name = str(req["global_agent_id"]), str(req["username"])
             user = db.session.query(User_mgmt).filter_by(username=name).first()
@@ -143,7 +159,7 @@ class YServerAdapter(PlatformAdapter):
                     log.warning("federation: cannot create an account named %r (1-15 characters)", name)
                     continue
                 user = User_mgmt(username=name, email=f"{name}@federation.local", password=secrets.token_hex(8), joined_on=int(last),
-                                 owner="federation", round_actions=3)
+                                 owner="federation", round_actions=3, **majority)
                 db.session.add(user)
                 db.session.flush()
                 db.session.add(FederationProvisioned(user_id=user.id, global_agent_id=gid, username=name,
