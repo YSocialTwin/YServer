@@ -65,7 +65,15 @@ def _register_route(app):
         @app.route("/federation/provisioned", methods=["GET"], endpoint="federation_provisioned")
         def _provisioned():
             adapter = app.config.get("federation_adapter")
-            accounts = adapter.provisioned_accounts() if adapter is not None and hasattr(adapter, "provisioned_accounts") else []
+            if adapter is None or not hasattr(adapter, "provisioned_accounts"):
+                accounts = []
+            elif request.args.get("all") in ("1", "true"):
+                try:
+                    accounts = adapter.provisioned_accounts(include_adopted=True)
+                except TypeError:  # an adapter that only knows the accounts not adopted yet
+                    accounts = adapter.provisioned_accounts()
+            else:
+                accounts = adapter.provisioned_accounts()
             return jsonify({"accounts": accounts})
 
         @app.route("/federation/provisioned/adopted", methods=["POST"], endpoint="federation_provisioned_adopted")

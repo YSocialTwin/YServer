@@ -99,5 +99,7 @@ def test_provisioned_accounts_are_created_bound_and_offered_to_a_client_once(bou
     assert [a["username"] for a in http.get("/federation/provisioned").get_json()["accounts"]] == ["newcomer"]
     assert http.post("/federation/provisioned/adopted", json={"user_ids": [int(by["40"])]}).status_code == 200
     assert http.get("/federation/provisioned").get_json()["accounts"] == []
+    # a client that restarts asks for all of them
+    assert [x["username"] for x in http.get("/federation/provisioned?all=1").get_json()["accounts"]] == ["newcomer"]
     bound.mark_adopted([int(by["40"])])
     assert bound.provisioned_accounts() == []

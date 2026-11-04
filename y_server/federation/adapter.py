@@ -154,8 +154,9 @@ class YServerAdapter(PlatformAdapter):
             done.append({"global_agent_id": gid, "local_account_id": str(user.id)})
         return done
 
-    def provisioned_accounts(self):
-        """[{user_id, username, interests, global_agent_id}] created here and not adopted by a client yet."""
+    def provisioned_accounts(self, include_adopted=False):
+        """[{user_id, username, interests, global_agent_id}] created here and not adopted by a client yet (all of them with
+        `include_adopted`: a client that restarts gives an agent again to the accounts it had adopted)."""
         import json
 
         from y_server import db
@@ -164,7 +165,8 @@ class YServerAdapter(PlatformAdapter):
         ensure_tables()
         return [{"user_id": r.user_id, "username": r.username, "global_agent_id": r.global_agent_id,
                  "interests": json.loads(r.interests_json or "[]")}
-                for r in db.session.query(FederationProvisioned).filter_by(adopted=False).order_by(FederationProvisioned.user_id)]
+                for r in (db.session.query(FederationProvisioned) if include_adopted
+                          else db.session.query(FederationProvisioned).filter_by(adopted=False)).order_by(FederationProvisioned.user_id)]
 
     def mark_adopted(self, user_ids):
         from y_server import db
