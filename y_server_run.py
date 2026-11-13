@@ -56,6 +56,7 @@ def start_server(config):
         app.config["perspective_api"] = config.get("perspective_api")
         app.config["toxicity_annotation"] = config.get("toxicity_annotation", False)
         app.config["sentiment_annotation"] = config.get("sentiment_annotation", False)
+        app.config["human_gateway_token"] = (config.get("human_gateway") or {}).get("token") or None  # off without a token
         app.config["emotion_annotation"] = config.get("emotion_annotation", False)
         app.config["stress_reward_enabled"] = bool(
             (config.get("stress_reward") or {}).get(
@@ -64,6 +65,9 @@ def start_server(config):
             )
         )
         app.config["sync_timeout_seconds"] = config.get("sync_timeout_seconds", 300)
+        from y_server.federation import init_federation
+
+        init_federation(config)  # no-op unless the "federation" section is enabled
         app.config["memory_enabled"] = bool(
             (config.get("memory") or {}).get("enabled", config.get("memory_enabled", False))
         )

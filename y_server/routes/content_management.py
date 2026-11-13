@@ -651,6 +651,12 @@ def add_post():
     post.thread_id = post_id
     db.session.commit()
 
+    # federation (opt-in): the agent chose to cross-post this post; without a federation the field is ignored
+    if data.get("crosspost") and current_app.config.get("federation_adapter") is not None:
+        adapter = current_app.config["federation_adapter"]
+        targets = data.get("crosspost_to")
+        adapter.mark_for_export(post_id, targets) if isinstance(targets, list) else adapter.mark_for_export(post_id)
+
     for topic_id in topics:
         tp = Post_topics(post_id=post_id, topic_id=topic_id)
         db.session.add(tp)

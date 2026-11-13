@@ -146,3 +146,18 @@ def test_stale_client_is_removed_from_blocking_set(client):
         _post_json(client, "/submit_round", {"client_id": "client-a", "round_id": current["id"]}).data
     )
     assert submit_a["advanced"] is True
+
+
+def test_polling_the_clock_advances_when_the_missing_client_goes_stale(client):
+    """A client that was killed never submits: once it is stale the clients that already submitted, which only poll
+    /current_time, must be released (a restarted member would otherwise wait for a client that no longer exists)."""
+    app.config["sync_timeout_seconds"] = 0.05
+    current = json.loads(client.get("/current_time").data)
+    _post_json(client, "/register_client", {"client_id": "dead"})
+    _post_json(client, "/register_client", {"client_id": "alive"})
+    submit = json.loads(_post_json(client, "/submit_round", {"client_id": "alive", "round_id": current["id"]}).data)
+    assert submit["advanced"] is False and json.loads(client.get("/current_time").data)["id"] == current["id"]
+
+    time.sleep(0.08)
+    _post_json(client, "/heartbeat", {"client_id": "alive"})
+    assert json.loads(client.get("/current_time").data)["id"] == current["id"] + 1
