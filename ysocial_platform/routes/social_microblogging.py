@@ -18,6 +18,7 @@ from flask import (
 )
 from flask_login import current_user, login_required
 from sqlalchemy import select
+
 from y_web.sdk import gettext as _
 from y_web.sdk import routes
 from y_web.sdk.commons.service import (
@@ -68,6 +69,7 @@ from y_web.sdk.social import (
     is_admin,
 )
 from y_web.sdk.social import logged_user as _forum_logged_user
+from y_web.sdk.web import choose_active_experiment
 from y_web.sdk.web import load_ui_settings as _load_ui_settings
 
 main = routes.blueprint("main")
@@ -147,15 +149,16 @@ def feeed_logged():
         Redirect to feed with experiment ID and user ID
     """
     # Get active experiments
-    exps = db.session.scalars(select(Exps).filter(Exps.status != 0)).all()
+    exps = db.session.scalars(
+        select(Exps).filter(Exps.status != 0, Exps.platform_type == "microblogging")
+    ).all()
     if not exps:
         flash(_("No active experiment. Please activate an experiment first."))
         return redirect("/admin/experiments")
 
-    if len(exps) > 1:
+    exp = choose_active_experiment(exps)
+    if exp is None:
         return redirect("/admin/join_simulation")
-
-    exp = exps[0]
 
     # Get experiment user UUID via the proper DB bind context manager.
     # The config["SQLALCHEMY_BINDS"] swap approach does NOT affect already-
