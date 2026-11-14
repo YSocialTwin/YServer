@@ -17,6 +17,7 @@ from y_web.sdk import (
     N_,
     STANDARD,
     CreationRules,
+    FederationTraits,
     PlatformProvider,
     StandardRuntime,
 )
@@ -30,6 +31,17 @@ class MicrobloggingStandard(PlatformProvider):
     label = N_("Microblogging")
     icon = "message-circle"
     order = 10
+    federation_traits = FederationTraits(
+        mdi_icon="mdi-message-text-outline",
+        local_kind="post",
+        author_sql="SELECT p.id, u.username, p.user_id FROM post p LEFT JOIN user_mgmt u ON u.id = p.user_id WHERE p.id IN ({q})",
+        content_path="/{exp}/thread/{id}",
+        profile_path="/{exp}/profile/{account}/recent/1",
+        account_sql="SELECT id, username FROM user_mgmt WHERE id = ?",
+        text_limit=280,
+        decision_triggers=("publish", "interaction"),
+        simulators=(STANDARD,),
+    )
     default_platform = True
 
     prompt_pack = ("prompts.json", "prompts.json")
