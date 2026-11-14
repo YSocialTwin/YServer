@@ -43,6 +43,7 @@ class MicrobloggingStandard(PlatformProvider):
     plugin_agents = True
     stress_reward_page = True
     stress_reward_in_form = True
+    tag_runtime_sets = (("microblogging_server", "microblogging_client"),)
     federation_traits = FederationTraits(
         mdi_icon="mdi-message-text-outline",
         local_kind="post",
