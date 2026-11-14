@@ -55,13 +55,15 @@ def publish_post(exp_id):
     # World Simulation (F8): an enrolled person who picked other platforms posts through the runtime gateway
     from y_web.sdk.federation import human_outbox as _ho
 
+    from .. import gateway as _gateway
+
     if not url:
         _sent = _ho.try_deliver(
             exp_id,
             current_user,
             _ho.requested_members(request.args.getlist("crosspost")),
             text,
-            lambda t: _ho.micro_post(text, t),
+            lambda t: _gateway.post(text, t),
             only="microblogging",
         )
         if _sent is not None:
