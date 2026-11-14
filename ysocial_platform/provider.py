@@ -39,6 +39,10 @@ class MicrobloggingStandard(PlatformProvider):
 
     server_label = "YServer"
     runtime_keys = ("microblogging_server", "microblogging_client")
+    runtime_pair_description = N_(
+        "Legacy microblogging simulator on Flask (timeline, posts, follows). Server and client are installed and updated independently from its page."
+    )
+    page_resources = True
     embedding_in_details = True
     plugin_agents = True
     stress_reward_page = True
