@@ -33,6 +33,11 @@ class MicrobloggingStandard(PlatformProvider):
     icon = "message-circle"
     order = 10
 
+    @property
+    def recsys_catalog(self):
+        """The recommenders this platform adds to the catalogue (``catalog.py``)."""
+        return importlib.import_module(f"{__package__}.catalog").RECSYS_CATALOG
+
     # what the admin "frontend settings" page offers for this platform (the boxes are in templates/slots/)
     frontend_settings = (
         FrontendSetting(
