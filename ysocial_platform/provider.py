@@ -33,6 +33,10 @@ class MicrobloggingStandard(PlatformProvider):
     icon = "message-circle"
     order = 10
 
+    crosspost_on_share = (
+        True  # a shared post can also go out through the World Simulation gateway
+    )
+
     reads_server_config = (
         True  # pages read the memory and stress/reward settings of its server config
     )
