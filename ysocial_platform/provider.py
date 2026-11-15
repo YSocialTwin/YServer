@@ -38,6 +38,10 @@ class MicrobloggingStandard(PlatformProvider):
     label = N_("Microblogging")
     icon = "message-circle"
     order = 10
+    standard_feed = True
+    infinite_scroll = True
+    menu_label = N_("Microblogging (i.e., X/BlueSky)")
+    client_form_fields = frozenset({"image", "news", "vote"})
 
     crosspost_on_share = (
         True  # a shared post can also go out through the World Simulation gateway

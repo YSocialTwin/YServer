@@ -334,7 +334,7 @@
                                         />
                                         <div class="control">
                     <textarea
-                            id="publish"
+                            id="publish" data-ws-source
                             class="textarea"
                             rows="3"
                             placeholder="{{ _('Write something about you...') }}"
@@ -536,7 +536,7 @@
                                                 id="link-autocpl-wrapper"
                                                 class="control is-location-wrapper has-margin">
                     <textarea
-                            id="link_post"
+                            id="link_post" data-ws-link
                             rows="1"
                             class="textarea"
                             placeholder="{{ _('Enter the link to the immage you are commenting on...') }}"
@@ -664,7 +664,6 @@
                     <!-- /partials/widgets/stories-widget.html -->
 
                 {% if username != "" %}
-                  {% set side_variant = 'micro' %}
                   {% include "shared/annotation_side_boxes.html" %}
                 {% endif %}
 
@@ -763,7 +762,7 @@
 
 <script src="{{ url_for('platform_static_ysocial_server', filename='js/mb-feed.js') }}"></script>
 {% if experiment_memory_enabled %}
-<script src="{{ url_for('static', filename='assets/js/microblog-chat.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/js/ys-chat.js') }}"></script>
 {% endif %}
 
 {% include "shared/plugin_loader.html" %}
