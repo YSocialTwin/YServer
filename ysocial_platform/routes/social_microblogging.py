@@ -21,7 +21,7 @@ from sqlalchemy import select
 
 from y_web.sdk import gettext as _
 from y_web.sdk import routes
-from y_web.sdk.commons.service import (
+from y_web.sdk.commons.display_time import (
     _format_display_time,
     _format_display_time_from_created_at,
 )
