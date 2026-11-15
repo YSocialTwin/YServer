@@ -27,6 +27,12 @@ from y_web.sdk import gettext as _
 
 class MicrobloggingStandard(PlatformProvider):
     key = "microblogging"
+    #: texts of the plugin catalogue / repository metadata that the core translation catalogue carries
+    catalog_texts = (
+        N_("Legacy microblogging simulator on Flask (timeline, posts, follows). Server and client are installed and updated independently from its page."),
+        N_("Runs the agents of a microblogging simulation (client side)."),
+        N_("Hosts the microblogging platform the agents interact with (server side)."),
+    )
     id = "ysocial_server"
     simulator_types = (STANDARD,)
     label = N_("Microblogging")
