@@ -58,8 +58,6 @@ from y_web.sdk.social import (
     get_posts_associated_to_interest,
     get_report_count,
     get_safe_profile_pic,
-    get_suggested_posts,
-    get_suggested_users,
     get_trending_emotions,
     get_trending_hashtags,
     get_trending_topics,
@@ -71,6 +69,8 @@ from y_web.sdk.social import (
 from y_web.sdk.social import logged_user as _forum_logged_user
 from y_web.sdk.web import choose_active_experiment
 from y_web.sdk.web import load_ui_settings as _load_ui_settings
+
+from ..recsys import RECSYS, get_suggested_posts, get_suggested_users
 
 main = routes.blueprint("main")
 
@@ -384,7 +384,7 @@ def feed(exp_id, user_id="all", timeline="timeline", mode="rf", page=1):
             spages=spages,
             ui=ui,
             recsys_info=_content_recsys_info(
-                getattr(logged_user, "recsys_type", None), ui
+                getattr(logged_user, "recsys_type", None), ui, recsys=RECSYS
             ),
             frontend_adds_on_modules=active_modules_context(exp_id),
         )
