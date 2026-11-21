@@ -138,6 +138,22 @@ def _build_friends_view_model(user_id, page, active_tab):
     }
 
 
+
+def _rank_last_requested(exp_id, user) -> bool:
+    """The participant switched the feed to the posts ranked last. The cookie ``ys_rank_last`` is signed by the training
+    plugin for one experiment and one participant, so a cookie made by hand (or for another experiment) changes nothing."""
+    raw = request.cookies.get("ys_rank_last")
+    if not raw or user is None:
+        return False
+    try:
+        from itsdangerous import URLSafeTimedSerializer  # noqa: PLC0415
+
+        data = URLSafeTimedSerializer(current_app.secret_key, salt="ys-rank-last").loads(raw, max_age=86400)
+    except Exception:
+        return False
+    return isinstance(data, dict) and data.get("e") == exp_id and str(data.get("u")) == str(user.id)
+
+
 @main.get("/feed")
 @login_required
 def feeed_logged():
@@ -281,6 +297,7 @@ def feed(exp_id, user_id="all", timeline="timeline", mode="rf", page=1):
                 max_post_per_page,
                 exp_engine=_exp_engine,
                 fb_settings=_fb_settings,
+                last_ranked=_rank_last_requested(exp_id, user),
             )
             username = user.username
 
@@ -383,6 +400,7 @@ def feed(exp_id, user_id="all", timeline="timeline", mode="rf", page=1):
             sfollow=sfollow,
             spages=spages,
             ui=ui,
+            rank_last_active=_rank_last_requested(exp_id, logged_user),
             recsys_info=_content_recsys_info(
                 getattr(logged_user, "recsys_type", None), ui, recsys=RECSYS
             ),
@@ -1202,6 +1220,7 @@ def api_feed(exp_id, user_id="all", timeline="timeline", mode="rf", page=1):
                 max_post_per_page,
                 exp_engine=_exp_engine,
                 fb_settings=_fb_settings,
+                last_ranked=_rank_last_requested(exp_id, user),
             )
             username = user.username
 

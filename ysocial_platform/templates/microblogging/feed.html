@@ -1,4 +1,4 @@
-{%  include "social/header.html" %}
+{% include "@ysocial_server/microblogging/header.html" %}
 
 <div class="view-wrapper">
     <!-- Container -->
@@ -622,6 +622,11 @@
                     {% endif %}
                     <!-- Post 1 -->
                     <!-- /partials/pages/feed/posts/feed-post1.html -->
+                    {% if rank_last_active %}
+                    <div class="ys-rank-last-note" role="status" style="margin:0 0 .8rem;padding:.55rem .9rem;border-radius:10px;background:#fff4d6;color:#8a5a00;font-size:.9rem">
+                        <i data-feather="arrow-down"></i> {{ _('You are seeing the posts your recommender ranks last.') }}
+                    </div>
+                    {% endif %}
                     <!-- POST #1 -->
                     <div id="posts-container">
                         {% include "@ysocial_server/microblogging/components/posts.html" %}
@@ -638,6 +643,7 @@
                     </div>
                     {% else %}
                     <!-- Classic pagination (infinite scroll disabled) -->
+                    {% if ui.show_pagination_buttons is undefined or ui.show_pagination_buttons %}
                     <nav class="ys-pagination" aria-label="{{ _('Feed pagination') }}">
                         {% if page > 1 %}
                         <a class="ys-page-btn" href="/{{exp_id}}/feed/{{user_id}}/{{timeline}}/{{mode}}/{{ page-1 }}">
@@ -653,6 +659,7 @@
                             {{ _('Next') }} <i data-feather="chevron-right"></i>
                         </a>
                     </nav>
+                    {% endif %}
                     {% endif %}
                     <!-- /Load more posts / Pagination -->
                 </div>

@@ -622,6 +622,30 @@ def _update_filter_bubble_interests(
         pass
 
 
+#: how many posts of the ranking are looked at to find the ones ranked last (the feed of an experiment is far smaller)
+LAST_RANKED_POOL = 1000
+
+
+class _RankedWindow:
+    """What ``get_suggested_posts`` returns when asked for the posts ranked last: a page of a list already in memory,
+    with the few attributes of a SQLAlchemy ``Pagination`` the routes read."""
+
+    def __init__(self, items, page, per_page, total):
+        self.items, self.page, self.per_page, self.total = items, page, per_page, total
+        self.pages = max(1, -(-total // per_page)) if per_page else 1
+        self.has_next = page < self.pages
+        self.has_prev = page > 1
+
+
+def _last_ranked_posts(uid, mode, page, per_page, follower_ratio, exp_engine, fb_settings):
+    """The posts the recommender of ``mode`` ranks last for the user, the very last one first (paged like the feed)."""
+    primary, extra = get_suggested_posts(uid, mode, 1, LAST_RANKED_POOL, follower_ratio, exp_engine, fb_settings)
+    ranked = list(getattr(primary, "items", None) or []) + list(getattr(extra, "items", None) or [])
+    ranked.reverse()
+    start = (max(1, page) - 1) * per_page
+    return _RankedWindow(ranked[start:start + per_page], max(1, page), per_page, len(ranked)), None
+
+
 def get_suggested_posts(
     uid,
     mode,
@@ -630,6 +654,7 @@ def get_suggested_posts(
     follower_ratio=0.6,
     exp_engine=None,
     fb_settings=None,
+    last_ranked=False,
 ):
     """
     Get recommended posts for a user based on specified algorithm.
@@ -644,11 +669,15 @@ def get_suggested_posts(
         page: Page number for pagination
         per_page: Number of posts per page
         follower_ratio: Ratio of primary-slot posts for split-feed modes
+        last_ranked: Return the posts the algorithm ranks last instead of first (worst first)
 
     Returns:
         Tuple of (posts, additional_posts) where posts is paginated query result
         and additional_posts may contain supplementary content
     """
+
+    if last_ranked and uid != "all":   # the posts the recommender would show last (an experiment option, see the routes)
+        return _last_ranked_posts(uid, mode, page, per_page, follower_ratio, exp_engine, fb_settings)
 
     raw_mode = mode
     mode = _normalize_content_recsys_mode(mode)

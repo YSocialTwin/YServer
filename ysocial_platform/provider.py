@@ -129,6 +129,7 @@ class MicrobloggingStandard(PlatformProvider):
         activity_profiles=True,
     )
     profile_template = "@ysocial_server/microblogging/profile.html"
+    edit_profile_template = "@ysocial_server/microblogging/edit_profile.html"
     has_interview = True
 
     def attach_routes(self) -> None:
