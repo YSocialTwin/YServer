@@ -18,7 +18,6 @@ from flask import (
 )
 from flask_login import current_user, login_required
 from sqlalchemy import select
-
 from y_web.sdk import gettext as _
 from y_web.sdk import routes
 from y_web.sdk.commons.display_time import (
@@ -31,13 +30,16 @@ from y_web.sdk.models import (
     Agent,
     Emotions,
     Exps,
+    Follow,
     Hashtags,
     Images,
     Interests,
+    Mentions,
     Page,
     Post,
     Reactions,
     Rounds,
+    User_interest,
     User_mgmt,
     db,
 )
@@ -137,6 +139,22 @@ def _build_friends_view_model(user_id, page, active_tab):
         "active_tab": active_tab,
     }
 
+
+
+# Feed tabs next to "Home" (the URL segment ``timeline`` carries the tab): each one forces a chronological recommender.
+_FEED_TABS = {
+    "recent": ("feed_tab_recent", "ReverseChrono"),
+    "friends": ("feed_tab_friends", "ReverseChronoFollowers"),
+    "popular": ("feed_tab_popular", "ReverseChronoPopularity"),
+}
+
+
+def _tab_recsys(timeline, default_recsys, ui):
+    """The recommender of the feed tab in ``timeline`` (when it is enabled), otherwise the user's own."""
+    tab = _FEED_TABS.get(str(timeline or "").lower())
+    if tab is None or not ui.get(tab[0], True):
+        return default_recsys
+    return tab[1]
 
 
 def _rank_last_requested(exp_id, user) -> bool:
@@ -242,7 +260,7 @@ def feed(exp_id, user_id="all", timeline="timeline", mode="rf", page=1):
                         "error",
                     )
                     return redirect(f"/admin/experiments")
-            recsys = user.recsys_type
+            recsys = _tab_recsys(timeline, user.recsys_type, ui)
             print(
                 f"[MICROBLOG DEBUG] feed(): url user_id={user_id!r} -> resolved user.id={user.id!r} username={user.username!r} recsys_type={recsys!r}"
             )
@@ -325,7 +343,7 @@ def feed(exp_id, user_id="all", timeline="timeline", mode="rf", page=1):
 
         # not enough posts to display
         if len(res) == 0 and page > 1:
-            return redirect(f"/feed/{user_id}/{timeline}/{mode}/{page - 1}")
+            return redirect(f"/{exp_id}/feed/{user_id}/{timeline}/{mode}/{page - 1}")
 
         trending_ht = get_trending_hashtags()
         mentions = get_unanswered_mentions(current_user.username)
@@ -402,7 +420,9 @@ def feed(exp_id, user_id="all", timeline="timeline", mode="rf", page=1):
             ui=ui,
             rank_last_active=_rank_last_requested(exp_id, logged_user),
             recsys_info=_content_recsys_info(
-                getattr(logged_user, "recsys_type", None), ui, recsys=RECSYS
+                _tab_recsys(timeline, getattr(logged_user, "recsys_type", None), ui),
+                ui,
+                recsys=RECSYS,
             ),
             frontend_adds_on_modules=active_modules_context(exp_id),
         )
@@ -1172,6 +1192,7 @@ def api_feed(exp_id, user_id="all", timeline="timeline", mode="rf", page=1):
         username = ""
         render_user_id = current_user.id
         posts, additional = None, None
+        recsys_payload = None
 
         if user_id == "all":
             posts, additional = get_suggested_posts("all", "", page, max_post_per_page)
@@ -1184,7 +1205,8 @@ def api_feed(exp_id, user_id="all", timeline="timeline", mode="rf", page=1):
             if not user:
                 return jsonify({"html": "", "has_more": False}), 404
             render_user_id = user.id
-            recsys = user.recsys_type
+            recsys = _tab_recsys(timeline, user.recsys_type, ui)
+            recsys_payload = _content_recsys_info(recsys, ui, recsys=RECSYS)
 
             # Resolve experiment engine and FilterBubble settings when needed
             _exp_engine = None
@@ -1261,7 +1283,7 @@ def api_feed(exp_id, user_id="all", timeline="timeline", mode="rf", page=1):
             len=len,
             ui=_load_ui_settings(exp_id),
         )
-        return jsonify({"html": html, "has_more": has_more})
+        return jsonify({"html": html, "has_more": has_more, "recsys": recsys_payload})
 
 
 @main.get("/<int:exp_id>/api/hashtag_posts/<hashtag_id>/<int:page>")
@@ -1402,3 +1424,200 @@ def api_profile_posts(exp_id, user_id, page=1, mode="recent"):
             ui=_load_ui_settings(exp_id),
         )
     return jsonify({"html": html, "has_more": len(rp) > 0})
+
+
+# ---------------------------------------------------------------------------
+# Bluesky-style pages: Chat, Notifications, Explore (frontend_v2)
+# ---------------------------------------------------------------------------
+
+
+def _bsky_page_context(exp_id):
+    """Context shared by the shell-based pages (nav, header hooks, current user)."""
+    cu = db.session.scalars(
+        select(User_mgmt).filter_by(username=current_user.username)
+    ).first()
+    profile_pic = (
+        get_safe_profile_pic(cu.username, getattr(cu, "is_page", 0) or 0) if cu else ""
+    )
+    logged_id = cu.id if cu else current_user.id
+    ctx = dict(
+        exp_id=exp_id,
+        user_id=logged_id,
+        logged_id=logged_id,
+        profile_pic=profile_pic,
+        username=cu.username if cu else current_user.username,
+        logged_username=cu.username if cu else current_user.username,
+        mentions=get_unanswered_mentions(current_user.id),
+        is_admin=is_admin(current_user.username),
+        ui=_load_ui_settings(exp_id),
+        enumerate=enumerate,
+        len=len,
+        str=str,
+        bool=bool,
+    )
+    return ctx, cu
+
+
+def _user_card(uid, cache):
+    """Return {id, name, pic} for a user id (memoised)."""
+    if uid in cache:
+        return cache[uid]
+    u = db.session.scalars(select(User_mgmt).filter_by(id=uid)).first()
+    if u is None:
+        card = {"id": uid, "name": _("Deleted account"), "pic": ""}
+    else:
+        card = {
+            "id": u.id,
+            "name": u.username,
+            "pic": get_safe_profile_pic(u.username, getattr(u, "is_page", 0) or 0),
+        }
+    cache[uid] = card
+    return card
+
+
+@main.get("/<int:exp_id>/chat")
+@login_required
+def chat_page(exp_id):
+    """Dedicated Chats page (agents the user follows); reuses the chat panel markup/JS."""
+    ctx, _cu = _bsky_page_context(exp_id)
+    return render_template("@ysocial_server/microblogging/chat.html", **ctx)
+
+
+@main.get("/<int:exp_id>/notifications")
+@login_required
+def notifications_page(exp_id):
+    """Notifications: follows, likes, reposts, replies and mentions received by the user."""
+    ctx, cu = _bsky_page_context(exp_id)
+    if cu is None:
+        return render_template(
+            "@ysocial_server/microblogging/notifications.html", items=[], **ctx
+        )
+    me = cu.id
+    cache = {}
+    rounds = {}
+
+    def _when(round_id):
+        if round_id not in rounds:
+            r = db.session.scalars(select(Rounds).filter_by(id=round_id)).first()
+            rounds[round_id] = (r.day, r.hour) if r else (None, None)
+        day, hour = rounds[round_id]
+        if day is None:
+            return ""
+        return _format_display_time(str(day), str(hour))
+
+    # Follow semantics in YSocial: Follow(user_id=A, follower_id=B) means "A follows B"
+    # (user_id is the source, follower_id the target). The latest event per pair wins.
+    latest = {}
+    for ev in db.session.scalars(
+        select(Follow)
+        .filter((Follow.user_id == me) | (Follow.follower_id == me))
+        .order_by(Follow.id.asc())
+    ).all():
+        latest[(ev.user_id, ev.follower_id)] = ev
+    following = {
+        tgt for (src, tgt), ev in latest.items() if src == me and ev.action == "follow"
+    }
+    followers_events = [
+        ev
+        for (src, tgt), ev in latest.items()
+        if tgt == me and src != me and ev.action == "follow"
+    ]
+    my_posts = {
+        p.id: p
+        for p in db.session.scalars(select(Post).filter_by(user_id=me)).all()
+    }
+    items = []
+
+    for f in sorted(followers_events, key=lambda e: e.id, reverse=True)[:60]:
+        who = _user_card(f.user_id, cache)
+        items.append(
+            {
+                "kind": "follow",
+                "key": f.round * 10,
+                "who": who,
+                "text": _("followed you"),
+                "when": _when(f.round),
+                "following": f.user_id in following,
+                "snippet": "",
+            }
+        )
+
+    if my_posts:
+        ids = list(my_posts.keys())
+        for r in db.session.scalars(
+            select(Reactions)
+            .filter(Reactions.post_id.in_(ids), Reactions.user_id != me)
+            .order_by(Reactions.id.desc())
+            .limit(100)
+        ).all():
+            if r.type not in ("like", "dislike"):
+                continue
+            items.append(
+                {
+                    "kind": r.type,
+                    "key": r.round * 10 + 1,
+                    "who": _user_card(r.user_id, cache),
+                    "text": _("liked your post") if r.type == "like" else _("disliked your post"),
+                    "when": _when(r.round),
+                    "following": r.user_id in following,
+                    "snippet": my_posts[r.post_id].tweet[:220],
+                    "post_id": r.post_id,
+                }
+            )
+        for c in db.session.scalars(
+            select(Post)
+            .filter(
+                Post.user_id != me,
+                (Post.comment_to.in_(ids)) | (Post.shared_from.in_(ids)),
+            )
+            .order_by(Post.id.desc())
+            .limit(100)
+        ).all():
+            is_reply = c.comment_to in my_posts
+            target = my_posts.get(c.comment_to if is_reply else c.shared_from)
+            items.append(
+                {
+                    "kind": "reply" if is_reply else "share",
+                    "key": c.round * 10 + 2,
+                    "who": _user_card(c.user_id, cache),
+                    "text": _("replied to your post") if is_reply else _("reposted your post"),
+                    "when": _when(c.round),
+                    "following": c.user_id in following,
+                    "snippet": (c.tweet if is_reply else (target.tweet if target else ""))[:220],
+                    "post_id": c.id if is_reply else (target.id if target else None),
+                }
+            )
+
+    items.sort(key=lambda i: i["key"], reverse=True)
+    return render_template(
+        "@ysocial_server/microblogging/notifications.html",
+        items=items[:150],
+        trending_ht=get_trending_hashtags(),
+        **ctx,
+    )
+
+
+@main.get("/<int:exp_id>/explore")
+@login_required
+def explore_page(exp_id):
+    """Explore: search, the user's interests, trending topics and hashtags."""
+    ctx, cu = _bsky_page_context(exp_id)
+    interests = []
+    if cu is not None:
+        seen = set()
+        for ui_row in db.session.scalars(
+            select(User_interest).filter_by(user_id=cu.id).order_by(User_interest.id.desc())
+        ).all():
+            if ui_row.interest_id in seen:
+                continue
+            seen.add(ui_row.interest_id)
+            it = db.session.scalars(select(Interests).filter_by(iid=ui_row.interest_id)).first()
+            if it is not None:
+                interests.append({"id": it.iid, "name": it.interest})
+    return render_template(
+        "@ysocial_server/microblogging/explore.html",
+        interests=interests,
+        trending_ht=get_trending_hashtags(limit=10),
+        trending_tp=get_trending_topics(limit=10),
+        **ctx,
+    )

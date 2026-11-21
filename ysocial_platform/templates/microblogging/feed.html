@@ -1,4 +1,4 @@
-{% include "@ysocial_server/microblogging/header.html" %}
+{% include "@ysocial_server/microblogging/components/bsky_shell.html" %}
 
 <div class="view-wrapper">
     <!-- Container -->
@@ -283,343 +283,38 @@
 
                 <!-- Middle column -->
  <div class="column is-6 ys-px-half">
-                    <!-- Publishing Area -->
-                    <!-- /partials/pages/feed/compose-card.html -->
-                    {% if ui.interaction_post %}
- <div id="compose-card" class="card is-new-content ys-card-mb">
-                        <!-- Top tabs -->
-                        <div class="tabs-wrapper">
-                            <div class="tabs is-boxed is-fullwidth">
-                                <ul>
-                                    <li class="is-active">
-                                        <a>
-                                            <span class="icon is-small"><i data-feather="edit-3"></i></span>
-                                            <span>{{ _('Publish') }}</span>
-                                        </a>
-                                    </li>
-                                    <!-- <li>
-                                       <a class="modal-trigger" data-modal="albums-help-modal">
-                                         <span class="icon is-small"><i data-feather="image"></i></span>
-                                         <span>Albums</span>
-                                       </a>
-                                     </li>
-                                     <li>
-                                       <a class="modal-trigger" data-modal="videos-help-modal">
-                                         <span class="icon is-small"><i data-feather="video"></i></span>
-                                         <span>Video</span>
-                                       </a>
-                                     </li> -->
-                                    <!-- Close X button -->
-                                    <li class="close-wrap">
-                  <span class="close-publish">
-                    <i data-feather="x"></i>
-                  </span>
-                                    </li>
-                                </ul>
-                            </div>
-
-                            <!-- Tab content -->
-                            <div class="tab-content">
-                                <!-- Compose form -->
-                                <div class="compose">
-                                    <div class="compose-form">
-                                        <img
-                                                src="https://via.placeholder.com/300x300"
-                                                {% if profile_pic =="" %}
-                                        data-demo-src="{{ url_for('static', filename='assets/img/users/'+ logged_id|user_image_id +'.png') }}"
-                                    {% else %}
-                                        data-demo-src="{{ profile_pic }}"
-                                    {% endif %}
-                                                alt=""
-                                        />
-                                        <div class="control">
-                    <textarea
-                            id="publish" data-ws-source
-                            class="textarea"
-                            rows="3"
-                            placeholder="{{ _('Write something about you...') }}"
-                    ></textarea>
-                                        </div>
-                                    </div>
-
-                                    <div id="feed-upload" class="feed-upload"></div>
-
-                                    <div id="options-summary" class="options-summary"></div>
-
-                                    <div id="tag-suboption" class="is-autocomplete is-suboption is-hidden">
-                                        <!-- Tag friends suboption -->
-                                        <div id="tag-list" class="tag-list"></div>
-                                        <div class="control">
-                                            <input
-                                                    id="users-autocpl"
-                                                    type="text"
-                                                    class="input"
-                                                    placeholder="{{ _('Who are you with?') }}"
-                                            />
-                                            <div class="icon">
-                                                <i data-feather="search"></i>
-                                            </div>
-                                            <div class="close-icon is-main">
-                                                <i data-feather="x"></i>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <!-- /Tag friends suboption -->
-
-                                    <!-- Activities suboption -->
-                                    <div
-                                            id="activities-suboption"
-                                            class="is-autocomplete is-suboption is-hidden"
-                                    >
-                                        <div id="activities-autocpl-wrapper" class="control has-margin">
-                    <textarea
-                            id="activities"
-                            rows="1"
-                            class="textarea"
-                            placeholder="{{ _('Enter the link to the website you want to share...') }}"
-                    ></textarea>
-                                            <!-- <div class="icon">
-                                               <i data-feather="search"></i>
-                                             </div> -->
-                                            <div class="close-icon is-main">
-                                                <i data-feather="x"></i>
-                                            </div>
-                                        </div>
-
-                                        <!-- Mood suboption -->
-                                        <div
-                                                id="mood-autocpl-wrapper"
-                                                class="is-autocomplete is-activity is-hidden"
-                                        >
-                                            <div class="control has-margin">
-                                                <input
-                                                        id="mood-autocpl"
-                                                        type="text"
-                                                        class="input is-subactivity"
-                                                        placeholder="{{ _('How do you feel?') }}"
-                                                />
-                                                <div class="input-block">{{ _('Feels') }}</div>
-                                                <div class="close-icon is-subactivity">
-                                                    <i data-feather="x"></i>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Drinking suboption child -->
-                                        <div
-                                                id="drinking-autocpl-wrapper"
-                                                class="is-autocomplete is-activity is-hidden"
-                                        >
-                                            <div class="control has-margin">
-                                                <input
-                                                        id="drinking-autocpl"
-                                                        type="text"
-                                                        class="input is-subactivity"
-                                                        placeholder="{{ _('What are you drinking?') }}"
-                                                />
-                                                <div class="input-block">{{ _('Drinks') }}</div>
-                                                <div class="close-icon is-subactivity">
-                                                    <i data-feather="x"></i>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Eating suboption child -->
-                                        <div
-                                                id="eating-autocpl-wrapper"
-                                                class="is-autocomplete is-activity is-hidden"
-                                        >
-                                            <div class="control has-margin">
-                                                <input
-                                                        id="eating-autocpl"
-                                                        type="text"
-                                                        class="input is-subactivity"
-                                                        placeholder="{{ _('What are you eating?') }}"
-                                                />
-                                                <div class="input-block">{{ _('Eats') }}</div>
-                                                <div class="close-icon is-subactivity">
-                                                    <i data-feather="x"></i>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Reading suboption child -->
-                                        <div
-                                                id="reading-autocpl-wrapper"
-                                                class="is-autocomplete is-activity is-hidden"
-                                        >
-                                            <div class="control has-margin">
-                                                <input
-                                                        id="reading-autocpl"
-                                                        type="text"
-                                                        class="input is-subactivity"
-                                                        placeholder="{{ _('What are you reading?') }}"
-                                                />
-                                                <div class="input-block">{{ _('Reads') }}</div>
-                                                <div class="close-icon is-subactivity">
-                                                    <i data-feather="x"></i>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Watching suboption child -->
-                                        <div
-                                                id="watching-autocpl-wrapper"
-                                                class="is-autocomplete is-activity is-hidden"
-                                        >
-                                            <div class="control has-margin">
-                                                <input
-                                                        id="watching-autocpl"
-                                                        type="text"
-                                                        class="input is-subactivity"
-                                                        placeholder="{{ _('What are you watching?') }}"
-                                                />
-                                                <div class="input-block">{{ _('Watches') }}</div>
-                                                <div class="close-icon is-subactivity">
-                                                    <i data-feather="x"></i>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Travel suboption child -->
-                                        <div
-                                                id="travel-autocpl-wrapper"
-                                                class="is-autocomplete is-activity is-hidden"
-                                        >
-                                            <div class="control has-margin">
-                                                <input
-                                                        id="travel-autocpl"
-                                                        type="text"
-                                                        class="input is-subactivity"
-                                                        placeholder="{{ _('Where are you going?') }}"
-                                                />
-                                                <div class="input-block">{{ _('Travels') }}</div>
-                                                <div class="close-icon is-subactivity">
-                                                    <i data-feather="x"></i>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <!-- /Activities suboption -->
-
-                                    <!-- Location suboption -->
-                                    <!--
-                                    <div
-                                      id="location-suboption"
-                                      class="is-autocomplete is-suboption is-hidden"
-                                    >
-
-                                      <div
-                                        id="location-autocpl-wrapper"
-                                        class="control is-location-wrapper has-margin"
-                                      >
-                                        <input
-                                          id="location-autocpl"
-                                          type="text"
-                                          class="input"
-                                          placeholder="Where are you now?"
-                                        />
-                                        <div class="icon">
-                                          <i data-feather="map-pin"></i>
-                                        </div>
-                                        <div class="close-icon is-main">
-                                          <i data-feather="x"></i>
-                                        </div>
-                                      </div>
-
-                                    </div>
-                                    -->
-
-                                    <!-- Link suboption -->
-                                    <div id="link-suboption" class="is-autocomplete is-suboption is-hidden">
-                                        <div
-                                                id="link-autocpl-wrapper"
-                                                class="control is-location-wrapper has-margin">
-                    <textarea
-                            id="link_post" data-ws-link
-                            rows="1"
-                            class="textarea"
-                            placeholder="{{ _('Enter the link to the immage you are commenting on...') }}"
-                    ></textarea>
-                                            <!--<div class="icon">
-                                              <i data-feather="link-2"></i>
-                                            </div> -->
-                                            <div class="close-icon is-main">
-                                                <i data-feather="x"></i>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- /Compose form -->
-
-
-                                <!-- General extended options -->
-                                <div id="extended-options" class="compose-options is-hidden">
-                                    <div class="columns is-multiline is-full">
-
-                                        <!--
-                                        <div class="column is-6 is-narrower">
-                                            <div
-                                                    id="extended-show-activities"
-                                                    class="compose-option is-centered"
-                                            >
-                                                <img src="{{ url_for('static', filename='assets/img/icons/emoji/emoji-1.svg') }}"
-                                                     alt=""/>
-                                                <span>Share Link</span>
-                                            </div>
-                                        </div>
-                                        -->
-
-                                        <!-- Share link action -->
-                                        <div class="column is-6 is-narrower">
-                                            <div id="open-link-suboption" class="compose-option is-centered">
-                                                <i data-feather="link-2"></i>
-                                                <span>{{ _('Share Image') }}</span>
-                                            </div>
-                                        </div>
-
-                                    </div>
-                                </div>
-                                <!-- /General extended options -->
-
-                                <!-- General basic options -->
-                                <div id="basic-options" class="compose-options">
-                                    <!-- Upload action -->
-
-                                    <!-- Mood
-                                    <div id="show-activities" class="compose-option">
-                                        <img src="{{ url_for('static', filename='assets/img/icons/emoji/emoji-1.svg') }}"
-                                             alt=""/>
-                                        <span>Activity</span>
-                                    </div> -->
-                                    <!-- Expand action -->
-                                    <div id="open-extended-options" class="compose-option">
-                                        <i data-feather="more-horizontal"></i>
-                                    </div>
-                                </div>
-                                <!-- /General basic options -->
-
-                                <!-- Hidden Options -->
-
-                                {% set ws_exp = exp_id %}{% include 'shared/world_simulation_crosspost.html' %}
-                                <!-- Footer buttons -->
-                                <div class="more-wrap">
-                                    <!-- View more button -->
-
-                                    <!-- Publish button -->
-                                    <button
-                                            id="publish-button"
-                                            type="button"
-                                            class="button is-solid accent-button is-fullwidth is-disabled"
-                                    >
-                                        {{ _('Publish') }}
-                                    </button>
-                                </div>
-                            </div>
+                    <div class="bsky-feedhead">
+                        <a class="bsky-feedhead__logo" href="/{{exp_id}}/feed/{{user_id}}/feed/{{mode}}/1" title="{{ _('Y Social') }}">
+                            <img class="light-image" src="{{ url_for('static', filename='assets/img/vector/logo/Ysocial.png') }}" alt="{{ _('Y Social') }}"/>
+                            <img class="dark-image" src="{{ url_for('static', filename='assets/img/vector/logo/Ysocial_white.png') }}" alt="{{ _('Y Social') }}"/>
+                        </a>
+                        {% set _tabs_on = {'recent': ui.get('feed_tab_recent', True), 'friends': ui.get('feed_tab_friends', True), 'popular': ui.get('feed_tab_popular', True)} %}
+                        {% set _active_tab = timeline if (timeline in _tabs_on and _tabs_on[timeline]) else 'feed' %}
+                        <div class="bsky-tabs" role="tablist">
+                            <a class="bsky-tab {% if _active_tab == 'feed' %}is-active{% endif %}" data-tab="feed" role="tab" aria-selected="{{ 'true' if _active_tab == 'feed' else 'false' }}" href="/{{exp_id}}/feed/{{user_id}}/feed/{{mode}}/1"><span>{{ _('Home') }}</span></a>
+                            {% if _tabs_on['recent'] %}<a class="bsky-tab {% if _active_tab == 'recent' %}is-active{% endif %}" data-tab="recent" role="tab" aria-selected="{{ 'true' if _active_tab == 'recent' else 'false' }}" href="/{{exp_id}}/feed/{{user_id}}/recent/{{mode}}/1"><span>{{ _('Recent') }}</span></a>{% endif %}
+                            {% if _tabs_on['friends'] %}<a class="bsky-tab {% if _active_tab == 'friends' %}is-active{% endif %}" data-tab="friends" role="tab" aria-selected="{{ 'true' if _active_tab == 'friends' else 'false' }}" href="/{{exp_id}}/feed/{{user_id}}/friends/{{mode}}/1"><span>{{ _('Friends') }}</span></a>{% endif %}
+                            {% if _tabs_on['popular'] %}<a class="bsky-tab {% if _active_tab == 'popular' %}is-active{% endif %}" data-tab="popular" role="tab" aria-selected="{{ 'true' if _active_tab == 'popular' else 'false' }}" href="/{{exp_id}}/feed/{{user_id}}/popular/{{mode}}/1"><span>{{ _('Popular') }}</span></a>{% endif %}
                         </div>
                     </div>
-
+                    {% if ui is not defined or ui.interaction_post %}
+                    {% set _wu_uid = logged_id if logged_id is defined else user_id %}
+                    {% set _wu_pic = header_logged_profile_pic if header_logged_profile_pic is defined else (profile_pic if profile_pic is defined else '') %}
+                    <div class="bsky-whatsup" id="bsky-whatsup" role="button" tabindex="0" aria-label="{{ _('New post') }}">
+                        <img {% if _wu_pic == '' %}src="{{ url_for('static', filename='assets/img/users/' + _wu_uid|string|user_image_id + '.png') }}"{% else %}src="{{ _wu_pic }}"{% endif %} alt=""/>
+                        <span class="bsky-whatsup__text">{{ _("What's up?") }}</span>
+                        <i data-feather="image"></i>
+                    </div>
+                    <script>
+                    (function () {
+                      var w = document.getElementById('bsky-whatsup');
+                      function go() { var b = document.getElementById('bsky-newpost'); if (b) b.click(); }
+                      if (w) { w.addEventListener('click', go); w.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }); }
+                    })();
+                    </script>
                     {% endif %}
+                    <!-- Publishing Area -->
+                    <!-- /partials/pages/feed/compose-card.html -->
                     <!-- Post 1 -->
                     <!-- /partials/pages/feed/posts/feed-post1.html -->
                     {% if rank_last_active %}

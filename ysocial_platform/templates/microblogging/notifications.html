@@ -1,0 +1,107 @@
+{% include "@ysocial_server/microblogging/components/bsky_shell.html" %}
+
+<div class="view-wrapper">
+    <div class="container is-fluid">
+        <div class="bsky-twocol">
+            <section class="bsky-main" id="bsky-notifications">
+                <div class="bsky-pagehead bsky-pagehead--title"><strong>{{ _('Notifications') }}</strong></div>
+                <div class="bsky-chips" id="bsky-notif-filters" role="tablist">
+                    <button type="button" class="bsky-chip is-active" data-filter="all">{{ _('All') }}</button>
+                    <button type="button" class="bsky-chip" data-filter="following">{{ _('People I follow') }}</button>
+                    <button type="button" class="bsky-chip" data-filter="reply">{{ _('Replies') }}</button>
+                    <button type="button" class="bsky-chip" data-filter="follow">{{ _('Follows') }}</button>
+                    <button type="button" class="bsky-chip" data-filter="mention">{{ _('Post alerts') }}{% if mentions|length > 0 %} <b class="bsky-chip__count">{{ mentions|length }}</b>{% endif %}</button>
+                </div>
+
+                <div id="bsky-notif-list">
+                {% for n in items %}
+                    <article class="bsky-notif" data-kind="{{ n.kind }}" data-following="{{ 1 if n.following else 0 }}">
+                        <div class="bsky-notif__icon bsky-notif__icon--{{ n.kind }}">
+                            {% if n.kind == 'like' %}<i data-feather="heart"></i>
+                            {% elif n.kind == 'dislike' %}<i data-feather="thumbs-down"></i>
+                            {% elif n.kind == 'share' %}<i data-feather="repeat"></i>
+                            {% elif n.kind == 'reply' %}<i data-feather="message-circle"></i>
+                            {% else %}<i data-feather="user-plus"></i>{% endif %}
+                        </div>
+                        <div class="bsky-notif__body">
+                            <a class="bsky-notif__avatar" href="/{{ exp_id }}/profile/{{ n.who.id }}/recent/1">
+                                {% if n.who.pic %}<img src="{{ n.who.pic }}" alt=""/>{% else %}<span>{{ n.who.name[:1]|upper }}</span>{% endif %}
+                            </a>
+                            <div class="bsky-notif__line">
+                                <a class="bsky-notif__who" href="/{{ exp_id }}/profile/{{ n.who.id }}/recent/1">{{ n.who.name }}</a>
+                                {{ n.text }}
+                            </div>
+                            {% if n.snippet %}
+                            <a class="bsky-notif__snippet" href="{% if n.post_id %}/{{ exp_id }}/thread/{{ n.post_id }}{% else %}#{% endif %}">{{ n.snippet }}</a>
+                            {% endif %}
+                            <div class="bsky-notif__time">{{ n.when }}</div>
+                        </div>
+                        {% if n.kind == 'follow' %}
+                            {% if n.following %}
+                            <span class="bsky-pill bsky-pill--muted">{{ _('Following') }}</span>
+                            {% else %}
+                            <a class="bsky-pill" href="/{{ exp_id }}/follow/{{ n.who.id }}/{{ logged_id }}">{{ _('Follow back') }}</a>
+                            {% endif %}
+                        {% endif %}
+                    </article>
+                {% endfor %}
+                </div>
+                <div id="bsky-mentions-pane" class="bsky-mentions-pane" hidden>
+                    <p class="bsky-empty" id="bsky-mentions-empty">{{ _('No notifications yet.') }}</p>
+                </div>
+                <p class="bsky-empty" id="bsky-notif-empty" hidden>{{ _('No notifications yet.') }}</p>
+            </section>
+
+            <aside class="bsky-aside">
+                {% if trending_ht %}
+                <div class="bsky-box">
+                    <div class="bsky-box__head"><i data-feather="trending-up"></i><strong>{{ _('Trending') }}</strong></div>
+                    <ol class="bsky-box__list">
+                        {% for h in trending_ht %}
+                        <li><a href="/{{ exp_id }}/hashtag_posts/{{ h['id'] }}/1">#{{ h['hashtag'] }}</a> <small>{{ h['count'] }} {{ _('posts') }}</small></li>
+                        {% endfor %}
+                    </ol>
+                </div>
+                {% endif %}
+            </aside>
+        </div>
+    </div>
+</div>
+
+{% if experiment_memory_enabled %}
+{% include "shared/chat_panel.html" %}
+{% endif %}
+{% include "@ysocial_server/microblogging/components/bsky_scripts.html" %}
+<script>
+(function () {
+  var chips = document.querySelectorAll('#bsky-notif-filters .bsky-chip');
+  var rows = document.querySelectorAll('#bsky-notif-list .bsky-notif');
+  var pane = document.getElementById('bsky-mentions-pane');
+  var list = document.getElementById('bsky-notif-list');
+  var empty = document.getElementById('bsky-notif-empty');
+  // post alerts = the core unanswered-mentions list (kept as is, so "dismiss" keeps working)
+  // pick the dropdown that really holds the mentions (the one with the dismiss buttons), never the account menu
+  var cancelBtn = document.querySelector('#main-navbar .cancel-notification');
+  var src = cancelBtn ? cancelBtn.closest('.nav-drop-body') : null;
+  if (src && pane) { var e = document.getElementById('bsky-mentions-empty'); if (e) e.remove(); pane.appendChild(src); }
+  function apply(f) {
+    var shown = 0;
+    if (f === 'mention') { list.hidden = true; pane.hidden = false; empty.hidden = true; return; }
+    list.hidden = false; pane.hidden = true;
+    rows.forEach(function (r) {
+      var ok = f === 'all' || (f === 'following' && r.dataset.following === '1') || r.dataset.kind === f;
+      r.hidden = !ok; if (ok) shown++;
+    });
+    empty.hidden = shown > 0;
+  }
+  chips.forEach(function (c) {
+    c.addEventListener('click', function () {
+      chips.forEach(function (x) { x.classList.remove('is-active'); });
+      c.classList.add('is-active'); apply(c.dataset.filter);
+    });
+  });
+  apply('all');
+})();
+</script>
+</body>
+</html>

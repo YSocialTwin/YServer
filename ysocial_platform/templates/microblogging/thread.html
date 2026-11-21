@@ -1,4 +1,4 @@
-{% include "@ysocial_server/microblogging/header.html" %}
+{% include "@ysocial_server/microblogging/components/bsky_shell.html" %}
 
 <div class="view-wrapper">
     <!-- Container -->
@@ -286,11 +286,10 @@
 
                 <!-- Middle column -->
  <div class="column is-8 ys-px-half">
-                    {% set hero_eyebrow = _('Thread Focus') %}
-                    {% set hero_prefix = _('Following the') %}
-                    {% set hero_focus = _('full discussion thread') %}
-                    {% set hero_suffix = _('in context.') %}
-                    {% include "@ysocial_server/microblogging/components/context_hero_card.html" %}
+                    <div class="bsky-pagehead">
+                        <a href="javascript:history.back()" aria-label="{{ _('Back') }}"><i data-feather="arrow-left"></i></a>
+                        <strong>{{ _('Post') }}</strong>
+                    </div>
 
                     <div class="profile-timeline">
 

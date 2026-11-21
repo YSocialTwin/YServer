@@ -1,0 +1,85 @@
+{% include "@ysocial_server/microblogging/components/bsky_shell.html" %}
+<script>document.body.classList.add('bsky-explore');</script>
+
+<div class="view-wrapper">
+    <div class="container is-fluid">
+        <div class="bsky-twocol">
+            <section class="bsky-main" id="bsky-explore">
+                <div class="bsky-explore-search">
+                    <form id="bsky-explore-form" autocomplete="off" action="/{{ exp_id }}/explore" method="get">
+                        <i data-feather="search"></i>
+                        <input type="search" id="bsky-explore-input" placeholder="{{ _('Search profiles, hashtags, topics') }}" aria-label="{{ _('Search') }}"/>
+                    </form>
+                    <div class="bsky-explore-results" id="bsky-explore-results" hidden></div>
+                </div>
+
+                <div id="bsky-explore-body">
+                    <div class="bsky-explore-card" id="bsky-interests-card">
+                        <div class="bsky-explore-card__head">
+                            <i data-feather="sliders"></i><strong>{{ _('Your interests') }}</strong>
+                            <button type="button" class="bsky-icon-btn" id="bsky-interests-close" aria-label="{{ _('Close') }}"><i data-feather="x"></i></button>
+                        </div>
+                        {% if interests %}
+                        <div class="bsky-tags">
+                            {% for it in interests %}<a class="bsky-tag" href="/{{ exp_id }}/interest/{{ it.id }}/1">{{ it.name }}</a>{% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="bsky-explore-card__text">{{ _('Your interests help us find what you like!') }}</p>
+                        {% endif %}
+                        <a class="bsky-btn-primary" href="/{{ exp_id }}/edit_profile/{{ logged_id }}">{{ _('Edit interests') }}</a>
+                    </div>
+
+                    <div class="bsky-trend-head"><i data-feather="trending-up"></i><strong>{{ _('Trending') }}</strong></div>
+                    {% for t in trending_tp %}
+                    <a class="bsky-trend" href="/{{ exp_id }}/interest/{{ t['id'] }}/1">
+                        <span class="bsky-trend__rank">{{ loop.index }}.</span>
+                        <span class="bsky-trend__main"><strong>{{ t['topic'] }}</strong><small>{{ t['count'] }} {{ _('posts') }}</small></span>
+                    </a>
+                    {% endfor %}
+                    {% for h in trending_ht %}
+                    <a class="bsky-trend" href="/{{ exp_id }}/hashtag_posts/{{ h['id'] }}/1">
+                        <span class="bsky-trend__rank">{{ (trending_tp|length) + loop.index }}.</span>
+                        <span class="bsky-trend__main"><strong>#{{ h['hashtag'] }}</strong><small>{{ h['count'] }} {{ _('posts') }}</small></span>
+                    </a>
+                    {% endfor %}
+                    {% if not trending_tp and not trending_ht %}<p class="bsky-empty">{{ _('Nothing is trending yet.') }}</p>{% endif %}
+                </div>
+            </section>
+            <aside class="bsky-aside"></aside>
+        </div>
+    </div>
+</div>
+
+{% if experiment_memory_enabled %}
+{% include "shared/chat_panel.html" %}
+{% endif %}
+{% include "@ysocial_server/microblogging/components/bsky_scripts.html" %}
+<script>
+(function () {
+  var input = document.getElementById('bsky-explore-input');
+  var box = document.getElementById('bsky-explore-results');
+  var body = document.getElementById('bsky-explore-body');
+  var timer = null;
+  document.getElementById('bsky-interests-close').addEventListener('click', function () {
+    document.getElementById('bsky-interests-card').hidden = true;
+  });
+  function esc(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+  function run() {
+    var q = input.value.trim();
+    if (q.length < 2) { box.hidden = true; body.hidden = false; return; }
+    fetch('/{{ exp_id }}/api/header_search?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var res = d.results || [];
+        box.innerHTML = res.length ? res.map(function (x) {
+          return '<a class="bsky-trend" href="' + esc(x.url) + '"><span class="bsky-trend__main"><strong>' + esc(x.title) + '</strong><small>' + esc(x.subtitle) + '</small></span></a>';
+        }).join('') : '<p class="bsky-empty">{{ _("No results found.") }}</p>';
+        box.hidden = false; body.hidden = true;
+      }).catch(function () {});
+  }
+  input.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(run, 200); });
+  document.getElementById('bsky-explore-form').addEventListener('submit', function (e) { e.preventDefault(); run(); });
+})();
+</script>
+</body>
+</html>

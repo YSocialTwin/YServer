@@ -1,4 +1,4 @@
-{% include "@ysocial_server/microblogging/header.html" %}
+{% include "@ysocial_server/microblogging/components/bsky_shell.html" %}
 
 <div class="view-wrapper">
     <!-- Container -->
@@ -31,6 +31,7 @@
                             />
                         </div>
                         <div class="cover-overlay"></div>
+                        <a class="bsky-cover-back" href="javascript:history.back()" title="{{ _('Back') }}"><i data-feather="arrow-left"></i></a>
                         <!--
                       <div class="cover-edit modal-trigger" data-modal="change-cover-modal">
                         <i class="mdi mdi-camera"></i>
@@ -105,6 +106,13 @@
                                     {% endif %}
                                 </div>
                             </div>
+
+                            <div class="subheader-posts">
+                                <div class="ys-profile-hero-stat ys-profile-hero-stat--posts">
+                                    <span class="ys-profile-hero-stat__value">{{ user['total_posts'] }}</span>
+                                    <span class="ys-profile-hero-stat__label">{{ _('Posts') }}</span>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="profile-menu is-hidden-mobile ys-profile-hero-actions-row">
@@ -113,6 +121,10 @@
                                    class="button has-min-width ys-profile-hero-action-btn">{{ _('Feeds') }}</a>
                             </div>
                             <div class="menu-end ys-profile-hero-actions-right">
+                                {% if logged_id == user_id %}
+                                <a href="/{{exp_id}}/edit_profile/{{ user_id }}"
+                                   class="button has-min-width ys-profile-hero-action-btn ys-profile-edit-btn">{{ _('Edit Profile') }}</a>
+                                {% endif %}
                                 {% if logged_id != user_id %}
                                 <form
                                         method="post"

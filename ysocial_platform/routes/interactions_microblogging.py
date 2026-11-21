@@ -1,12 +1,12 @@
 """
 Microblogging interaction routes.
 
-Contains the publish_post route for the Twitter-style (microblogging) platform.
+Contains the publish_post and publish_comment routes for the Twitter-style (microblogging) platform.
 """
 
 import uuid
 
-from flask import flash, redirect, request
+from flask import flash, redirect, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import func, select
 from y_web.sdk import gettext as _
@@ -36,6 +36,7 @@ from y_web.sdk.models import (
     db,
 )
 from y_web.sdk.runtime import prompt_packs
+from y_web.sdk.social import maybe_update_fb_interests as _maybe_update_fb_interests
 
 user = routes.blueprint("user")
 
@@ -312,5 +313,278 @@ def publish_post(exp_id):
             # update post
             post.tweet = text.lstrip().rstrip()
             db.session.commit()
+
+    return {"message": "Published successfully", "status": 200}
+
+
+@user.route("/<int:exp_id>/publish_comment")
+@login_required
+def publish_comment(exp_id):
+    """
+    Publish a comment on a post from form submission.
+
+    Returns:
+        Redirect to thread page after commenting
+    """
+    # Get experiment user (not admin user)
+    exp_user = db.session.scalars(
+        select(User_mgmt).filter_by(username=current_user.username)
+    ).first()
+    if not exp_user:
+        flash(_("User not found in experiment"), "error")
+        return (
+            redirect(request.referrer)
+            if request.referrer
+            else redirect(url_for("main.index"))
+        )
+    exp_user_id = exp_user.id
+
+    text = request.args.get("post")
+    pid = request.args.get("parent")
+
+    # Handle both int and UUID parent ID formats
+    try:
+        pid = int(pid)
+    except (ValueError, TypeError):
+        # Keep as string if it's a UUID
+        pass
+
+    # get the last round id from Rounds
+    current_round = db.session.scalars(
+        select(Rounds).order_by(Rounds.day.desc(), Rounds.hour.desc())
+    ).first()
+
+    # get the thread if of the post with id pid
+    parent_post = db.session.scalars(select(Post).filter_by(id=pid)).first()
+    if not parent_post:
+        flash(_("Parent post not found"), "error")
+        return (
+            redirect(request.referrer)
+            if request.referrer
+            else redirect(url_for("main.index"))
+        )
+    thread_id = parent_post.thread_id if parent_post.thread_id else parent_post.id
+
+    # If parent post has no thread_id, update it to use its own ID
+    # This ensures queries for thread_id = post.id will find all comments
+    if not parent_post.thread_id:
+        parent_post.thread_id = parent_post.id
+        db.session.commit()
+
+    try:
+        # add post to the db
+        post = Post(
+            tweet=text,
+            round=current_round.id,
+            user_id=exp_user_id,
+            comment_to=pid,
+            thread_id=thread_id,
+        )
+
+        db.session.add(post)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        uid = str(uuid.uuid4())
+        # add post to the db
+        post = Post(
+            id=uid,
+            tweet=text,
+            round=current_round.id,
+            user_id=exp_user_id,
+            comment_to=pid,
+            thread_id=thread_id,
+        )
+
+        db.session.add(post)
+        db.session.commit()
+
+    # get sentiment of the post is responding to
+    sentiment_root = db.session.scalars(
+        select(Post_Sentiment).filter_by(post_id=pid)
+    ).first()
+
+    if sentiment_root is not None:
+        values = {
+            "pos": sentiment_root.pos,
+            "neg": sentiment_root.neg,
+            "neu": sentiment_root.neu,
+        }
+        # get the key with the max value
+    else:
+        values = {"neu": 1}
+
+    sentiment_parent = max(values, key=values.get)
+    sentiment = vader_sentiment(text)
+
+    toxicity(text, current_user.username, post.id, db)
+
+    # check if the comment is to answer a mention
+    mention = db.session.scalars(
+        select(Mentions).filter_by(post_id=pid, user_id=exp_user_id)
+    ).first()
+    if mention:
+        mention.answered = 1
+        db.session.commit()
+
+    user = db.session.scalars(
+        select(Admin_users).filter_by(username=current_user.username)
+    ).first()
+    llm = user.llm if user.llm != "" else "llama3.1"
+    llm_url = user.llm_url if user.llm_url != "" else None
+    llm_api_key = user.llm_api_key or None
+
+    annotator = ContentAnnotator(
+        llm=llm,
+        llm_url=llm_url,
+        llm_api_key=llm_api_key,
+        language=prompt_packs.experiment_language(exp_id),
+    )
+    emotions = annotator.annotate_emotions(text)
+    hashtags = annotator.extract_components(text, c_type="hashtags")
+    mentions = annotator.extract_components(text, c_type="mentions")
+
+    topics_id = db.session.scalars(
+        select(Post_topics).filter_by(post_id=thread_id)
+    ).all()
+    topics_id = [t.topic_id for t in topics_id]
+
+    if len(topics_id) > 0:
+        for t in topics_id:
+            try:
+                ui = User_interest(
+                    user_id=exp_user_id, interest_id=t, round_id=current_round.id
+                )
+                db.session.add(ui)
+                ti = Post_topics(post_id=post.id, topic_id=t)
+                db.session.add(ti)
+                db.session.commit()
+
+                post_sentiment = Post_Sentiment(
+                    post_id=post.id,
+                    user_id=exp_user_id,
+                    topic_id=t,
+                    pos=sentiment["pos"],
+                    neg=sentiment["neg"],
+                    neu=sentiment["neu"],
+                    compound=sentiment["compound"],
+                    sentiment_parent=sentiment_parent,
+                    round=current_round.id,
+                )
+                db.session.add(post_sentiment)
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                ui = User_interest(
+                    id=str(uuid.uuid4()),
+                    user_id=exp_user_id,
+                    interest_id=t,
+                    round_id=current_round.id,
+                )
+                db.session.add(ui)
+                ti = Post_topics(id=str(uuid.uuid4()), post_id=post.id, topic_id=t)
+                db.session.add(ti)
+                db.session.commit()
+
+                post_sentiment = Post_Sentiment(
+                    id=str(uuid.uuid4()),
+                    post_id=post.id,
+                    user_id=exp_user_id,
+                    topic_id=t,
+                    pos=sentiment["pos"],
+                    neg=sentiment["neg"],
+                    neu=sentiment["neu"],
+                    compound=sentiment["compound"],
+                    sentiment_parent=sentiment_parent,
+                    round=current_round.id,
+                )
+                db.session.add(post_sentiment)
+                db.session.commit()
+
+    for emotion in emotions:
+        if len(emotion) < 1:
+            continue
+
+        em = db.session.scalars(select(Emotions).filter_by(emotion=emotion)).first()
+        if em is not None:
+            try:
+                post_emotion = Post_emotions(post_id=post.id, emotion_id=em.id)
+                db.session.add(post_emotion)
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                post_emotion = Post_emotions(
+                    id=str(uuid.uuid4()), post_id=post.id, emotion_id=em.id
+                )
+                db.session.add(post_emotion)
+                db.session.commit()
+
+    for tag in hashtags:
+        tag = normalize_hashtag(tag)
+        if len(tag) < 3:
+            continue
+
+        ht = db.session.scalars(
+            select(Hashtags).filter(func.lower(Hashtags.hashtag) == tag.lower())
+        ).first()
+        if ht is None:
+            try:
+                ht = Hashtags(hashtag=tag)
+                db.session.add(ht)
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                ht = Hashtags(id=str(uuid.uuid4()), hashtag=tag)
+                db.session.add(ht)
+                db.session.commit()
+            ht = db.session.scalars(
+                select(Hashtags).filter(func.lower(Hashtags.hashtag) == tag.lower())
+            ).first()
+
+        try:
+            post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
+            db.session.add(post_tag)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            post_tag = Post_hashtags(
+                id=str(uuid.uuid4()), post_id=post.id, hashtag_id=ht.id
+            )
+            db.session.add(post_tag)
+            db.session.commit()
+
+    for mention in mentions:
+        if len(mention) < 1:
+            continue
+
+        us = db.session.scalars(
+            select(User_mgmt).filter_by(username=mention.strip("@"))
+        ).first()
+
+        # existing user and not self
+        # @todo: check ghost mentions to the current user...
+        if us is not None and us.id != exp_user_id:
+            try:
+                mn = Mentions(user_id=us.id, post_id=post.id, round=current_round.id)
+                db.session.add(mn)
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                mn = Mentions(
+                    id=str(uuid.uuid4()),
+                    user_id=us.id,
+                    post_id=post.id,
+                    round=current_round.id,
+                )
+                db.session.add(mn)
+                db.session.commit()
+        else:
+            text = text.replace(mention, "")
+
+            # update post
+            post.tweet = text.lstrip().rstrip()
+            db.session.commit()
+
+    _maybe_update_fb_interests(exp_id, exp_user, pid, "comment")
 
     return {"message": "Published successfully", "status": 200}

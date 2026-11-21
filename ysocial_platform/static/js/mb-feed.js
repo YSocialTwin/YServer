@@ -262,6 +262,76 @@ var MB_FEED = (function() {
         }
     }
 
+
+    // "Your recommender system" box: show the algorithm of the tab that is now displayed.
+    function updateRecsysBox(info) {
+        var box = document.getElementById('ys-recsys-box');
+        if (!box || !info) { return; }
+        box.setAttribute('data-recsys', info.name || '');
+        var pill = box.querySelector('.ys-recsys-pill');
+        if (pill) { pill.textContent = info.label || info.name || ''; }
+        var how = box.querySelector('.ys-recsys-how p');
+        if (how) { how.textContent = info.description || ''; }
+    }
+
+    // Switch between the feed tabs (Home / Recent / Friends / Popular) without reloading the page.
+    var popBound = false;
+    function switchTab(tab, href) {
+        var cfg = window.YS_DATA_MB_FEED;
+        if (!cfg || cfg.infiniteScrollEnabled === false || !state.postsContainer) {
+            return false;
+        }
+        stopAutoRefresh();
+        var url = '/' + cfg.expId + '/api/feed/' + cfg.userId + '/' + tab + '/' + cfg.mode + '/1';
+        state.postsContainer.style.opacity = '.45';
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+            .then(function(response) {
+                if (!response.ok) { throw new Error('tab'); }
+                return response.json();
+            })
+            .then(function(payload) {
+                // new URL first: the annotation add-on reads the tab from the page URL (Referer) of its requests
+                if (window.history && window.history.pushState) {
+                    window.history.pushState({ tab: tab }, '', href);
+                    if (!popBound) {
+                        popBound = true;
+                        window.addEventListener('popstate', function() { window.location.reload(); });
+                    }
+                }
+                state.postsContainer.innerHTML = payload.html || '';
+                initializeDynamicFeedContent(state.postsContainer);
+                updateRecsysBox(payload.recsys);
+                cfg.timeline = tab;
+                cfg.page = 1;
+                init();
+                document.querySelectorAll('.bsky-feedhead .bsky-tab').forEach(function(t) {
+                    var on = t.getAttribute('data-tab') === tab;
+                    t.classList.toggle('is-active', on);
+                    t.setAttribute('aria-selected', on ? 'true' : 'false');
+                });
+                // "Your annotations" box listens to this event and reloads its statistics (now scoped to the tab)
+                try { window.dispatchEvent(new Event('ys:annotation-saved')); } catch (e) {}
+                window.scrollTo({ top: 0 });
+            })
+            .catch(function() {
+                window.location.href = href;
+            })
+            .finally(function() {
+                state.postsContainer.style.opacity = '';
+            });
+        return true;
+    }
+
+    document.addEventListener('click', function(event) {
+        var link = event.target.closest ? event.target.closest('.bsky-feedhead .bsky-tab[data-tab]') : null;
+        if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.button) {
+            return;
+        }
+        if (switchTab(link.getAttribute('data-tab'), link.getAttribute('href'))) {
+            event.preventDefault();
+        }
+    });
+
     document.addEventListener('DOMContentLoaded', init);
     window.addEventListener('beforeunload', stopAutoRefresh);
 
