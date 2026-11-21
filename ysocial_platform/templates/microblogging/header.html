@@ -156,7 +156,7 @@
                                 {% for mention in mentions %}
                                 <span style="width: 90%; display: inline; float: left;"
                                       id="left-{{ mention[0].post_id }}">
-        <a class="account-item" href="/{{exp_id}}/thread/{{ mention[0].post_id }}">
+        {% set _tl = ui is not defined or ui.get('thread_links', True) %}<{{ 'a' if _tl else 'div' }} class="account-item"{% if _tl %} href="/{{exp_id}}/thread/{{ mention[0].post_id }}"{% endif %}>
           <div class="media">
             <div class="icon-wrap">
               <img
@@ -175,7 +175,7 @@
                 <small>"{{ mention[3][:28] }}..."</small>
             </div>
           </div>
-        </a>
+        </{{ 'a' if _tl else 'div' }}>
         </span>
                                 <span style="width: 10%; display: inline; float: right;" val="{{ mention[0].post_id }}"
                                       class="cancel-notification" id="right-{{ mention[0].post_id }}">

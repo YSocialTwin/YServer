@@ -32,7 +32,7 @@
                                 {{ n.text }}
                             </div>
                             {% if n.snippet %}
-                            <a class="bsky-notif__snippet" href="{% if n.post_id %}/{{ exp_id }}/thread/{{ n.post_id }}{% else %}#{% endif %}">{{ n.snippet }}</a>
+                            {% if n.post_id and (ui is not defined or ui.get('thread_links', True)) %}<a class="bsky-notif__snippet" href="/{{ exp_id }}/thread/{{ n.post_id }}">{{ n.snippet }}</a>{% else %}<span class="bsky-notif__snippet">{{ n.snippet }}</span>{% endif %}
                             {% endif %}
                             <div class="bsky-notif__time">{{ n.when }}</div>
                         </div>

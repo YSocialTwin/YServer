@@ -44,7 +44,7 @@
                 </div>
                 <div class="dropdown-menu" role="menu">
                     <div class="dropdown-content">
-                        <a href="/{{exp_id}}/thread/{{ item['thread_id'] }}" class="dropdown-item">
+                        {% set _tl = ui is not defined or ui.get('thread_links', True) %}{% if _tl %}<a href="/{{exp_id}}/thread/{{ item['thread_id'] }}" class="dropdown-item">
                             <div class="media">
                                 <i data-feather="bookmark"></i>
                                 <div class="media-content">
@@ -52,7 +52,7 @@
                                     <small>{{ _('See full discussion thread') }}</small>
                                 </div>
                             </div>
-                        </a>
+                        </a>{% endif %}
                         {% if item['author_id'] == user_id %}
                         <a class="dropdown-item" id="delete_post" val="{{ item['post_id'] }}">
                             <div class="media">
@@ -89,7 +89,7 @@
             <div class="post-text">
                 {% if item["shared_from"] != -1 and (item["shared_from"][1] != 'Unknown' and item["shared_from"][0] != -1) %}
  <div class="ys-text-right-border">
-                    <p><small>{{ _('Shared from:') }} <a href="/{{exp_id}}/thread/{{ item['shared_from'][0] }}">{{ item['shared_from'][1] }}</a></small></p>
+                    <p><small>{{ _('Shared from:') }} {% if ui is not defined or ui.get('thread_links', True) %}<a href="/{{exp_id}}/thread/{{ item['shared_from'][0] }}">{{ item['shared_from'][1] }}</a>{% else %}{{ item['shared_from'][1] }}{% endif %}</small></p>
                 </div>
                 {% endif %}
                 <p>

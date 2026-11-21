@@ -58,6 +58,17 @@ class MicrobloggingStandard(PlatformProvider):
 
     # what the admin "frontend settings" page offers for this platform (the boxes are in templates/slots/)
     frontend_settings = (
+        # entries of the left menu, the theme switch and the log-out link (all shown by default)
+        FrontendSetting("nav_home", True),
+        FrontendSetting("nav_explore", True),
+        FrontendSetting("nav_chat", True),
+        FrontendSetting("nav_friends", True),
+        FrontendSetting("nav_profile", True),
+        FrontendSetting("nav_interview", True),
+        FrontendSetting("nav_admin", True),
+        FrontendSetting("nav_theme_switch", True),
+        FrontendSetting("nav_logout", True),
+        FrontendSetting("thread_links", True),  # links to the /thread pages (False = removed everywhere)
         # tabs next to "Home" in the feed (each one forces a chronological recommender for that view)
         FrontendSetting("feed_tab_recent", True),  # Recent  -> ReverseChrono
         FrontendSetting("feed_tab_friends", True),  # Friends -> ReverseChronoFollowers
@@ -160,6 +171,7 @@ class MicrobloggingStandard(PlatformProvider):
         from flask_login import current_user
         from sqlalchemy import select
         from y_web.sdk.models import Admin_users, Agent, db
+        from y_web.sdk.web import load_ui_settings
 
         profile_pic = ""
         try:
@@ -180,5 +192,5 @@ class MicrobloggingStandard(PlatformProvider):
             profile_pic=profile_pic,
             experiment_memory_enabled=True,
             len=len,
-            **context,
+            **{"ui": load_ui_settings(exp_id), **context},
         )

@@ -1,0 +1,49 @@
+          <!-- ══ BOX — Microblogging left menu ══ -->
+          <div class="misc-compact-box" id="box-mb-menu" data-cap-any="nav_home nav_explore nav_chat nav_friends nav_profile nav_interview nav_admin nav_theme_switch nav_logout">
+            <h3>{{ _('Left menu') }}</h3>
+            <div class="box-content">
+              <p style="color:#6b7280;font-size:.85rem;margin-bottom:14px;">
+                {{ _('Choose the entries of the left menu, whether people can switch between the light and the dark theme and whether the log-out link is shown.') }}
+              </p>
+              <div class="ys-toggle-row" data-cap="nav_home">
+                <span class="ys-toggle-label">{{ _('Home') }} <small>{{ _('Link to the feed') }}</small></span>
+                <label class="switch-small"><input type="checkbox" id="nav_home"><span class="slider-small round"></span></label>
+              </div>
+              <div class="ys-toggle-row" data-cap="nav_explore">
+                <span class="ys-toggle-label">{{ _('Explore') }} <small>{{ _('Search, interests and trending topics') }}</small></span>
+                <label class="switch-small"><input type="checkbox" id="nav_explore"><span class="slider-small round"></span></label>
+              </div>
+              <div class="ys-toggle-row" data-cap="nav_chat">
+                <span class="ys-toggle-label">{{ _('Chat') }} <small>{{ _('Chat page (only when the experiment has agent memory)') }}</small></span>
+                <label class="switch-small"><input type="checkbox" id="nav_chat"><span class="slider-small round"></span></label>
+              </div>
+              <div class="ys-toggle-row" data-cap="nav_friends">
+                <span class="ys-toggle-label">{{ _('Friends') }} <small>{{ _('The people and pages the user follows') }}</small></span>
+                <label class="switch-small"><input type="checkbox" id="nav_friends"><span class="slider-small round"></span></label>
+              </div>
+              <div class="ys-toggle-row" data-cap="nav_profile">
+                <span class="ys-toggle-label">{{ _('Profile') }} <small>{{ _('Link to the profile of the logged-in user') }}</small></span>
+                <label class="switch-small"><input type="checkbox" id="nav_profile"><span class="slider-small round"></span></label>
+              </div>
+              <div class="ys-toggle-row" data-cap="nav_interview">
+                <span class="ys-toggle-label">{{ _('Interview') }} <small>{{ _('Interview page (researchers and administrators)') }}</small></span>
+                <label class="switch-small"><input type="checkbox" id="nav_interview"><span class="slider-small round"></span></label>
+              </div>
+              <div class="ys-toggle-row" data-cap="nav_admin">
+                <span class="ys-toggle-label">{{ _('Admin Dashboard') }} <small>{{ _('Link back to the admin area (administrators)') }}</small></span>
+                <label class="switch-small"><input type="checkbox" id="nav_admin"><span class="slider-small round"></span></label>
+              </div>
+              <div class="ys-toggle-row" data-cap="nav_theme_switch">
+                <span class="ys-toggle-label">{{ _('Light / dark theme switch') }} <small>{{ _('Let the user change between the light and the dark theme') }}</small></span>
+                <label class="switch-small"><input type="checkbox" id="nav_theme_switch"><span class="slider-small round"></span></label>
+              </div>
+              <div class="ys-toggle-row" data-cap="nav_logout">
+                <span class="ys-toggle-label">{{ _('Log out link') }} <small>{{ _('Show the log-out button at the bottom of the menu') }}</small></span>
+                <label class="switch-small"><input type="checkbox" id="nav_logout"><span class="slider-small round"></span></label>
+              </div>
+              <div class="ys-fs-save-row">
+                <button class="button is-solid primary-button" onclick="saveSection(event,'mb-menu')">{{ _('Save left menu') }}</button>
+                <span class="ys-fs-save-status" id="status-mb-menu"></span>
+              </div>
+            </div>
+          </div>

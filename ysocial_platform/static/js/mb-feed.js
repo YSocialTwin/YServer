@@ -322,6 +322,39 @@ var MB_FEED = (function() {
         return true;
     }
 
+    // Read the page again (same address) and swap what depends on the feed -- posts, pagination, the "ranked last" note, the
+    // recommender box -- without leaving the page. Works with infinite scrolling and with classic pagination.
+    function softReload(url) {
+        var current = state.postsContainer;
+        if (!current || !window.fetch || !window.DOMParser) { return Promise.reject(new Error('unsupported')); }
+        stopAutoRefresh();
+        current.style.opacity = '.45';
+        return fetch(url || window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+            .then(function(response) {
+                if (!response.ok) { throw new Error('reload'); }
+                return response.text();
+            })
+            .then(function(html) {
+                var doc = new DOMParser().parseFromString(html, 'text/html');
+                var next = doc.getElementById('posts-container');
+                if (!next) { throw new Error('reload'); }
+                current.innerHTML = next.innerHTML;
+                initializeDynamicFeedContent(current);
+                ['.ys-pagination', '#ys-recsys-box'].forEach(function(selector) {
+                    var a = document.querySelector(selector), b = doc.querySelector(selector);
+                    if (a && b) { a.replaceWith(b); } else if (a) { a.remove(); }
+                });
+                var oldNote = document.querySelector('.ys-rank-last-note'), newNote = doc.querySelector('.ys-rank-last-note');
+                if (oldNote && newNote) { oldNote.replaceWith(newNote); }
+                else if (oldNote) { oldNote.remove(); }
+                else if (newNote) { current.parentNode.insertBefore(newNote, current); }
+                initializeDynamicFeedContent(document.querySelector('.ys-rank-last-note') || current);
+                init();
+                try { window.dispatchEvent(new Event('ys:annotation-saved')); } catch (e) {}
+            })
+            .finally(function() { current.style.opacity = ''; });
+    }
+
     document.addEventListener('click', function(event) {
         var link = event.target.closest ? event.target.closest('.bsky-feedhead .bsky-tab[data-tab]') : null;
         if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.button) {
@@ -338,6 +371,8 @@ var MB_FEED = (function() {
     return {
         init: init,
         probeForNewPosts: probeForNewPosts,
-        refreshFeed: refreshFeed
+        refreshFeed: refreshFeed,
+        switchTab: switchTab,
+        softReload: softReload
     };
 })();

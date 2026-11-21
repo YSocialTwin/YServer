@@ -14,36 +14,44 @@
             <img {% if _bs_pic == '' %}src="{{ url_for('static', filename='assets/img/users/' + _bs_uid|user_image_id + '.png') }}"{% else %}src="{{ _bs_pic }}"{% endif %} alt="{{ logged_username|display_name }}"/>
             <span class="bsky-nav__avatar-card"><strong>{{ logged_username|display_name }}</strong><small>@{{ logged_username }}</small></span>
         </a>
+        {% if ui is not defined or ui.get('nav_home', True) %}
         <a class="bsky-nav__item" data-bsky-nav="home" href="/{{ exp_id }}/feed/{{ _bs_uid }}/feed/rf/1">
             <i data-feather="home"></i><span>{{ _('Home') }}</span>
         </a>
+        {% endif %}
+        {% if ui is not defined or ui.get('nav_explore', True) %}
         <a class="bsky-nav__item" data-bsky-nav="explore" href="/{{ exp_id }}/explore">
             <i data-feather="search"></i><span>{{ _('Explore') }}</span>
         </a>
+        {% endif %}
         {% if ui is not defined or ui.notifications_menu %}
         <a class="bsky-nav__item" data-bsky-nav="notifications" href="/{{ exp_id }}/notifications">
             <i data-feather="bell"></i><span>{{ _('Notifications') }}</span>
             {% if _bs_mentions|length > 0 %}<b class="bsky-badge">{{ _bs_mentions|length }}</b>{% endif %}
         </a>
         {% endif %}
-        {% if experiment_memory_enabled and current_user_role in ['admin', 'researcher'] %}
+        {% if experiment_memory_enabled and current_user_role in ['admin', 'researcher'] and (ui is not defined or ui.get('nav_interview', True)) %}
         <a class="bsky-nav__item" data-bsky-nav="interview" href="/{{ exp_id }}/interview">
             <i data-feather="message-square"></i><span>{{ _('Interview') }}</span>
         </a>
         {% endif %}
-        {% if experiment_memory_enabled %}
+        {% if experiment_memory_enabled and (ui is not defined or ui.get('nav_chat', True)) %}
         <a class="bsky-nav__item" data-bsky-nav="chat" href="/{{ exp_id }}/chat">
             <i data-feather="message-circle"></i><span>{{ _('Chat') }}</span>
             <b class="bsky-badge" id="bsky-chat-badge" hidden></b>
         </a>
         {% endif %}
+        {% if ui is not defined or ui.get('nav_friends', True) %}
         <a class="bsky-nav__item" data-bsky-nav="friends" href="/{{ exp_id }}/friends/{{ _bs_uid }}/1">
             <i data-feather="users"></i><span>{{ _('Friends') }}</span>
         </a>
+        {% endif %}
+        {% if ui is not defined or ui.get('nav_profile', True) %}
         <a class="bsky-nav__item" data-bsky-nav="profile" id="bsky-profile-link" href="/{{ exp_id }}/profile/{{ _bs_uid }}/recent/1">
             <i data-feather="user"></i><span>{{ _('Profile') }}</span>
         </a>
-        {% if is_admin == True %}
+        {% endif %}
+        {% if is_admin == True and (ui is not defined or ui.get('nav_admin', True)) %}
         <a class="bsky-nav__item" data-bsky-nav="admin" href="/admin/dashboard">
             <i data-feather="sliders"></i><span>{{ _('Admin Dashboard') }}</span>
         </a>
@@ -62,11 +70,13 @@
             <div class="bsky-me__meta">
                 <strong>{{ logged_username|display_name }}</strong>
             </div>
+            {% if ui is not defined or ui.get('nav_theme_switch', True) %}
             <label class="theme-toggle bsky-me__theme" title="{{ _('Theme') }}">
                 <input type="checkbox"/>
                 <span class="toggler"><span class="dark"><i data-feather="moon"></i></span><span class="light"><i data-feather="sun"></i></span></span>
             </label>
             <a class="bsky-me__logout" href="{{ url_for('auth.logout') }}" title="{{ _('Log out') }}"><i data-feather="log-out"></i></a>
+            {% endif %}
         </div>
     </nav>
 
