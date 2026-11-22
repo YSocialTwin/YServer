@@ -274,3 +274,42 @@
   });
 })();
 </script>
+<script>
+  // Comments panel. (1) core's initPostComments() wires the comment button, but compose.js only calls it when the inline
+  // composer (#compose-card) exists; this skin has none, so register it once everything loaded (delegated, idempotent).
+  window.addEventListener('load', function () { if (typeof window.initPostComments === 'function') window.initPostComments(); });
+  // (2) The first time a panel opens, swap its flat list for the real thread tree (the same markup as the /thread page):
+  // root post, nested replies with their rails, and the "Less/More" branch toggles. On any failure the flat list stays.
+  (function () {
+    function unwrap(n) { while (n.firstChild) n.parentNode.insertBefore(n.firstChild, n); n.remove(); }
+    document.addEventListener('click', function (e) {
+      var fab = e.target.closest && e.target.closest('.fab-wrapper.is-comment');
+      var card = fab && fab.closest('.card.is-post');
+      var wrap = card && card.querySelector(':scope > .comments-wrap');
+      var body = wrap && wrap.querySelector(':scope > .comments-body');
+      var id = card && (card.id || '').replace('feed-post-', '');
+      if (!body || !id || body.dataset.threadLoaded) return;
+      body.dataset.threadLoaded = '1';
+      fetch('/' + (window.EXP_ID || '') + '/thread/' + encodeURIComponent(id), { credentials: 'same-origin' })
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+        .then(function (html) {
+          var tl = new DOMParser().parseFromString(html, 'text/html').querySelector('.profile-timeline');
+          if (!tl || !tl.querySelector('.media.is-comment')) throw new Error('no thread');
+          // the thread page wraps every post in its own comments panel and reuses the feed ids: neutralise both
+          tl.querySelectorAll('.comments-body').forEach(unwrap);
+          tl.querySelectorAll('.comments-wrap').forEach(unwrap);
+          tl.querySelectorAll('[id^="feed-post-"]').forEach(function (n) { n.removeAttribute('id'); });
+          while (body.firstChild) body.removeChild(body.firstChild);
+          Array.prototype.slice.call(tl.childNodes).forEach(function (n) { body.appendChild(document.adoptNode(n)); });
+          body.querySelectorAll('[data-demo-src]').forEach(function (img) { img.setAttribute('src', img.getAttribute('data-demo-src')); });
+          if (window.jQuery) {
+            window.jQuery(body).find('.dropdown-trigger').off('click').on('click', function (ev) {
+              ev.stopPropagation(); window.jQuery('.dropdown-trigger').not(this).removeClass('is-active'); window.jQuery(this).toggleClass('is-active');
+            });
+          }
+          if (window.feather) window.feather.replace();
+        })
+        .catch(function () { delete body.dataset.threadLoaded; });
+    });
+  })();
+</script>

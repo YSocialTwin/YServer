@@ -252,12 +252,40 @@
         <!-- /Header -->
         <!-- Post  -->
         <!-- Comments body -->
-        <div class="comments-body has-slimscroll">
-            <!-- Comment -->
-            <div class="original-post{% if item.get('is_moderation_comment') %} moderation-comment{% endif %}">
+        <div class="comments-body has-slimscroll profile-timeline">
+            <!-- Comment: the opening post, laid out like the thread page (avatar, heading, text, actions) -->
+            <div class="media is-comment original-post{% if item.get('is_moderation_comment') %} moderation-comment{% endif %}">
+                <div class="media-left">
+                    <div class="image">
+                        <img
+                                src="https://via.placeholder.com/300x300"
+                                {% if item['profile_pic'] == "" %}
+                                    data-demo-src="{{ url_for('static', filename='assets/img/users/'+ item['author_id']|user_image_id +'.png') }}"
+                                {% else %}
+                                    data-demo-src="{{ item['profile_pic'] }}"
+                                {% endif %}
+                                data-user-popover="1"
+                                alt=""
+                        />
+                    </div>
+                </div>
                 <div class="media-content">
-                    <a href="/{{exp_id}}/profile/{{ item['author_id'] }}/recent/1">{{ item["author"]|display_name }}</a><br/>
-                    {% if ui.show_post_time %}<span class="time">{{ _('Day %(day)s - %(hour)s:00', day=item["day"], hour=item["hour"]) }}</span>{% endif %}
+                    <div class="post-comment-heading">
+                        <div>
+                            <a href="/{{exp_id}}/profile/{{ item['author_id'] }}/recent/1">{{ item["author"]|display_name }}</a>
+                            {% if ui.show_post_time %}<span class="time">{{ _('Day %(day)s - %(hour)s:00', day=item["day"], hour=item["hour"]) }}</span>{% endif %}
+                        </div>
+                        {% if (item.get('author_type_badge') and ui.annotation_author_type) or (item.get('adhoc_agent_badge') and ui.annotation_agent_type) %}
+                        <div class="post-author-badges">
+                            {% if item.get('author_type_badge') and ui.annotation_author_type %}
+                            <span class="post-author-badge {% if item['author_type_badge'] == 'AI Agent' %}is-ai{% else %}is-human{% endif %}">{{ _(item['author_type_badge']) }}</span>
+                            {% endif %}
+                            {% if item.get('adhoc_agent_badge') and ui.annotation_agent_type %}
+                            <span class="post-author-badge is-adhoc">{{ _(item['adhoc_agent_badge']) }}</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
                     <div class="post-text post-content-section is-threaded">
                         <p> {{ item["post"]|safe }}</p>
                     </div>

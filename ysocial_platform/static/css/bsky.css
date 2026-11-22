@@ -926,3 +926,22 @@ body.bsky #profile-main .ys-profile-hero-stat--posts { flex-direction: row; alig
 .bsky-nav__avatar:hover .bsky-nav__avatar-card, .bsky-nav__avatar:focus-visible .bsky-nav__avatar-card { display: flex; }
 @media (max-width: 1180px) { .bsky-nav__avatar { margin-left: 0; } .bsky-nav__avatar:hover .bsky-nav__avatar-card { display: none; } }
 body.bsky #profile-main .ys-profile-edit-btn { background: var(--bs-bg-alt) !important; border-color: var(--bs-bg-alt); }
+
+/* ---- comments panel: same look as the thread page (it reuses the .profile-timeline rules) ----------- */
+body.bsky .comments-heading { position: sticky; top: 0; z-index: 5; backdrop-filter: blur(8px); background: color-mix(in srgb, var(--bs-bg) 88%, transparent); }
+body.bsky .comments-body.profile-timeline { background: var(--bs-bg); }
+body.bsky .comments-body .media.is-comment.original-post { padding: 14px 16px 6px !important; border-bottom: 1px solid var(--bs-border) !important; }
+body.bsky .comments-body .media.is-comment.original-post .post-content-section.is-threaded p { font-size: 18px; line-height: 1.4; }
+body.bsky .comments-body .media.is-comment.original-post .media-left::after { display: none !important; }
+body.bsky .comments-body > hr { display: none; }
+body.bsky .comments-body .media.is-comment:not(.original-post) { border-bottom: 1px solid var(--bs-border) !important; }
+body.bsky .comments-body .media.is-comment:hover { background: color-mix(in srgb, var(--bs-bg-alt) 45%, var(--bs-bg)); }
+body.bsky .reply-form-shell:focus-within { border-color: var(--bs-primary); box-shadow: 0 0 0 3px var(--bs-primary-soft); }
+body.bsky .media.is-comment .media-right .dropdown .button { border: 0; background: transparent; box-shadow: none; color: var(--bs-muted); width: 32px; height: 32px; padding: 0; border-radius: 50%; }
+body.bsky .media.is-comment .media-right .dropdown .button:hover { background: var(--bs-bg-alt); color: var(--bs-text); }
+body.bsky .media.is-comment .media-right .dropdown-content { background: var(--bs-bg); border: 1px solid var(--bs-border); border-radius: var(--bs-radius); box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+body.bsky .media.is-comment .media-right .dropdown-item { color: var(--bs-text); }
+body.bsky .media.is-comment .media-right .dropdown-item:hover { background: var(--bs-bg-alt); }
+/* the panel is one thread: a thick band closes it, the opening post is the large one above the nested replies */
+body.bsky .comments-wrap:not(.is-hidden) { border-bottom: 6px solid var(--bs-bg-alt); }
+body.bsky .comments-body.profile-timeline > .card.is-post:first-child { background: color-mix(in srgb, var(--bs-primary-soft) 35%, var(--bs-bg)) !important; }
