@@ -6,8 +6,16 @@ whether the platform implements it and ``describe`` returns the plain-language e
 
 from y_web.sdk import N_
 
-from y_web.sdk.fixed_recsys import canonical as _fixed_canonical
-from y_web.sdk.fixed_recsys import is_fixed_mode
+try:  # PLATFORM_API 1.4; with an older core the fixed-order recommenders are simply not offered
+    from y_web.sdk.fixed_recsys import canonical as _fixed_canonical
+    from y_web.sdk.fixed_recsys import is_fixed_mode
+except ImportError:  # pragma: no cover - exercised by tests through a reload
+
+    def is_fixed_mode(mode):
+        return False
+
+    def _fixed_canonical(mode):
+        return mode
 
 SUPPORTED_CONTENT_RECSYS_MODES = frozenset(
     {
