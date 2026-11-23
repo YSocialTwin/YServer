@@ -29,6 +29,7 @@ from y_web.sdk.models import (
 logger = logging.getLogger(__name__)
 
 
+from y_web.sdk.fixed_recsys import fixed_posts, is_fixed_mode
 from .modes import (  # noqa: F401
     SUPPORTED_CONTENT_RECSYS_MODES,
     _normalize_content_recsys_mode,
@@ -678,6 +679,9 @@ def get_suggested_posts(
 
     if last_ranked and uid != "all":   # the posts the recommender would show last (an experiment option, see the routes)
         return _last_ranked_posts(uid, mode, page, per_page, follower_ratio, exp_engine, fb_settings)
+
+    if is_fixed_mode(mode):   # an explicit order defined by the experiment authors: only the listed posts
+        return fixed_posts(mode, page, per_page, _make_pagination), None
 
     raw_mode = mode
     mode = _normalize_content_recsys_mode(mode)

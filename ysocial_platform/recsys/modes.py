@@ -6,6 +6,9 @@ whether the platform implements it and ``describe`` returns the plain-language e
 
 from y_web.sdk import N_
 
+from y_web.sdk.fixed_recsys import canonical as _fixed_canonical
+from y_web.sdk.fixed_recsys import is_fixed_mode
+
 SUPPORTED_CONTENT_RECSYS_MODES = frozenset(
     {
         "Random",
@@ -33,6 +36,8 @@ def _normalize_content_recsys_mode(mode):
     raw = str(mode or "").strip()
     if not raw:
         return "Random"
+    if is_fixed_mode(raw):
+        return _fixed_canonical(raw)
 
     compact = raw.replace("_", "").replace("-", "").replace(" ", "").strip().lower()
     mode_aliases = {
@@ -83,7 +88,8 @@ def _normalize_content_recsys_mode(mode):
 
 def is_supported_content_recsys_mode(mode):
     """Return whether a stored/UI value resolves to executable code."""
-    return _normalize_content_recsys_mode(mode) in SUPPORTED_CONTENT_RECSYS_MODES
+    canonical = _normalize_content_recsys_mode(mode)
+    return canonical in SUPPORTED_CONTENT_RECSYS_MODES or is_fixed_mode(canonical)
 
 
 # Plain-language explanations of the content recommender systems, keyed by canonical mode name.
@@ -138,6 +144,13 @@ _RECSYS_DESCRIPTIONS = {
 }
 
 
+_FIXED_DESCRIPTION = N_(
+    "Only the posts chosen by the experiment authors, in the order they defined."
+)
+
+
 def describe(mode):
     """Explanation (a translatable message id) of a canonical mode, or ``None`` when it has none."""
+    if is_fixed_mode(mode):
+        return _FIXED_DESCRIPTION
     return _RECSYS_DESCRIPTIONS.get(mode)
