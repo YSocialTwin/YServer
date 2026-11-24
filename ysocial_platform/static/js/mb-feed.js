@@ -298,6 +298,8 @@ var MB_FEED = (function() {
                         window.addEventListener('popstate', function() { window.location.reload(); });
                     }
                 }
+                // the feed shown is about to change (another recommender): add-ons drop what they know about the posts of the old one
+                try { window.dispatchEvent(new Event('ys:feed-swapped')); } catch (e) {}
                 state.postsContainer.innerHTML = payload.html || '';
                 initializeDynamicFeedContent(state.postsContainer);
                 updateRecsysBox(payload.recsys);
@@ -338,6 +340,8 @@ var MB_FEED = (function() {
                 var doc = new DOMParser().parseFromString(html, 'text/html');
                 var next = doc.getElementById('posts-container');
                 if (!next) { throw new Error('reload'); }
+                // the feed shown is about to change (another recommender): add-ons drop what they know about the posts of the old one
+                try { window.dispatchEvent(new Event('ys:feed-swapped')); } catch (e) {}
                 current.innerHTML = next.innerHTML;
                 initializeDynamicFeedContent(current);
                 ['.ys-pagination', '#ys-recsys-box'].forEach(function(selector) {
