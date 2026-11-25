@@ -24,11 +24,11 @@
                             {% else %}<i data-feather="user-plus"></i>{% endif %}
                         </div>
                         <div class="bsky-notif__body">
-                            <a class="bsky-notif__avatar" href="/{{ exp_id }}/profile/{{ n.who.id }}/recent/1">
+                            {% set _pl = ui is not defined or ui.get('show_profile_links', True) %}<{{ 'a' if _pl else 'span' }} class="bsky-notif__avatar" {% if _pl %}href="/{{ exp_id }}/profile/{{ n.who.id }}/recent/1"{% endif %} >
                                 {% if n.who.pic %}<img src="{{ n.who.pic }}" alt=""/>{% else %}<span>{{ n.who.name[:1]|upper }}</span>{% endif %}
-                            </a>
+                            </{{ 'a' if _pl else 'span' }}>
                             <div class="bsky-notif__line">
-                                <a class="bsky-notif__who" href="/{{ exp_id }}/profile/{{ n.who.id }}/recent/1">{{ n.who.name }}</a>
+                                {% set _pl = ui is not defined or ui.get('show_profile_links', True) %}<{{ 'a' if _pl else 'span' }} class="bsky-notif__who" {% if _pl %}href="/{{ exp_id }}/profile/{{ n.who.id }}/recent/1"{% endif %} >{{ n.who.name }}</{{ 'a' if _pl else 'span' }}>
                                 {{ n.text }}
                             </div>
                             {% if n.snippet %}

@@ -31,7 +31,7 @@
     {% for card in active_cards %}
     {% set card_pic = (profile_pic_follower if active_tab == 'followers' else profile_pic_followee).get(card['id'], '') %}
     <article class="ys-friends-profile-card">
-        <a class="ys-friends-profile-card__avatar" href="/{{exp_id}}/profile/{{ card['id'] }}/recent/1">
+        {% set _pl = ui is not defined or ui.get('show_profile_links', True) %}<{{ 'a' if _pl else 'span' }} class="ys-friends-profile-card__avatar" {% if _pl %}href="/{{exp_id}}/profile/{{ card['id'] }}/recent/1"{% endif %} >
             <img
                 src="https://via.placeholder.com/300x300"
                 {% if card_pic %}
@@ -41,11 +41,11 @@
                 {% endif %}
                 alt=""
             />
-        </a>
+        </{{ 'a' if _pl else 'span' }}>
         <div class="ys-friends-profile-card__body">
-            <a class="ys-friends-profile-card__name" href="/{{exp_id}}/profile/{{ card['id'] }}/recent/1">
+            {% set _pl = ui is not defined or ui.get('show_profile_links', True) %}<{{ 'a' if _pl else 'span' }} class="ys-friends-profile-card__name" {% if _pl %}href="/{{exp_id}}/profile/{{ card['id'] }}/recent/1"{% endif %} >
                 {{ card['username']|display_name }}
-            </a>
+            </{{ 'a' if _pl else 'span' }}>
             <div class="ys-friends-profile-card__stats">
                 <span>{{ ngettext('<strong>%(num)s</strong> follower', '<strong>%(num)s</strong> followers', card['number_followers']|int) }}</span>
                 <span>{{ _('<strong>%(num)s</strong> following', num=card['number_followees']) }}</span>

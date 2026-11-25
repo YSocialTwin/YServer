@@ -5,6 +5,7 @@
     <div class="container is-fluid">
         <div class="bsky-twocol">
             <section class="bsky-main" id="bsky-explore">
+                {% if ui is not defined or ui.get('show_search', True) %}
                 <div class="bsky-explore-search">
                     <form id="bsky-explore-form" autocomplete="off" action="/{{ exp_id }}/explore" method="get">
                         <i data-feather="search"></i>
@@ -12,6 +13,7 @@
                     </form>
                     <div class="bsky-explore-results" id="bsky-explore-results" hidden></div>
                 </div>
+                {% endif %}
 
                 <div id="bsky-explore-body">
                     <div class="bsky-explore-card" id="bsky-interests-card">
@@ -58,6 +60,7 @@
 (function () {
   var input = document.getElementById('bsky-explore-input');
   var box = document.getElementById('bsky-explore-results');
+  if (!input || !box) return;
   var body = document.getElementById('bsky-explore-body');
   var timer = null;
   document.getElementById('bsky-interests-close').addEventListener('click', function () {

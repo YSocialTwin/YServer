@@ -72,6 +72,8 @@ class MicrobloggingStandard(PlatformProvider):
         FrontendSetting("nav_theme_switch", True),
         FrontendSetting("nav_logout", True),
         FrontendSetting("thread_links", True),  # links to the /thread pages (False = removed everywhere)
+        FrontendSetting("show_search", True),  # the search boxes (header, explore page) and the search endpoint
+        FrontendSetting("show_profile_links", True),  # links to the profiles of the other users (False = plain names)
         # tabs next to "Home" in the feed (each one forces a chronological recommender for that view)
         FrontendSetting("feed_tab_recent", True),  # Recent  -> ReverseChrono
         FrontendSetting("feed_tab_friends", True),  # Friends -> ReverseChronoFollowers

@@ -117,6 +117,7 @@
             </a>
         </div>
         <div class="navbar-menu">
+            {% if ui is not defined or ui.get('show_search', True) %}
             <div class="navbar-item ys-mb-header-search-shell">
                 <form
                         class="ys-mb-header-search"
@@ -139,6 +140,7 @@
                     <div class="ys-mb-header-search__results" data-search-results hidden></div>
                 </form>
             </div>
+            {% endif %}
             <div class="navbar-end">
 
                 {% if ui is not defined or ui.notifications_menu %}
@@ -342,6 +344,7 @@
     </div>
     <!-- Navbar mobile menu -->
     <div class="navbar-menu">
+        {% if ui is not defined or ui.get('show_search', True) %}
         <div class="navbar-item ys-mb-header-mobile-search-item">
             <form
                     class="ys-mb-header-search ys-mb-header-search--mobile"
@@ -364,6 +367,7 @@
                 <div class="ys-mb-header-search__results" data-search-results hidden></div>
             </form>
         </div>
+        {% endif %}
         <!-- Account -->
         <div class="navbar-item has-dropdown is-active">
             <a href="/{{exp_id}}/profile/{{ logged_id }}/recent/1" class="navbar-link">

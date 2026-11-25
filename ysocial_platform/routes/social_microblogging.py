@@ -793,6 +793,8 @@ def api_friends(exp_id, user_id, page=1):
 @main.get("/<int:exp_id>/api/header_search")
 @login_required
 def api_header_search(exp_id):
+    if not _load_ui_settings(exp_id).get("show_search", True):
+        return jsonify({"results": []})
     query = str(request.args.get("q", "") or "").strip()
     if len(query) < 2:
         return jsonify({"results": []})
@@ -1394,6 +1396,11 @@ def api_profile_posts(exp_id, user_id, page=1, mode="recent"):
     except (ValueError, TypeError):
         # Keep as string if it's a UUID
         pass
+
+    if str(user_id) != str(current_user.id) and not _load_ui_settings(exp_id).get(
+        "show_profile_links", True
+    ):
+        return jsonify({"html": "", "has_more": False}), 403
 
     rp = get_user_recent_posts(user_id, page, 10, mode, current_user.id, exp_id)
     exp = db.session.scalars(select(Exps).filter_by(idexp=int(exp_id))).first()

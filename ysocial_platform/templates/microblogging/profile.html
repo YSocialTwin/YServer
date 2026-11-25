@@ -315,7 +315,7 @@
                                         data-user-popover="1"
                                 />
                                 <div class="text-content ys-suggestion-copy">
-                                    <a class="ys-suggestion-name" href="/{{exp_id}}/profile/{{ suser['id'] }}/recent/1">{{ suser['username']|display_name }}</a>
+                                    {% set _pl = ui is not defined or ui.get('show_profile_links', True) %}<{{ 'a' if _pl else 'span' }} class="ys-suggestion-name" {% if _pl %}href="/{{exp_id}}/profile/{{ suser['id'] }}/recent/1"{% endif %} >{{ suser['username']|display_name }}</{{ 'a' if _pl else 'span' }}>
                                     <span class="ys-suggestion-meta">{{ _('Mutual contact') }}</span>
                                 </div>
                             </div>

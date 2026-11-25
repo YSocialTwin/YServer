@@ -80,6 +80,7 @@
         </div>
     </nav>
 
+    {% if ui is not defined or ui.get('show_search', True) %}
     <aside class="bsky-searchslot" id="bsky-search">
         <form class="ys-mb-header-search bsky-search" data-mb-global-search
               data-search-endpoint="/{{ exp_id }}/api/header_search"
@@ -93,6 +94,7 @@
             <div class="ys-mb-header-search__results" data-search-results hidden></div>
         </form>
     </aside>
+    {% endif %}
 
     <div class="bsky-popover" id="bsky-notif-pop" hidden>
         <div class="bsky-popover__head">{{ _('Mentioning Posts') }}</div>
