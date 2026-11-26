@@ -66,3 +66,34 @@ def test_the_provider_declares_it():
 def test_without_the_plugin_the_platform_is_unaffected(monkeypatch):
     monkeypatch.setitem(sys.modules, "modules.scenario_editor.backend.drivers.kits", None)
     assert scenario_design.build_driver() is None
+
+
+def test_the_driver_publishes_with_the_adapter_of_this_platform():
+    """The adapter lives in ``ysocial_platform/scenario_adapter.py`` and gets what it needs from the plugin's support."""
+    driver = scenario_design.build_driver()
+    adapter = driver.adapter if hasattr(driver, "adapter") else driver._make_adapter()
+    assert type(adapter).__module__.endswith("ysocial_platform.scenario_adapter")
+    assert type(adapter).__name__ == "StandardMaterializationAdapter"
+    for method in ("validate", "preview", "publish"):
+        assert callable(getattr(adapter, method))
+
+
+def test_the_adapter_needs_the_support_of_the_plugin():
+    scenario_design._support = None
+    with pytest.raises(RuntimeError, match="has not handed its support"):
+        scenario_design.support()
+
+
+def test_without_the_support_of_the_plugin_the_kit_adapter_is_used(monkeypatch):
+    """A plugin older than SCENARIO_API 1.3 does not offer ``support``: the plugin's own adapter keeps publishing."""
+    import types
+
+    from modules.scenario_editor.backend.drivers import kits
+
+    stripped = types.ModuleType("kits_without_support")
+    for name in dir(kits):
+        if not name.startswith("__") and name != "support":
+            setattr(stripped, name, getattr(kits, name))
+    scenario_design.build_driver.cache_clear()
+    driver = scenario_design.build_driver(stripped)
+    assert not type(driver._make_adapter()).__module__.endswith("ysocial_platform.scenario_adapter")
