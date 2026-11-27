@@ -147,6 +147,10 @@ class MicrobloggingStandard(PlatformProvider):
         client_repo="YClient",
         fake_agent_module="y_client.classes",
         activity_profiles=True,
+        server_script="y_server_run.py",
+        server_app_module="y_server",
+        client_class_path="y_client.clients:YClientWeb",
+        client_federation_module="y_client.federation",
     )
     profile_template = "@ysocial_server/microblogging/profile.html"
     edit_profile_template = "@ysocial_server/microblogging/edit_profile.html"
