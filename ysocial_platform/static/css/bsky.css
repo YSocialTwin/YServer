@@ -1,0 +1,947 @@
+/* ==========================================================================
+   YSocial microblogging - Bluesky-style skin (branch frontend_v2)
+   Loaded after the core CSS. It restyles the existing markup (no DOM, id or
+   JS hook is removed), so every YSocial feature keeps working.
+   Layout: left nav 240 | feed 600 | side column 350 (like bsky.app on desktop).
+   ========================================================================== */
+
+body.bsky {
+  --bs-bg: #ffffff;
+  --bs-bg-alt: #f1f3f5;
+  --bs-border: #d4dbe2;
+  --bs-text: #0b0f14;
+  --bs-muted: #667b99;
+  --bs-primary: #1083fe;
+  --bs-primary-soft: #e8f2ff;
+  --bs-like: #ec4899;
+  --bs-green: #20bc07;
+  --bs-radius: 12px;
+  --bs-nav: 240px;
+  --bs-col: 600px;
+  --bs-side: 350px;
+  background: var(--bs-bg);
+  color: var(--bs-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+}
+body.bsky.is-dark {
+  --bs-bg: #161e27;
+  --bs-bg-alt: #1e2936;
+  --bs-border: #2e3d4f;
+  --bs-text: #f1f3f5;
+  --bs-muted: #8b9db5;
+  --bs-primary: #208bfe;
+  --bs-primary-soft: #1a2a40;
+}
+body.bsky h1, body.bsky h2, body.bsky h3, body.bsky h4, body.bsky h5 { color: var(--bs-text); font-family: inherit; }
+body.bsky a { color: var(--bs-primary); }
+
+/* ---- core chrome we replace --------------------------------------------- */
+body.bsky #main-navbar,
+body.bsky .mobile-navbar,
+body.bsky .ys-sidebar-user-card { display: none !important; }
+
+/* ---- frame / left navigation -------------------------------------------- */
+.bsky-frame {
+  position: fixed; top: 0; left: 50%; transform: translateX(-50%);
+  width: calc(var(--bs-nav) + var(--bs-col) + var(--bs-side)); max-width: 100vw;
+  height: 100vh; pointer-events: none; z-index: 60;
+}
+.bsky-frame > * { pointer-events: auto; }
+.bsky-nav {
+  position: absolute; left: 0; top: 0; bottom: 0; width: var(--bs-nav);
+  display: flex; flex-direction: column; gap: 2px; padding: 14px 12px 14px 8px; overflow-y: auto;
+}
+.bsky-nav__logo { display: block; padding: 6px 12px 14px; }
+.bsky-nav__logo img { height: 44px; width: 44px; border-radius: 50%; object-fit: cover; display: block; }
+body.bsky .dark-image { display: none; }
+body.bsky.is-dark .dark-image { display: inline-block; }
+body.bsky.is-dark .light-image { display: none; }
+.bsky-nav__item {
+  position: relative; display: flex; align-items: center; gap: 16px; width: 100%;
+  padding: 11px 14px; border: 0; background: none; border-radius: 999px; cursor: pointer;
+  font-size: 19px; line-height: 1.2; color: var(--bs-text) !important; text-decoration: none; text-align: left;
+}
+.bsky-nav__item svg, .bsky-nav__item i[data-feather] { width: 26px; height: 26px; stroke-width: 1.8; flex: none; }
+.bsky-nav__item:hover { background: var(--bs-bg-alt); }
+.bsky-nav__item.is-active { font-weight: 700; }
+.bsky-nav__item.is-active svg { stroke-width: 2.6; }
+.bsky-badge {
+  position: absolute; left: 30px; top: 5px; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 9px; background: var(--bs-primary); color: #fff; font-size: 11px; line-height: 18px; text-align: center;
+}
+.bsky-newpost {
+  display: inline-flex; align-items: center; gap: 8px; margin: 14px 0 0 6px; padding: 12px 22px;
+  border: 0; border-radius: 999px; background: var(--bs-primary); color: #fff; font-size: 16px; font-weight: 700; cursor: pointer;
+  align-self: flex-start;
+}
+.bsky-newpost svg { width: 18px; height: 18px; stroke: #fff; }
+.bsky-newpost:hover { filter: brightness(1.08); }
+.bsky-nav__spacer { flex: 1; }
+.bsky-me { display: flex; align-items: center; gap: 8px; padding: 10px 6px; border-top: 1px solid var(--bs-border); }
+.bsky-me__avatar img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; display: block; }
+.bsky-me__meta { flex: 1; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bsky-me__logout { color: var(--bs-muted) !important; display: inline-flex; }
+.bsky-me__logout svg { width: 18px; height: 18px; }
+.bsky-me__theme { transform: scale(.8); margin: 0; }
+
+.bsky-searchslot { position: absolute; right: 0; top: 0; width: var(--bs-side); padding: 12px 0 8px 24px; background: var(--bs-bg); z-index: 5; }
+.bsky-search .ys-mb-header-search__field { background: var(--bs-bg-alt); border-radius: 999px; border: 1px solid transparent; }
+.bsky-search .ys-mb-header-search__input { background: transparent; color: var(--bs-text); }
+.bsky-search .ys-mb-header-search__results { position: absolute; left: 24px; right: 0; top: 58px; background: var(--bs-bg); border: 1px solid var(--bs-border); border-radius: var(--bs-radius); box-shadow: 0 8px 28px rgba(0,0,0,.14); max-height: 70vh; overflow: auto; z-index: 70; }
+
+.bsky-popover { position: absolute; left: 20px; top: 150px; width: 340px; max-height: 60vh; overflow: auto; background: var(--bs-bg); border: 1px solid var(--bs-border); border-radius: var(--bs-radius); box-shadow: 0 10px 32px rgba(0,0,0,.18); z-index: 80; }
+.bsky-popover[hidden] { display: none; }
+.bsky-popover__head { padding: 12px 16px; font-weight: 700; border-bottom: 1px solid var(--bs-border); }
+.bsky-popover__body { padding: 4px 8px; }
+.bsky-popover .account-item { display: block; padding: 8px; }
+.bsky-popover .media { display: flex; gap: 10px; align-items: center; }
+.bsky-popover .icon-wrap img { width: 36px; height: 36px; border-radius: 50%; }
+.bsky-empty { padding: 16px; color: var(--bs-muted); margin: 0; }
+
+/* ---- page grid ------------------------------------------------------------ */
+body.bsky .view-wrapper { padding: 0 !important; margin: 0 !important; background: transparent; }
+body.bsky #main-feed.container,
+body.bsky .view-wrapper > .container {
+  width: 100%; max-width: calc(var(--bs-nav) + var(--bs-col) + var(--bs-side)) !important;
+  margin: 0 auto !important; padding: 0 0 0 var(--bs-nav) !important; box-sizing: border-box;
+}
+body.bsky .view-wrap > .columns:not(.no-margin) {
+  display: grid !important; grid-template-columns: var(--bs-col) var(--bs-side); grid-template-rows: min-content 1fr;
+  margin: 0 !important; align-items: start;
+}
+body.bsky .view-wrap > .columns.no-margin { display: block !important; width: var(--bs-col); margin: 0 !important; border-left: 1px solid var(--bs-border); border-right: 1px solid var(--bs-border); }
+body.bsky .view-wrap > .columns.no-margin > .column { width: 100% !important; padding: 0 !important; }
+body.bsky .view-wrap > .columns:not(.no-margin) > .column { width: auto !important; max-width: none; flex: none; padding: 0 !important; }
+/* first column (old left sidebar: trending…) goes to the side column, first row */
+body.bsky .view-wrap > .columns:not(.no-margin) > .column:first-child { grid-column: 2; grid-row: 1; padding: 64px 0 0 24px !important; display: block !important; }
+body.bsky .view-wrap > .columns:not(.no-margin) > .column:nth-child(2) { grid-column: 1; grid-row: 1 / span 2; border-left: 1px solid var(--bs-border); border-right: 1px solid var(--bs-border); min-height: 100vh; background: var(--bs-bg); }
+body.bsky .view-wrap > .columns:not(.no-margin) > .column:nth-child(3) { grid-column: 2; grid-row: 2; padding: 0 0 24px 24px !important; }
+/* the placeholders shown at load time keep the old three-block look but within the grid */
+body.bsky #shadow-dom { display: none; }
+body.bsky #activity-feed.is-hidden { display: block !important; }
+
+/* ---- cards: flat, bordered, no shadow ------------------------------------ */
+body.bsky .card { background: var(--bs-bg); border: 0; box-shadow: none !important; border-radius: 0; color: var(--bs-text); }
+body.bsky .card .card-heading.is-bordered { border-color: var(--bs-border); }
+body.bsky .column:nth-child(1) .card,
+body.bsky .column:nth-child(3) .card,
+body.bsky .ys-card-mb.ys-ranked-card {
+  border: 1px solid var(--bs-border); border-radius: var(--bs-radius); margin-bottom: 14px !important; overflow: hidden;
+}
+body.bsky .ys-card-mb { margin-bottom: 0 !important; }
+
+/* feed tabs bar injected by feed.html (Bluesky "Following/Discover" row) */
+.bsky-tabs { display: flex; position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bs-bg) 92%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--bs-border); }
+.bsky-tab { flex: 1; text-align: center; padding: 14px 8px 0; font-weight: 600; color: var(--bs-muted) !important; text-decoration: none; position: relative; }
+.bsky-tab span { display: inline-block; padding-bottom: 12px; }
+.bsky-tab.is-active { color: var(--bs-text) !important; font-weight: 700; }
+.bsky-tab.is-active span { border-bottom: 3px solid var(--bs-primary); }
+.bsky-tab:hover { background: var(--bs-bg-alt); }
+
+/* ---- composer: inline "What's up?" row + modal --------------------------- */
+body.bsky #compose-card { border-bottom: 1px solid var(--bs-border); }
+body.bsky #compose-card .tabs-wrapper > .tabs { display: none; }
+body.bsky #compose-card .tab-content { padding: 12px 16px 8px; }
+body.bsky #compose-card .compose-form { display: flex; gap: 12px; align-items: flex-start; }
+body.bsky #compose-card .compose-form img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; flex: none; }
+body.bsky #compose-card .compose-form .control { flex: 1; }
+body.bsky #compose-card textarea#publish { border: 0; box-shadow: none; background: transparent; resize: none; min-height: 44px; font-size: 18px; color: var(--bs-text); padding: 8px 0; }
+body.bsky #compose-card textarea#publish:focus { box-shadow: none; }
+body.bsky #compose-card .compose-options { border: 0; padding: 4px 0; }
+body.bsky #compose-card .more-wrap, body.bsky #compose-card .more-wrap * { background: transparent; }
+body.bsky #compose-card .more-wrap { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 8px 0 10px; border-top: 1px solid var(--bs-border); margin-top: 6px; }
+body.bsky #compose-card #publish-button { width: auto !important; flex: none; background: var(--bs-primary) !important; border-radius: 999px; background: var(--bs-primary); color: #fff; border: 0; padding: 8px 24px; font-weight: 700; height: auto; }
+body.bsky #compose-card #publish-button.is-disabled { opacity: .45; }
+.bsky-counter { margin-right: auto; color: var(--bs-muted); font-size: 13px; }
+.bsky-compose-bar { display: none; padding: 12px 16px 0; }
+.bsky-link { background: none; border: 0; color: var(--bs-primary); font-size: 16px; cursor: pointer; padding: 0; }
+.bsky-backdrop { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, .55); z-index: 900; }
+body.bsky-composing .bsky-backdrop { display: block; }
+body.bsky-composing #compose-card {
+  position: fixed; z-index: 950; top: 12vh; left: 50%; transform: translateX(-50%); width: min(600px, 94vw);
+  background: var(--bs-bg); border-radius: 16px !important; border: 1px solid var(--bs-border) !important; box-shadow: 0 20px 60px rgba(0,0,0,.35) !important;
+}
+body.bsky-composing #compose-card .bsky-compose-bar { display: block; }
+body.bsky-composing #compose-card textarea#publish { min-height: 140px; }
+
+/* ---- posts ----------------------------------------------------------------- */
+body.bsky .card.is-post { margin: 0 !important; border-radius: 0 !important; border-bottom: 1px solid var(--bs-border); background: var(--bs-bg); }
+body.bsky .card.is-post:hover { background: color-mix(in srgb, var(--bs-bg-alt) 45%, var(--bs-bg)); }
+body.bsky .card.is-post .content-wrap {
+  display: grid; grid-template-columns: 46px minmax(0, 1fr); column-gap: 12px; padding: 12px 16px 6px !important; position: relative;
+}
+body.bsky .card.is-post .card-heading,
+body.bsky .card.is-post .user-block { display: contents; }
+body.bsky .card.is-post .user-block .image { grid-column: 1; grid-row: 1 / span 30; }
+body.bsky .card.is-post .user-block .image img { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; }
+body.bsky .card.is-post .user-info { grid-column: 2; display: flex; align-items: baseline; gap: 8px; padding-right: 32px; min-width: 0; }
+body.bsky .card.is-post .user-info a { font-weight: 700; font-size: 15px; color: var(--bs-text) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.bsky .card.is-post .user-info .time { font-size: 14px; color: var(--bs-muted); }
+body.bsky .card.is-post .post-author-badges { grid-column: 2; display: flex; justify-content: flex-start !important; gap: 6px; margin: 2px 0 4px; position: static !important; }
+body.bsky .card.is-post .card-heading > .dropdown { position: absolute; top: 6px; right: 8px; }
+body.bsky .card.is-post .card-heading > .dropdown .button { border: 0; background: none; box-shadow: none; color: var(--bs-muted); }
+body.bsky .card.is-post .card-body { grid-column: 2; padding: 2px 0 0 !important; }
+body.bsky .card.is-post .post-text, body.bsky .card.is-post .post-text p { font-size: 16px; line-height: 1.4; color: var(--bs-text) !important; word-break: break-word; }
+body.bsky .card.is-post .post-image img { border-radius: var(--bs-radius) !important; box-shadow: none !important; border: 1px solid var(--bs-border); }
+body.bsky .card.is-post .post-annotation-section { grid-column: 2; padding: 4px 0 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
+body.bsky .card.is-post .post-action-section { grid-column: 2; padding: 4px 0 6px !important; border: 0 !important; background: transparent !important; }
+body.bsky .card.is-post .post-action-section .social-count { margin: 0 !important; width: 100%; max-width: 420px; justify-content: space-between; }
+body.bsky .card.is-post .post-action-section .like-wrapper,
+body.bsky .card.is-post .post-action-section .dislike-wrapper { display: inline-flex; }
+body.bsky .card.is-post .post-action-section .like-wrapper > a,
+body.bsky .card.is-post .post-action-section .dislike-wrapper > a,
+body.bsky .card.is-post .post-action-section .small-fab,
+body.bsky .card.is-post .post-action-section .share-button {
+  display: inline-flex !important; align-items: center; gap: 6px; width: auto !important; height: auto !important; min-width: 0 !important;
+  padding: 0 !important; border: 0 !important; box-shadow: none !important; background: none !important; border-radius: 999px; color: var(--bs-muted);
+}
+body.bsky .card.is-post .post-action-section span { color: var(--bs-muted); font-size: 13px; font-weight: 500; }
+body.bsky .card.is-post .post-action-section .controls,
+body.bsky .card.is-post .post-action-section > div { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+body.bsky .card.is-post .post-action-section .controls > *,
+body.bsky .card.is-post .post-action-section .likes-count,
+body.bsky .card.is-post .post-action-section .fab-wrapper {
+  display: inline-flex; align-items: center; gap: 6px; margin: 0 !important; padding: 6px 10px; border-radius: 999px; color: var(--bs-muted); font-size: 13px;
+}
+body.bsky .card.is-post .post-action-section a { color: var(--bs-muted) !important; }
+body.bsky .card.is-post .post-action-section svg { width: 18px; height: 18px; stroke-width: 1.8; }
+body.bsky .card.is-post .post-action-section *:hover > svg,
+body.bsky .card.is-post .post-action-section a:hover svg { stroke: var(--bs-primary); }
+body.bsky .card.is-post .like-wrapper.is-liked svg, body.bsky .card.is-post .like-button.is-liked svg { stroke: var(--bs-like); fill: var(--bs-like); }
+body.bsky .post-meta-chip { border-radius: 999px; }
+body.bsky .comments-wrap { border-top: 1px solid var(--bs-border); background: var(--bs-bg); }
+body.bsky .ys-rank-last-note { border-radius: 0 !important; margin: 0 !important; }
+
+/* pagination / spinner */
+body.bsky .ys-pagination { display: flex; justify-content: center; gap: 12px; padding: 16px; }
+body.bsky .ys-page-btn { border-radius: 999px; }
+
+/* ---- side column cards ---------------------------------------------------- */
+body.bsky .ys-ranked-card .card-heading, body.bsky .column:nth-child(1) .card-heading, body.bsky .column:nth-child(3) .card-heading { padding: 12px 16px; font-weight: 800; font-size: 19px; border: 0; }
+body.bsky .column:nth-child(1) .card-body, body.bsky .column:nth-child(3) .card-body { padding: 4px 16px 12px; }
+
+/* ---- profile --------------------------------------------------------------- */
+body.bsky .cover-bg { border-radius: 0; height: 190px; background-size: cover; }
+body.bsky .cover-bg .cover-image { object-fit: cover; width: 100%; height: 100%; }
+body.bsky .ys-profile-activity-tabs { display: flex; border-bottom: 1px solid var(--bs-border); overflow-x: auto; gap: 0; }
+body.bsky .ys-profile-activity-tab { flex: none; border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; color: var(--bs-muted); font-weight: 600; padding: 14px 16px 12px; height: auto; }
+body.bsky .ys-profile-activity-tab.is-active { color: var(--bs-text); font-weight: 700; border-bottom: 3px solid var(--bs-primary) !important; }
+body.bsky .ys-profile-hero-action-btn, body.bsky .button.ys-profile-follow-menu-btn { border-radius: 999px; font-weight: 700; }
+
+/* ---- generic controls ------------------------------------------------------ */
+body.bsky .button.is-solid.accent-button, body.bsky .button.is-primary { background: var(--bs-primary); border-color: var(--bs-primary); color: #fff; border-radius: 999px; }
+body.bsky .input, body.bsky .textarea { background: var(--bs-bg-alt); color: var(--bs-text); border-color: var(--bs-border); border-radius: 10px; }
+
+/* ---- responsive ------------------------------------------------------------ */
+@media (max-width: 1180px) {
+  body.bsky { --bs-nav: 76px; --bs-side: 0px; }
+  .bsky-nav { align-items: center; padding: 14px 6px; }
+  .bsky-nav__item span, .bsky-me__meta, .bsky-me__theme, .bsky-newpost span { display: none; }
+  .bsky-nav__item { width: auto; padding: 12px; }
+  .bsky-newpost { padding: 14px; margin: 14px 0 0; }
+  .bsky-nav__logo img { height: 36px; width: 36px; }
+  .bsky-searchslot { display: none; }
+  .bsky-me { flex-direction: column; border: 0; }
+  body.bsky #main-feed.container, body.bsky .view-wrapper > .container { max-width: calc(var(--bs-nav) + var(--bs-col)) !important; }
+  body.bsky .view-wrap > .columns:not(.no-margin) { grid-template-columns: var(--bs-col); }
+  /* narrow screens: the side boxes (trending, annotations, suggestions…) stack under the feed instead of disappearing */
+  body.bsky .view-wrap > .columns:not(.no-margin) > .column:nth-child(2) { grid-column: 1; grid-row: 1; min-height: 0; }
+  body.bsky .view-wrap > .columns:not(.no-margin) > .column:first-child { grid-column: 1; grid-row: 2; padding: 16px !important; border-left: 1px solid var(--bs-border); border-right: 1px solid var(--bs-border); }
+  body.bsky .view-wrap > .columns:not(.no-margin) > .column:nth-child(3) { grid-column: 1; grid-row: 3; padding: 0 16px 24px !important; border-left: 1px solid var(--bs-border); border-right: 1px solid var(--bs-border); }
+  .bsky-frame { width: calc(var(--bs-nav) + var(--bs-col)); }
+  .bsky-popover { left: 76px; }
+}
+@media (max-width: 720px) {
+  body.bsky { --bs-nav: 0px; --bs-col: 100vw; padding-bottom: 60px; }
+  .bsky-frame { width: 100vw; height: auto; top: auto; bottom: 0; left: 0; transform: none; }
+  .bsky-nav { position: static; width: 100%; flex-direction: row; justify-content: space-around; padding: 4px; background: var(--bs-bg); border-top: 1px solid var(--bs-border); overflow: visible; }
+  .bsky-nav__logo, .bsky-nav__spacer, .bsky-me, .bsky-newpost { display: none; }
+  .bsky-nav__item[data-bsky-nav="admin"], .bsky-nav__item[data-bsky-nav="explore"] { display: none; }
+  body.bsky #main-feed.container, body.bsky .view-wrapper > .container { max-width: 100% !important; padding-left: 0 !important; }
+  body.bsky .view-wrap > .columns:not(.no-margin) { grid-template-columns: 100%; }
+  body.bsky .view-wrap > .columns.no-margin { width: 100%; border: 0; }
+  body.bsky .view-wrap > .columns:not(.no-margin) > .column:nth-child(2) { border: 0; }
+  .bsky-popover { left: 8px; right: 8px; width: auto; top: auto; bottom: 62px; }
+}
+
+/* spacing refinements */
+body.bsky .card.is-post .card-body.post-content-section, body.bsky .card.is-post .post-text { min-height: 0 !important; margin: 0 !important; padding: 0 !important; }
+body.bsky .card.is-post .post-text p { margin: 0 0 4px; }
+body.bsky .card.is-post .post-action-section .social-count > * { padding: 0 !important; margin: 0 !important; }
+body.bsky .card.is-post .post-action-section .likes-count { min-width: 0; }
+
+/* ---- Trending (compact, like bsky.app "Trending") --------------------------- */
+body.bsky .ys-trending-card { border: 1px solid var(--bs-border) !important; border-radius: var(--bs-radius) !important; overflow: hidden; }
+body.bsky .ys-trending-card .card-heading { padding: 10px 16px 6px !important; border: 0 !important; }
+body.bsky .ys-trending-card .ys-trending-card__header h4 { font-size: 17px; font-weight: 800; margin: 0; }
+body.bsky .ys-trending-card .ys-trending-card__subtitle,
+body.bsky .ys-trending-card .ys-trending-rank,
+body.bsky .ys-trending-card .ys-trending-count { display: none !important; }
+body.bsky .ys-trending-card .card-body { padding: 0 0 6px !important; }
+body.bsky .ys-trending-card .ys-trending-row {
+  display: block; padding: 7px 16px !important; margin: 0 !important; border: 0 !important; border-radius: 0 !important; background: none !important; text-decoration: none;
+}
+body.bsky .ys-trending-card .ys-trending-row:hover { background: var(--bs-bg-alt) !important; }
+body.bsky .ys-trending-card .ys-trending-copy { display: flex; flex-direction: column; gap: 0; }
+body.bsky .ys-trending-card .ys-trending-tag { font-size: 14.5px; font-weight: 700; line-height: 1.25; color: var(--bs-text); }
+body.bsky .ys-trending-card .ys-trending-meta { font-size: 12.5px; line-height: 1.2; color: var(--bs-muted); }
+body.bsky .ys-trending-card .ys-trending-empty { padding: 8px 16px; font-size: 13px; color: var(--bs-muted); }
+
+/* ==========================================================================
+   Round 2
+   ========================================================================== */
+.bsky-nav__item { font-size: 18px; gap: 14px; }
+
+/* ---- composer modal -------------------------------------------------------- */
+.bsky-composer { display: none; position: fixed; z-index: 950; top: 10vh; left: 50%; transform: translateX(-50%); width: min(600px, 94vw);
+  background: var(--bs-bg); color: var(--bs-text); border: 1px solid var(--bs-border); border-radius: 16px; box-shadow: 0 24px 70px rgba(0,0,0,.35); padding: 0 0 8px; }
+body.bsky-composing .bsky-composer { display: block; }
+.bsky-composer__bar { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; }
+.bsky-post-btn { border: 0; border-radius: 999px; background: var(--bs-primary); color: #fff; font-weight: 700; font-size: 15px; padding: 8px 22px; cursor: pointer; }
+.bsky-post-btn.is-disabled { opacity: .4; pointer-events: none; }
+.bsky-composer__body { display: flex; gap: 12px; padding: 4px 16px 8px; }
+.bsky-composer__avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex: none; }
+.bsky-composer textarea { width: 100%; border: 0 !important; outline: none; box-shadow: none !important; background: transparent !important; color: var(--bs-text);
+  font: inherit; font-size: 19px; resize: none; min-height: 110px; max-height: 320px; padding: 8px 0; }
+.bsky-composer__image { display: none; padding: 0 16px 8px 72px; }
+.bsky-composer__image.is-open { display: block; }
+.bsky-composer__image textarea { min-height: 38px; font-size: 14px; border: 1px solid var(--bs-border) !important; border-radius: 10px; padding: 8px 10px; background: var(--bs-bg-alt) !important; }
+.bsky-composer__foot { display: flex; align-items: center; gap: 10px; padding: 8px 16px 4px; border-top: 1px solid var(--bs-border); margin-top: 4px; }
+.bsky-icon-btn { border: 0; background: none; color: var(--bs-primary); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.bsky-icon-btn:hover { background: var(--bs-primary-soft); }
+.bsky-icon-btn svg { width: 20px; height: 20px; }
+.bsky-composer .ws-crosspost, .bsky-composer [data-ws-crosspost] { margin: 0 16px; }
+.bsky-counter { margin-left: auto; color: var(--bs-muted); font-size: 13px; }
+
+/* ---- post actions: keep visible after click -------------------------------- */
+body.bsky .post-action-section svg[style*="255, 255, 255"], body.bsky .post-action-section svg[style*="#fff"] { stroke: var(--bs-primary) !important; }
+body.bsky .post-action-section span[style*="255, 255, 255"], body.bsky .post-action-section span[style*="#fff"] { color: var(--bs-primary) !important; }
+body.bsky .post-action-section .like-wrapper svg[style*="255, 255, 255"] { stroke: var(--bs-like) !important; fill: color-mix(in srgb, var(--bs-like) 25%, transparent); }
+body.bsky .post-action-section .like-wrapper span[style*="255, 255, 255"] { color: var(--bs-like) !important; }
+body.bsky .post-action-section .share-button svg[style*="255, 255, 255"], body.bsky .post-action-section .share-count svg[style*="255, 255, 255"] { stroke: var(--bs-green) !important; }
+body.bsky .post-action-section .share-button span[style*="255, 255, 255"], body.bsky .post-action-section .share-count span[style*="255, 255, 255"] { color: var(--bs-green) !important; }
+body.bsky .post-action-section a[style], body.bsky .post-action-section .share-button[style] { background: none !important; color: var(--bs-muted); }
+body.bsky .post-action-section .ys-stroke-blue { stroke: currentColor !important; }
+body.bsky .post-action-section .ys-text-light-blue { color: inherit !important; }
+body.bsky .post-action-section .controls > div { cursor: pointer; }
+
+/* ---- annotate button (post_annotation add-on) no longer overlaps the actions - */
+body.bsky .content-wrap > .edu-annotate-btn { top: 8px !important; bottom: auto !important; right: 44px !important; }
+body.bsky .media-content > .edu-annotate-btn { top: 0 !important; bottom: auto !important; right: 0 !important; }
+body.bsky .content-wrap > .edu-annot-summary { grid-column: 2; padding-right: 0 !important; }
+body.bsky .media-content > .edu-annot-summary { padding-right: 0 !important; }
+
+/* ---- comments panel (opens when clicking "comment") ------------------------- */
+body.bsky .comments-wrap:not(.is-hidden) { display: block; padding: 0; background: var(--bs-bg); }
+body.bsky .comments-heading { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--bs-border); background: var(--bs-bg); }
+body.bsky .comments-heading h4 { margin: 0; font-size: 17px; font-weight: 800; }
+body.bsky .comments-heading h4 small { color: var(--bs-muted); font-weight: 500; }
+body.bsky .comments-heading .close-comments { order: -1; cursor: pointer; width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--bs-text); }
+body.bsky .comments-heading .close-comments:hover { background: var(--bs-bg-alt); }
+body.bsky .comments-body, body.bsky .comments-body.has-slimscroll { max-height: none !important; height: auto !important; overflow: visible !important; padding: 0 !important; }
+body.bsky .slimScrollDiv { height: auto !important; overflow: visible !important; }
+body.bsky .comments-body .original-post { padding: 12px 16px; border-bottom: 1px solid var(--bs-border); }
+body.bsky .comments-body .original-post hr, body.bsky .comments-body > hr { display: none; }
+body.bsky .comments-body .original-post .media-content > a { font-weight: 700; color: var(--bs-text); }
+body.bsky .media.is-comment {
+  display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; column-gap: 10px; align-items: start;
+  margin: 0 !important; padding: 12px 16px !important; border: 0; border-bottom: 1px solid var(--bs-border); background: transparent; box-shadow: none;
+}
+body.bsky .media.is-comment .media-left { margin: 0; }
+body.bsky .media.is-comment .media-left .image, body.bsky .media.is-comment .media-left img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+body.bsky .media.is-comment .media-content { min-width: 0; padding: 0; }
+body.bsky .media.is-comment .post-comment-heading { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+body.bsky .media.is-comment .time { color: var(--bs-muted); font-size: 13px; }
+body.bsky .media.is-comment .post-content-section p { margin: 2px 0 4px; color: var(--bs-text); font-size: 15px; line-height: 1.4; }
+body.bsky .media.is-comment .post-action-section.is-threaded, body.bsky .original-post .post-action-section.is-threaded { padding: 2px 0 !important; border: 0 !important; background: none !important; }
+body.bsky .post-action-section.is-threaded .controls { display: flex; gap: 22px; flex-wrap: wrap; }
+body.bsky .post-action-section.is-threaded .controls > * { display: inline-flex; align-items: center; gap: 6px; padding: 4px 0 !important; color: var(--bs-muted); font-size: 13px; }
+body.bsky .post-thread-tools { margin: 2px 0; }
+body.bsky .reply-toggle-button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--bs-muted); font-size: 13px; font-weight: 600; padding: 4px 8px; margin-left: -8px; border-radius: 999px; cursor: pointer; }
+body.bsky .reply-toggle-button:hover { background: var(--bs-primary-soft); color: var(--bs-primary); }
+body.bsky .reply-form-shell { margin-top: 6px !important; padding: 8px; border: 1px solid var(--bs-border); border-radius: 12px; background: var(--bs-bg); }
+body.bsky .reply-form-shell textarea { width: 100%; border: 0 !important; outline: none; box-shadow: none !important; background: transparent !important; color: var(--bs-text); resize: vertical; min-height: 60px; font: inherit; }
+body.bsky .reply-form-shell .add-comment-button { width: auto !important; display: block; margin: 6px 0 0 auto; padding: 6px 18px; height: auto; border-radius: 999px; background: var(--bs-primary) !important; color: #fff !important; border: 0; font-weight: 700; }
+body.bsky .media.is-comment .media-right { align-self: start; }
+
+/* ---- side boxes ------------------------------------------------------------- */
+body.bsky .ys-sidebox.ys-sidebox {
+  --ys-accent: var(--bs-primary); --ys-accent-soft: var(--bs-primary-soft); --ys-line: var(--bs-border); --ys-track: var(--bs-bg-alt);
+  background: var(--bs-bg); color: var(--bs-text); border: 1px solid var(--bs-border); border-radius: var(--bs-radius);
+  box-shadow: none; padding: 12px 16px 12px; margin: 0 0 14px;
+}
+body.bsky .ys-sidebox::before { display: none; }
+body.bsky .ys-sidebox__icon { width: 30px; height: 30px; border-radius: 50%; }
+body.bsky .ys-sidebox h4 { font-size: 17px; font-weight: 800; }
+body.bsky .ys-sidebox__sub { font-size: 12.5px; color: var(--bs-muted); opacity: 1; }
+body.bsky .ys-recsys-pill { border-color: transparent; background: var(--bs-primary-soft); color: var(--bs-primary); }
+body.bsky .ys-recsys-how { border-top-color: var(--bs-border); }
+body.bsky .ys-kpi { background: var(--bs-bg-alt); border-radius: 10px; }
+body.bsky .ys-kpi strong { color: var(--bs-text); }
+body.bsky .ys-stat-bar > i { background: var(--bs-primary); }
+body.bsky .ys-suggestion-card { border: 1px solid var(--bs-border) !important; border-radius: var(--bs-radius) !important; overflow: hidden; background: var(--bs-bg); margin-bottom: 14px !important; }
+body.bsky .ys-suggestion-card .card-heading { padding: 10px 16px 4px !important; border: 0 !important; background: none; }
+body.bsky .ys-suggestion-card h4 { font-size: 17px; font-weight: 800; margin: 0; }
+body.bsky .ys-suggestion-card__subtitle { display: none; }
+body.bsky .ys-suggestion-card .card-body { padding: 0 0 6px !important; }
+body.bsky .ys-suggestion-row { display: flex !important; align-items: center; gap: 10px; padding: 8px 16px !important; margin: 0 !important; border: 0 !important; background: none !important; border-radius: 0 !important; }
+body.bsky .ys-suggestion-row:hover { background: var(--bs-bg-alt) !important; }
+body.bsky .ys-suggestion-avatar { width: 40px !important; height: 40px !important; border-radius: 50% !important; object-fit: cover; }
+body.bsky .ys-suggestion-copy { display: flex; flex-direction: column; min-width: 0; }
+body.bsky .ys-suggestion-name { font-weight: 700; font-size: 14.5px; color: var(--bs-text) !important; }
+body.bsky .ys-suggestion-meta { font-size: 12.5px; color: var(--bs-muted); }
+body.bsky .ys-suggestion-row .ys-icon-circle-blue { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 999px; background: var(--bs-primary-soft) !important; color: var(--bs-primary) !important; border: 0; }
+body.bsky .ys-suggestion-row .ys-icon-circle-blue svg { width: 16px; height: 16px; stroke: var(--bs-primary); }
+body.bsky .column:nth-child(1) .card-heading h4, body.bsky .column:nth-child(3) .card-heading h4 { font-size: 17px; font-weight: 800; margin: 0; }
+
+/* ---- context hero (hashtag / emotion / interest pages) ----------------------- */
+body.bsky .page_head_topic.ys-context-hero {
+  position: sticky; top: 0; z-index: 15; margin: 0 !important; padding: 12px 16px !important; min-height: 0 !important; height: auto !important;
+  background: color-mix(in srgb, var(--bs-bg) 92%, transparent) !important; backdrop-filter: blur(8px);
+  color: var(--bs-text) !important; border: 0 !important; border-bottom: 1px solid var(--bs-border) !important; border-radius: 0 !important; box-shadow: none !important; text-align: left;
+}
+body.bsky .ys-context-hero::before, body.bsky .ys-context-hero::after { display: none !important; }
+body.bsky .ys-context-hero__eyebrow { color: var(--bs-muted) !important; font-size: 11.5px !important; letter-spacing: .08em; font-weight: 700; text-transform: uppercase; margin: 0 0 2px !important; }
+body.bsky .ys-context-hero__title { color: var(--bs-text) !important; font-size: 20px !important; line-height: 1.3 !important; font-weight: 800 !important; margin: 0 !important; }
+body.bsky .ys-context-hero__focus {
+  display: inline-flex; align-items: center; gap: 6px; padding: 1px 12px; border-radius: 999px; font-size: inherit !important;
+  background: var(--bs-primary-soft) !important; color: var(--bs-primary) !important; border: 0 !important; box-shadow: none !important; vertical-align: baseline;
+}
+
+/* ---- profile: header in the feed column, side boxes in the side column ------- */
+body.bsky #profile-main:has(> .columns.no-margin) { display: grid; grid-template-columns: var(--bs-col) var(--bs-side); grid-template-rows: min-content 1fr; align-items: start; }
+body.bsky #profile-main:has(> .columns.no-margin) > .columns.no-margin { grid-column: 1; grid-row: 1; width: auto; }
+body.bsky #profile-main:has(> .columns.no-margin) > .columns:not(.no-margin) { display: contents !important; }
+body.bsky #profile-main:has(> .columns.no-margin) > .columns:not(.no-margin) > .column:first-child {
+  grid-column: 2; grid-row: 1 / span 2; padding: 64px 0 24px 24px !important; border: 0; min-height: 0; display: block !important; width: auto !important;
+}
+body.bsky #profile-main:has(> .columns.no-margin) > .columns:not(.no-margin) > .column:nth-child(2) {
+  grid-column: 1; grid-row: 2; min-height: 50vh; border-left: 1px solid var(--bs-border); border-right: 1px solid var(--bs-border); width: auto !important; padding: 0 !important;
+}
+body.bsky #profile-main .basic-infos-wrapper, body.bsky #profile-main .friend-cards-list { margin: 0 0 14px !important; padding: 0 !important; }
+body.bsky #profile-main .ys-profile-panel-card { margin: 0 !important; box-shadow: none !important; border: 0 !important; background: transparent; }
+body.bsky #profile-main .ys-profile-panel-head { padding: 12px 16px 4px !important; }
+body.bsky #profile-main .ys-profile-panel-head h4 { font-size: 17px; font-weight: 800; margin: 0; }
+body.bsky #profile-main .ys-profile-section-heading__subtitle { font-size: 12.5px; color: var(--bs-muted); margin: 0; }
+body.bsky #profile-main .ys-profile-panel-wrap { border: 1px solid var(--bs-border); border-radius: var(--bs-radius); overflow: hidden; background: var(--bs-bg); }
+body.bsky #profile-main .ys-profile-hero-shell, body.bsky #profile-main .profile-subheader { box-shadow: none; border-radius: 0; background: transparent; }
+
+/* ---- friends ---------------------------------------------------------------- */
+body.bsky .ys-friends-page { align-content: start; gap: 0; max-width: var(--bs-col); margin: 0; border-left: 1px solid var(--bs-border); border-right: 1px solid var(--bs-border); min-height: 100vh; background: var(--bs-bg); padding: 0 !important; }
+body.bsky .ys-friends-hero-card { margin: 0 !important; padding: 12px 16px 0 !important; background: var(--bs-bg) !important; border: 0 !important; border-bottom: 1px solid var(--bs-border) !important; border-radius: 0 !important; box-shadow: none !important; color: var(--bs-text); }
+body.bsky .ys-friends-hero-main { display: block; }
+body.bsky .ys-friends-back-link { display: inline-flex; align-items: center; gap: 8px; color: var(--bs-text) !important; font-weight: 600; margin-bottom: 10px; }
+body.bsky .ys-friends-hero-identity { display: flex; align-items: center; gap: 12px; }
+body.bsky .ys-friends-hero-avatar img { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; }
+body.bsky .ys-friends-hero-kicker { display: none; }
+body.bsky .ys-friends-hero-copy h1 { font-size: 20px; font-weight: 800; margin: 0; color: var(--bs-text); }
+body.bsky .ys-friends-hero-copy p { margin: 0; color: var(--bs-muted); font-size: 13.5px; }
+body.bsky .ys-friends-stats-row { display: none; }
+body.bsky .ys-friends-list-card { background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; margin: 0 !important; }
+body.bsky .ys-friends-list-head { display: block; padding: 0; }
+body.bsky .ys-friends-tabs { display: flex; border-bottom: 1px solid var(--bs-border); background: none; padding: 0; gap: 0; border-radius: 0; }
+body.bsky .ys-friends-tab { flex: 1; text-align: center; padding: 13px 8px 11px; border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; color: var(--bs-muted) !important; font-weight: 600; }
+body.bsky .ys-friends-tab.is-active { color: var(--bs-text) !important; font-weight: 700; border-bottom: 3px solid var(--bs-primary) !important; }
+body.bsky .ys-friends-tab__count { background: var(--bs-bg-alt); color: var(--bs-muted); border-radius: 999px; padding: 0 8px; margin-left: 6px; font-size: 12px; }
+body.bsky .ys-friends-list-meta { padding: 8px 16px; color: var(--bs-muted); font-size: 12.5px; }
+body.bsky .ys-friends-grid { display: block !important; }
+body.bsky .ys-friends-profile-card { display: flex !important; align-items: center; gap: 12px; padding: 12px 16px !important; margin: 0 !important; border: 0 !important; border-bottom: 1px solid var(--bs-border) !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; }
+body.bsky .ys-friends-profile-card:hover { background: var(--bs-bg-alt) !important; }
+body.bsky .ys-friends-profile-card__avatar img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; display: block; }
+body.bsky .ys-friends-profile-card__name { font-weight: 700; font-size: 15px; color: var(--bs-text) !important; }
+body.bsky .ys-friends-profile-card__stats { display: flex; gap: 12px; flex-wrap: wrap; color: var(--bs-muted); font-size: 13px; }
+body.bsky .ys-friends-profile-card__stats strong { color: var(--bs-text); }
+body.bsky .ys-friends-empty { text-align: center; padding: 40px 16px; color: var(--bs-muted); }
+body.bsky .ys-friends-empty img { max-width: 140px; opacity: .85; }
+body.bsky .ys-friends-pagination { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 16px; }
+body.bsky .ys-friends-pagination__btn { border-radius: 999px !important; border: 1px solid var(--bs-border) !important; background: none !important; color: var(--bs-text) !important; padding: 6px 14px; box-shadow: none !important; }
+
+/* ---- interview (admin) -------------------------------------------------------- */
+body.bsky .interview-shell { max-width: none; margin: 0 !important; padding: 0 !important; }
+body.bsky .interview-shell > .columns {
+  display: grid !important; grid-template-columns: var(--bs-col) var(--bs-side); grid-template-rows: min-content 1fr; margin: 0 !important; align-items: start;
+}
+body.bsky .interview-shell > .columns > .column { width: auto !important; flex: none; padding: 0 !important; }
+body.bsky .interview-shell > .columns > .column:nth-child(2) { grid-column: 1; grid-row: 1 / span 2; border-left: 1px solid var(--bs-border); border-right: 1px solid var(--bs-border); min-height: 100vh; }
+body.bsky .interview-shell > .columns > .column:nth-child(1) { grid-column: 2; grid-row: 1; padding: 64px 0 0 24px !important; }
+body.bsky .interview-shell > .columns > .column:nth-child(3) { grid-column: 2; grid-row: 2; padding: 14px 0 24px 24px !important; }
+body.bsky .interview-card { border: 1px solid var(--bs-border); border-radius: var(--bs-radius); box-shadow: none; background: var(--bs-bg); color: var(--bs-text); margin-bottom: 14px; }
+body.bsky .interview-card .card-header { background: none; border-bottom: 1px solid var(--bs-border); box-shadow: none; }
+body.bsky .interview-card .card-header-title { color: var(--bs-text); font-weight: 800; font-size: 17px; padding: 12px 16px; }
+body.bsky .interview-card .card-content { padding: 12px 16px; }
+body.bsky .interview-card .label { color: var(--bs-muted); font-size: 12.5px; font-weight: 600; }
+body.bsky .interview-card .help { color: var(--bs-muted); }
+body.bsky .interview-shell > .columns > .column:nth-child(2) .interview-card { border: 0; border-radius: 0; margin: 0; background: transparent; }
+body.bsky .interview-shell > .columns > .column:nth-child(2) .card-header { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bs-bg) 92%, transparent); backdrop-filter: blur(8px); }
+body.bsky #interview-messages > div { max-width: 82%; margin: 0 0 10px !important; padding: 9px 14px; border-radius: 18px 18px 18px 4px; background: var(--bs-bg-alt); color: var(--bs-text); }
+body.bsky #interview-messages > div:has(> .has-text-link) { margin-left: auto !important; border-radius: 18px 18px 4px 18px; background: var(--bs-primary); color: #fff; }
+body.bsky #interview-messages > div:has(> .has-text-link) > div:first-child { color: rgba(255,255,255,.8) !important; }
+body.bsky #interview-messages > div > div:first-child { font-size: 11px !important; letter-spacing: .05em; opacity: .75; }
+body.bsky .interview-shell .ys-scroll-lg { min-height: 52vh; max-height: 62vh; overflow-y: auto; }
+body.bsky #interview-input { border-radius: 14px; background: var(--bs-bg-alt); color: var(--bs-text); }
+body.bsky #interview-send, body.bsky #interview-start-session { border-radius: 999px; background: var(--bs-primary); border-color: var(--bs-primary); color: #fff; font-weight: 700; }
+body.bsky #interview-refresh-memory { border-radius: 999px; }
+body.bsky .interview-shell .select select { border-radius: 10px; background: var(--bs-bg-alt); color: var(--bs-text); border-color: var(--bs-border); }
+body.bsky .interview-memory-card { margin: 14px 0 24px 0; }
+body.bsky .interview-persona-row { border-color: var(--bs-border); }
+
+/* ---- edit profile ------------------------------------------------------------- */
+body.bsky .view-wrapper.is-full > .container.is-fluid { padding-left: var(--bs-nav) !important; }
+body.bsky .ys-edit-profile-page { align-content: start; gap: 0; max-width: var(--bs-col); margin: 0; border-left: 1px solid var(--bs-border); border-right: 1px solid var(--bs-border); min-height: 100vh; background: var(--bs-bg); padding: 0 !important; }
+body.bsky .ys-edit-profile-hero { margin: 0 !important; padding: 12px 16px !important; background: var(--bs-bg) !important; border: 0 !important; border-bottom: 1px solid var(--bs-border) !important; border-radius: 0 !important; box-shadow: none !important; color: var(--bs-text); }
+body.bsky .ys-edit-profile-hero__main { display: flex; align-items: center; gap: 12px; }
+body.bsky .ys-edit-profile-hero__avatar img { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; }
+body.bsky .ys-edit-profile-hero__copy h1 { font-size: 20px; font-weight: 800; margin: 0; color: var(--bs-text); }
+body.bsky .ys-edit-profile-hero__copy p { margin: 0; color: var(--bs-muted); font-size: 13.5px; }
+body.bsky .ys-ep-two-col { display: block !important; }
+body.bsky .ys-ep-two-col > div { width: 100% !important; }
+body.bsky .ys-edit-profile-section { margin: 0 !important; padding: 16px !important; border: 0 !important; border-bottom: 1px solid var(--bs-border) !important; border-radius: 0 !important; box-shadow: none !important; background: transparent !important; }
+body.bsky .ys-edit-profile-section h4 { font-size: 17px; font-weight: 800; margin: 0; }
+body.bsky .ys-edit-profile-section .ys-profile-panel-head { padding: 0 0 10px !important; }
+body.bsky .ys-edit-profile-field label { color: var(--bs-muted); font-size: 12.5px; font-weight: 600; }
+body.bsky .ys-edit-profile-field .input, body.bsky .ys-edit-profile-field select, body.bsky .ys-edit-profile-field textarea { background: var(--bs-bg-alt); color: var(--bs-text); border: 1px solid var(--bs-border); border-radius: 10px; box-shadow: none; }
+body.bsky .ys-edit-profile-actions .button, body.bsky .ys-edit-profile-form .button.form-button { border-radius: 999px; background: var(--bs-primary) !important; border-color: var(--bs-primary) !important; color: #fff !important; font-weight: 700; }
+body.bsky .ys-edit-profile-subsection { border-color: var(--bs-border); }
+body.bsky .ys-ep-topic-card { border: 1px solid var(--bs-border); border-radius: var(--bs-radius); box-shadow: none; background: var(--bs-bg); }
+
+@media (max-width: 1180px) {
+  body.bsky #profile-main:has(> .columns.no-margin) { grid-template-columns: var(--bs-col); }
+  body.bsky #profile-main:has(> .columns.no-margin) > .columns:not(.no-margin) > .column:first-child { grid-column: 1; grid-row: 3; padding: 16px !important; border: 0; }
+  body.bsky #profile-main:has(> .columns.no-margin) > .columns:not(.no-margin) > .column:nth-child(2) { grid-column: 1; grid-row: 2; }
+  body.bsky .interview-shell > .columns { grid-template-columns: var(--bs-col); }
+  body.bsky .interview-shell > .columns > .column:nth-child(1) { grid-column: 1; grid-row: 2; padding: 16px !important; }
+  body.bsky .interview-shell > .columns > .column:nth-child(2) { grid-column: 1; grid-row: 1; min-height: 0; }
+  body.bsky .interview-shell > .columns > .column:nth-child(3) { grid-column: 1; grid-row: 3; padding: 0 16px 16px !important; }
+}
+@media (max-width: 720px) {
+  body.bsky #profile-main:has(> .columns.no-margin) { grid-template-columns: 100%; }
+  body.bsky .interview-shell > .columns { grid-template-columns: 100%; }
+  body.bsky .view-wrapper.is-full > .container.is-fluid { padding-left: 0 !important; }
+}
+
+/* friends / edit-profile avatar wrappers and spacing */
+body.bsky .ys-friends-hero-main, body.bsky .ys-friends-hero-identity, body.bsky .ys-friends-hero-copy, body.bsky .ys-edit-profile-hero__main, body.bsky .ys-edit-profile-hero__copy { min-height: 0 !important; height: auto !important; margin: 0 !important; padding: 0 !important; }
+body.bsky .ys-friends-hero-card { padding-bottom: 12px !important; }
+body.bsky .ys-friends-hero-avatar, body.bsky .ys-friends-profile-card__avatar, body.bsky .ys-edit-profile-hero__avatar {
+  width: auto !important; height: auto !important; padding: 0 !important; border: 0 !important; border-radius: 50% !important; background: none !important; box-shadow: none !important; overflow: hidden; flex: none; display: block;
+}
+body.bsky .ys-friends-hero-avatar img, body.bsky .ys-edit-profile-hero__avatar img { width: 52px !important; height: 52px !important; }
+body.bsky .ys-friends-profile-card__avatar img { width: 48px !important; height: 48px !important; }
+body.bsky .ys-friends-list-head { border: 0 !important; margin: 0 !important; background: none !important; box-shadow: none !important; }
+body.bsky .ys-friends-tabs { border-top: 0 !important; margin: 0 !important; }
+body.bsky .ys-friends-list-card { min-height: 0 !important; }
+body.bsky .ys-friends-hero-card, body.bsky .ys-edit-profile-hero { min-height: 0 !important; height: auto !important; display: block !important; gap: 0 !important; }
+body.bsky .ys-friends-page > section + section { margin-top: 0 !important; }
+
+/* ==========================================================================
+   Thread view (post + replies) - Bluesky style
+   ========================================================================== */
+.bsky-pagehead { position: sticky; top: 0; z-index: 15; display: flex; align-items: center; gap: 14px; padding: 8px 14px; background: color-mix(in srgb, var(--bs-bg) 92%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--bs-border); }
+.bsky-pagehead a { display: inline-flex; width: 36px; height: 36px; border-radius: 50%; align-items: center; justify-content: center; color: var(--bs-text) !important; }
+.bsky-pagehead a:hover { background: var(--bs-bg-alt); }
+.bsky-pagehead strong { font-size: 19px; font-weight: 800; }
+
+body.bsky .profile-timeline { padding: 0 !important; background: transparent; }
+body.bsky .profile-timeline .card.is-post { margin: 0 !important; background: none !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
+body.bsky .profile-timeline .card.is-post:hover { background: none !important; }
+body.bsky .profile-timeline .comments-wrap { display: block; border: 0 !important; background: none !important; padding: 0 !important; }
+body.bsky .profile-timeline .comments-body, body.bsky .profile-timeline .comments-body.ys-p-1rem { padding: 0 !important; }
+body.bsky .profile-timeline .media.is-comment { padding: 10px 16px 2px 12px !important; border: 0 !important; column-gap: 10px; }
+body.bsky .profile-timeline .media.is-comment .media-left { position: relative; align-self: stretch; }
+body.bsky .profile-timeline .post-comment-heading { justify-content: space-between; align-items: center; }
+body.bsky .profile-timeline .post-comment-heading > div:first-child { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+body.bsky .profile-timeline .post-comment-heading a { font-weight: 700; font-size: 15px; color: var(--bs-text) !important; }
+body.bsky .profile-timeline .post-comment-heading .post-author-badges { margin: 0; }
+body.bsky .profile-timeline .post-content-section.is-threaded p { font-size: 15.5px; line-height: 1.42; margin: 1px 0 6px; color: var(--bs-text); }
+body.bsky .profile-timeline .post-annotation-section.is-threaded { margin: 0 0 4px; padding: 0 !important; border: 0 !important; background: none !important; }
+body.bsky .profile-timeline .post-annotation-section .card-footer { padding: 2px 0 !important; border: 0 !important; background: none !important; }
+
+/* action row: plain icons with counts, no bubbles */
+body.bsky .profile-timeline .post-action-section.is-threaded { margin: 0; padding: 2px 0 4px !important; }
+body.bsky .profile-timeline .post-action-section.is-threaded .controls { display: flex; align-items: center; gap: 26px; }
+body.bsky .profile-timeline .post-action-section.is-threaded .controls > *,
+body.bsky .profile-timeline .post-action-section.is-threaded .share-count a {
+  display: inline-flex !important; align-items: center; gap: 6px; width: auto !important; height: auto !important; padding: 4px 0 !important;
+  border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; color: var(--bs-muted) !important; font-size: 13px;
+}
+body.bsky .profile-timeline .post-action-section.is-threaded svg { width: 18px; height: 18px; stroke-width: 1.8; }
+
+/* "Less" + "Reply" on one compact line */
+body.bsky .profile-timeline .post-thread-tools { display: flex; align-items: center; gap: 4px; margin: 0 0 6px; }
+body.bsky .profile-timeline .thread-toggle-button { order: 2; border: 0 !important; background: none !important; box-shadow: none !important; padding: 4px 10px; height: auto; font-size: 13px; font-weight: 600; color: var(--bs-primary) !important; border-radius: 999px; cursor: pointer; }
+body.bsky .profile-timeline .thread-toggle-button:hover { background: var(--bs-primary-soft) !important; }
+body.bsky .profile-timeline .reply-toggle-button { order: 1; }
+body.bsky .profile-timeline .media-right { display: block; }
+
+/* the thread: connector line along the avatar column, replies nested under it */
+body.bsky .profile-timeline > [id^="child-"] { margin: 0; border: 0; }
+body.bsky .profile-timeline > [id^="child-"] > .ys-pl-20 { padding-left: 0 !important; border-top: 1px solid var(--bs-border); }
+body.bsky .profile-timeline [id^="child-"] [id^="child-"] { position: relative; margin-left: 31px; padding-left: 0; border-left: 2px solid var(--bs-border); border-radius: 0 0 0 12px; }
+body.bsky .profile-timeline [id^="child-"] .ys-pl-20 { padding-left: 0 !important; margin: 0; }
+body.bsky .profile-timeline .card.is-post:has(+ [id^="child-"] .card) .media-left::after {
+  content: ""; position: absolute; left: 19px; top: 50px; bottom: -4px; width: 2px; background: var(--bs-border);
+}
+/* the opening post of the thread is the large one */
+body.bsky .profile-timeline > div > .card.is-post:first-child .media.is-comment,
+body.bsky .profile-timeline > .card.is-post .media.is-comment { padding: 14px 16px 6px 16px !important; }
+body.bsky .profile-timeline > .card.is-post .post-content-section.is-threaded p { font-size: 18px; line-height: 1.4; }
+body.bsky .profile-timeline > .card.is-post .media-left::after { display: none; }
+body.bsky .profile-timeline .post-content-section.is-threaded { margin: 0 !important; padding: 0 !important; min-height: 0 !important; }
+body.bsky .profile-timeline .post-content-section.is-threaded p { color: var(--bs-text) !important; }
+body.bsky .profile-timeline .post-action-section.is-threaded { margin: 0 !important; min-height: 0 !important; }
+body.bsky .profile-timeline .post-action-section.is-threaded .controls { margin: 0 !important; padding: 0 !important; }
+body.bsky .profile-timeline .post-thread-tools { margin: 0 !important; padding: 0 0 4px !important; justify-content: flex-start !important; min-height: 0 !important; }
+body.bsky .profile-timeline .post-thread-tools .reply-toggle-button { margin-left: -6px; }
+body.bsky .profile-timeline .media.is-comment .media-content > p:empty { display: none; }
+body.bsky .profile-timeline .media.is-comment .media-content > * { margin-top: 0; margin-bottom: 0; }
+
+/* ---- interview: chat panel pinned to the viewport, compact side column ------- */
+body.bsky .interview-shell > .columns > .column:nth-child(2) { min-height: 0; align-self: start; }
+body.bsky .interview-shell > .columns > .column:nth-child(2) > .interview-card {
+  display: flex; flex-direction: column; height: 100vh; position: sticky; top: 0;
+}
+body.bsky .interview-shell > .columns > .column:nth-child(2) > .interview-card > .card-content:first-of-type,
+body.bsky .interview-shell .ys-scroll-lg { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; }
+body.bsky .interview-shell > .columns > .column:nth-child(2) > .interview-card > .card-content:last-of-type {
+  flex: none; border-top: 1px solid var(--bs-border) !important; padding: 10px 16px 12px; background: var(--bs-bg);
+}
+body.bsky .interview-shell > .columns > .column:nth-child(2) .field { margin: 0 0 6px; }
+body.bsky .interview-shell > .columns > .column:nth-child(2) .field .label { display: none; }
+body.bsky #interview-input { min-height: 56px; max-height: 140px; padding: 10px 14px; }
+body.bsky .interview-shell > .columns > .column:nth-child(2) .field.is-grouped { justify-content: flex-end; margin: 0; }
+body.bsky #interview-messages:empty::before { content: attr(data-empty); }
+
+body.bsky .interview-shell > .columns > .column { min-width: 0; overflow-wrap: anywhere; }
+body.bsky .interview-persona-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; min-width: 0; }
+body.bsky .interview-persona-meta { min-width: 0; }
+body.bsky .interview-persona-name { font-size: 16px; font-weight: 800; overflow-wrap: anywhere; }
+body.bsky .interview-persona-subtitle { font-size: 12.5px; color: var(--bs-muted); overflow-wrap: anywhere; }
+body.bsky .interview-avatar { width: 52px; height: 52px; border-radius: 50%; flex: none; overflow: hidden; }
+body.bsky .interview-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+body.bsky .interview-persona-row { display: block !important; padding: 6px 0; border-bottom: 1px solid var(--bs-border); }
+body.bsky .interview-persona-row:last-child { border-bottom: 0; }
+body.bsky .interview-persona-row-label { display: block; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--bs-muted); }
+body.bsky .interview-persona-row-value { display: block; text-align: left !important; font-size: 14px; color: var(--bs-text); white-space: normal; overflow-wrap: anywhere; }
+body.bsky .interview-card .card-content { max-width: 100%; }
+
+/* memory: same width as the chat column, below it */
+body.bsky .interview-shell > .interview-memory-card, body.bsky #interview-memory-card { max-width: var(--bs-col); margin: 0 0 24px !important; border-radius: 0; border-width: 1px 1px 1px 1px; }
+body.bsky #interview-memory-card .card-header-title { padding: 12px 16px; }
+body.bsky .interview-memory-primary-grid { display: block; }
+body.bsky .interview-memory-primary-grid > * { margin-bottom: 10px; }
+
+/* ---- thread tree (every level): rail along the parent's avatar, a stub into each reply ------------ */
+body.bsky .profile-timeline [id^="child-"] {
+  position: relative; margin: 0 0 0 37px !important; padding: 0 !important; border: 0 !important; border-radius: 0 !important;
+}
+body.bsky .profile-timeline .ys-pl-20 { position: relative; padding: 0 !important; margin: 0 !important; border: 0 !important; }
+body.bsky .profile-timeline .ys-pl-20::before {
+  content: ""; position: absolute; left: -1px; top: 0; width: 2px; height: 100%; background: var(--bs-border); z-index: 1;
+}
+body.bsky .profile-timeline .ys-pl-20:last-child::before { height: 34px; border-radius: 0 0 0 2px; }
+body.bsky .profile-timeline .ys-pl-20::after {
+  content: ""; position: absolute; left: -1px; top: 32px; width: 17px; height: 2px; background: var(--bs-border); z-index: 1;
+}
+body.bsky .profile-timeline .media.is-comment { padding: 10px 16px 2px 16px !important; }
+/* the parent's avatar column continues into the rail; the root too */
+body.bsky .profile-timeline .card.is-post:has(+ [id^="child-"] .card) .media-left::after,
+body.bsky .profile-timeline > .card.is-post:has(+ [id^="child-"] .card) .media-left::after {
+  display: block !important; content: ""; position: absolute; left: 19px; top: 50px; bottom: -6px; width: 2px; background: var(--bs-border);
+}
+/* separator under the opening post and keep replies flowing as one thread */
+body.bsky .profile-timeline > .card.is-post { border-bottom: 1px solid var(--bs-border) !important; }
+
+/* ---- annotate button: bottom-right, clear of the user badges and the actions -------------------- */
+body.bsky .content-wrap > .edu-annotate-btn { top: auto !important; bottom: 8px !important; right: 16px !important; }
+body.bsky .media-content > .edu-annotate-btn { top: auto !important; bottom: 4px !important; right: 0 !important; }
+body.bsky .post-action-section .social-count { max-width: calc(100% - 120px); }
+body.bsky .profile-timeline .post-thread-tools { max-width: calc(100% - 110px); }
+
+/* ---- annotation spotlight: the lifted card gets a solid background so the whole post is bright --------- */
+body.bsky .edu-spotlight { background: var(--bs-bg) !important; border-radius: 14px !important; overflow: visible; }
+body.bsky .edu-spotlight .content-wrap, body.bsky .edu-spotlight .media.is-comment, body.bsky .edu-spotlight .comments-wrap { background: var(--bs-bg) !important; border-radius: 14px; }
+body.bsky .edu-popover { color: #1f2937; }
+
+/* ---- toast ------------------------------------------------------------------------------------------- */
+.bsky-toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 3000; max-width: min(520px, 92vw); padding: 12px 18px; border-radius: 12px; background: #1f2937; color: #fff; font-size: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.3); transition: opacity .35s; }
+.bsky-toast.is-out { opacity: 0; }
+
+/* ==========================================================================
+   Side column: suggestions first, trending below; lighter, more compact boxes
+   ========================================================================== */
+body.bsky .view-wrap > .columns:not(.no-margin) > .column:nth-child(3) { grid-row: 1; padding: 64px 0 0 24px !important; }
+body.bsky .view-wrap > .columns:not(.no-margin) > .column:first-child { grid-row: 2; padding: 0 0 24px 24px !important; }
+/* pages with only two columns (hashtag, emotion, interest, thread): the side column is the first one */
+body.bsky .view-wrap > .columns:not(.no-margin) > .column:first-child:nth-last-child(2) { grid-row: 1; padding: 64px 0 24px 24px !important; }
+@media (max-width: 1180px) {
+  body.bsky .view-wrap > .columns:not(.no-margin) > .column:nth-child(3) { grid-row: 2; padding: 16px 16px 0 !important; }
+  body.bsky .view-wrap > .columns:not(.no-margin) > .column:first-child { grid-row: 3; padding: 0 16px 24px !important; }
+  body.bsky .view-wrap > .columns:not(.no-margin) > .column:first-child:nth-last-child(2) { grid-row: 2; padding: 16px !important; }
+}
+
+/* one light header for every box of the side column */
+body.bsky .ys-trending-card, body.bsky .ys-suggestion-card, body.bsky .ys-sidebox.ys-sidebox,
+body.bsky #profile-main .ys-profile-panel-wrap, body.bsky .interview-card {
+  border-radius: 12px !important; margin-bottom: 10px !important;
+}
+body.bsky .ys-trending-card .card-heading, body.bsky .ys-suggestion-card .card-heading, body.bsky #profile-main .ys-profile-panel-head,
+body.bsky .column:nth-child(1) .card-heading, body.bsky .column:nth-child(3) .card-heading {
+  padding: 9px 14px 4px !important; background: none !important; border: 0 !important; min-height: 0 !important; box-shadow: none !important;
+}
+body.bsky .ys-trending-card h4, body.bsky .ys-suggestion-card h4, body.bsky #profile-main .ys-profile-panel-head h4,
+body.bsky .ys-sidebox h4, body.bsky .column:nth-child(1) .card-heading h4, body.bsky .column:nth-child(3) .card-heading h4 {
+  font-size: 14.5px !important; font-weight: 700 !important; line-height: 1.25; margin: 0 !important; color: var(--bs-text);
+}
+body.bsky .ys-trending-card__subtitle, body.bsky .ys-suggestion-card__subtitle, body.bsky #profile-main .ys-profile-section-heading__subtitle,
+body.bsky .ys-sidebox__sub { display: none !important; }
+body.bsky .ys-trending-card .ys-trending-row { padding: 5px 14px !important; }
+body.bsky .ys-trending-card .ys-trending-tag { font-size: 14px; }
+body.bsky .ys-trending-card .ys-trending-meta { font-size: 12px; }
+body.bsky .ys-trending-card .card-body, body.bsky .ys-suggestion-card .card-body { padding: 0 0 4px !important; }
+body.bsky .ys-suggestion-row { padding: 5px 14px !important; gap: 9px; }
+body.bsky .ys-suggestion-avatar { width: 32px !important; height: 32px !important; }
+body.bsky .ys-suggestion-name { font-size: 14px; }
+body.bsky .ys-suggestion-meta { font-size: 12px; }
+body.bsky .ys-suggestion-row .ys-icon-circle-blue { width: 28px; height: 28px; }
+/* annotation side boxes */
+body.bsky .ys-sidebox.ys-sidebox { padding: 9px 14px 10px; }
+body.bsky .ys-sidebox__head { margin-bottom: 8px; gap: 8px; }
+body.bsky .ys-sidebox__icon { width: 24px; height: 24px; }
+body.bsky .ys-sidebox__icon svg { width: 14px; height: 14px; }
+body.bsky .ys-recsys-how { margin-top: 8px; padding-top: 8px; }
+body.bsky .ys-recsys-how p { font-size: 13px; line-height: 1.4; }
+body.bsky .ys-kpi { padding: 6px 4px; } body.bsky .ys-kpi strong { font-size: 1.05rem; }
+body.bsky .ys-stat-group { margin-top: 10px; } body.bsky .ys-stat-row { margin-bottom: 3px; font-size: 12.5px; }
+/* profile side panels */
+body.bsky #profile-main .ys-profile-panel-wrap { margin-bottom: 10px !important; }
+body.bsky #profile-main .ys-profile-panel-card .card-body, body.bsky #profile-main .ys-profile-panel-card .card-content { padding: 4px 14px 10px !important; }
+body.bsky #profile-main .ys-profile-panel-card { font-size: 13.5px; }
+body.bsky #profile-main .ys-profile-panel-card li, body.bsky #profile-main .ys-profile-panel-card .ys-profile-info-row { padding-top: 4px !important; padding-bottom: 4px !important; }
+body.bsky #profile-main .ys-profile-panel-card p { margin: 0 0 4px; }
+body.bsky #profile-main .friend-cards-list .ys-suggestion-row, body.bsky #profile-main .ys-profile-panel-card .ys-suggestion-row { padding: 5px 14px !important; }
+body.bsky #profile-main .ys-profile-panel-card img { max-width: 100%; }
+body.bsky #profile-main:has(> .columns.no-margin) > .columns:not(.no-margin) > .column:first-child { padding-top: 64px !important; }
+body.bsky .interview-card .card-header-title { font-size: 14.5px; padding: 9px 14px; font-weight: 700; }
+
+
+/* ==========================================================================
+   Chat / Notifications / Explore pages
+   ========================================================================== */
+.bsky-badge[hidden] { display: none; }
+body.bsky .bsky-twocol { display: grid; grid-template-columns: var(--bs-col) var(--bs-side); align-items: start; }
+body.bsky .bsky-main { border-left: 1px solid var(--bs-border); border-right: 1px solid var(--bs-border); min-height: 100vh; background: var(--bs-bg); min-width: 0; }
+body.bsky .bsky-aside { padding: 64px 0 24px 24px; min-width: 0; }
+body.bsky .bsky-pagehead--title { justify-content: space-between; padding: 14px 16px; }
+body.bsky .bsky-pagehead--title strong { font-size: 20px; font-weight: 800; }
+body.bsky.bsky-explore .bsky-searchslot { display: none; }
+@media (max-width: 1180px) {
+  body.bsky .bsky-twocol { grid-template-columns: var(--bs-col); }
+  body.bsky .bsky-aside { padding: 16px; border: 1px solid var(--bs-border); border-top: 0; }
+}
+@media (max-width: 720px) {
+  body.bsky .bsky-twocol { grid-template-columns: 100%; }
+  body.bsky .bsky-main { border: 0; }
+}
+
+/* filter chips */
+.bsky-chips { display: flex; gap: 8px; padding: 4px 16px 12px; overflow-x: auto; border-bottom: 1px solid var(--bs-border); }
+.bsky-chip { border: 1px solid var(--bs-border); background: var(--bs-bg); color: var(--bs-text); border-radius: 999px; padding: 8px 16px; font-size: 14.5px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.bsky-chip:hover { background: var(--bs-bg-alt); }
+.bsky-chip.is-active { background: var(--bs-bg-alt); font-weight: 700; border-color: var(--bs-bg-alt); }
+.bsky-chip__count { background: var(--bs-primary); color: #fff; border-radius: 9px; font-size: 11px; padding: 1px 6px; margin-left: 4px; }
+
+/* notification rows */
+.bsky-notif { display: grid; grid-template-columns: 44px 1fr auto; gap: 8px 12px; padding: 14px 16px; border-bottom: 1px solid var(--bs-border); align-items: start; }
+.bsky-notif[hidden] { display: none; }
+.bsky-notif:hover { background: var(--bs-bg-alt); }
+.bsky-notif__icon { display: flex; justify-content: center; padding-top: 6px; color: var(--bs-primary); }
+.bsky-notif__icon svg { width: 24px; height: 24px; }
+.bsky-notif__icon--like svg { color: var(--bs-like); fill: var(--bs-like); }
+.bsky-notif__icon--share svg { color: var(--bs-green); }
+.bsky-notif__icon--dislike svg { color: var(--bs-muted); }
+.bsky-notif__avatar { display: inline-flex; width: 34px; height: 34px; border-radius: 50%; overflow: hidden; background: var(--bs-bg-alt); align-items: center; justify-content: center; font-weight: 700; color: var(--bs-muted); margin-bottom: 6px; }
+.bsky-notif__avatar img { width: 100%; height: 100%; object-fit: cover; }
+.bsky-notif__line { font-size: 15.5px; color: var(--bs-text); line-height: 1.35; }
+.bsky-notif__who { font-weight: 700; color: var(--bs-text) !important; }
+.bsky-notif__snippet { display: block; margin-top: 4px; color: var(--bs-muted) !important; font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
+.bsky-notif__time { margin-top: 4px; font-size: 13.5px; color: var(--bs-muted); }
+.bsky-pill { align-self: start; border: 1px solid var(--bs-primary); color: var(--bs-primary) !important; border-radius: 999px; padding: 6px 14px; font-size: 14px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.bsky-pill:hover { background: var(--bs-primary-soft); }
+.bsky-pill--muted { border-color: transparent; background: var(--bs-bg-alt); color: var(--bs-muted) !important; }
+.bsky-mentions-pane { padding: 0; }
+.bsky-mentions-pane[hidden] { display: none; }
+
+/* side box (trending) */
+.bsky-box { border: 1px solid var(--bs-border); border-radius: var(--bs-radius); padding: 12px 16px; background: var(--bs-bg); }
+.bsky-box__head { display: flex; align-items: center; gap: 8px; font-size: 17px; margin-bottom: 8px; }
+.bsky-box__head svg { width: 18px; height: 18px; }
+.bsky-box__list { margin: 0; padding-left: 22px; color: var(--bs-muted); }
+.bsky-box__list li { padding: 4px 0; font-size: 14.5px; }
+.bsky-box__list a { color: var(--bs-text) !important; font-weight: 500; }
+.bsky-box__list small { color: var(--bs-muted); margin-left: 4px; }
+
+/* explore */
+.bsky-explore-search { padding: 12px 16px; border-bottom: 1px solid var(--bs-border); position: sticky; top: 0; z-index: 20; background: var(--bs-bg); }
+.bsky-explore-search form { display: flex; align-items: center; gap: 10px; background: var(--bs-bg-alt); border-radius: 999px; padding: 0 16px; }
+.bsky-explore-search svg { width: 20px; height: 20px; color: var(--bs-muted); flex: none; }
+.bsky-explore-search input { flex: 1; border: 0; background: none; outline: none; box-shadow: none; padding: 13px 0; font-size: 16px; color: var(--bs-text); }
+.bsky-explore-results[hidden], #bsky-explore-body[hidden], .bsky-explore-card[hidden] { display: none; }
+.bsky-explore-card { padding: 16px; border-bottom: 1px solid var(--bs-border); }
+.bsky-explore-card__head { display: flex; align-items: center; gap: 10px; font-size: 19px; margin-bottom: 6px; }
+.bsky-explore-card__head .bsky-icon-btn { margin-left: auto; }
+.bsky-explore-card__text { margin: 0 0 12px; color: var(--bs-text); }
+.bsky-tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 14px; }
+.bsky-tag { border: 1px solid var(--bs-border); border-radius: 999px; padding: 5px 12px; font-size: 14px; color: var(--bs-text) !important; text-decoration: none; }
+.bsky-tag:hover { background: var(--bs-bg-alt); }
+.bsky-btn-primary { display: block; text-align: center; background: var(--bs-primary); color: #fff !important; border-radius: 999px; padding: 12px; font-weight: 700; text-decoration: none; }
+.bsky-btn-primary:hover { filter: brightness(1.08); }
+.bsky-trend-head { display: flex; align-items: center; gap: 8px; padding: 18px 16px 14px; font-size: 20px; border-bottom: 1px solid var(--bs-border); }
+.bsky-trend { display: flex; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--bs-border); text-decoration: none; color: var(--bs-text) !important; }
+.bsky-trend:hover { background: var(--bs-bg-alt); }
+.bsky-trend__rank { color: var(--bs-muted); min-width: 24px; font-size: 16px; }
+.bsky-trend__main { display: flex; flex-direction: column; min-width: 0; }
+.bsky-trend__main strong { font-size: 16.5px; font-weight: 700; overflow-wrap: anywhere; }
+.bsky-trend__main small { color: var(--bs-muted); font-size: 14px; }
+
+/* chat: the panel is a page (only on /chat); elsewhere it is not shown ------------- */
+body.bsky .ys-chat-panel { display: none; }
+body.bsky.bsky-chatpage .ys-chat-panel {
+  display: block; position: fixed; top: 0; bottom: 0; right: 0; z-index: 55; pointer-events: auto; width: auto;
+  left: max(var(--bs-nav), calc((100vw - (var(--bs-nav) + var(--bs-col) + var(--bs-side))) / 2 + var(--bs-nav)));
+  max-width: calc(var(--bs-col) + var(--bs-side)); background: var(--bs-bg);
+  border-left: 1px solid var(--bs-border); border-right: 1px solid var(--bs-border);
+}
+body.bsky.bsky-chatpage .ys-chat-collapse-handle, body.bsky.bsky-chatpage #ys-chat-collapse, body.bsky.bsky-chatpage #ys-chat-refresh { display: none !important; }
+body.bsky.bsky-chatpage .bsky-searchslot { display: none; }
+body.bsky.bsky-chatpage .ys-chat-card {
+  display: grid !important; grid-template-columns: minmax(260px, 340px) 1fr; grid-template-rows: auto 1fr;
+  width: 100%; height: 100vh; max-height: none; border: 0; border-radius: 0; box-shadow: none; background: var(--bs-bg); backdrop-filter: none;
+}
+body.bsky.bsky-chatpage .ys-chat-card-header { grid-column: 1; grid-row: 1; padding: 16px 16px 10px; color: var(--bs-text); border-right: 1px solid var(--bs-border); }
+body.bsky.bsky-chatpage .ys-chat-title { font-size: 22px; font-weight: 800; color: var(--bs-text); }
+body.bsky.bsky-chatpage .ys-chat-subtitle { display: none; }
+body.bsky.bsky-chatpage .ys-chat-browser { grid-column: 1; grid-row: 2; display: flex !important; flex-direction: column; min-height: 0; border-right: 1px solid var(--bs-border); }
+body.bsky.bsky-chatpage .ys-chat-browser.is-hidden { display: flex !important; }
+body.bsky.bsky-chatpage .ys-chat-search-row { padding: 0 12px 10px; }
+body.bsky.bsky-chatpage .ys-chat-search-input { border-radius: 999px; background: var(--bs-bg-alt); border: 0; color: var(--bs-text); box-shadow: none; }
+body.bsky.bsky-chatpage .ys-chat-list { flex: 1; overflow-y: auto; padding: 0 8px 12px; max-height: none; }
+body.bsky.bsky-chatpage .ys-chat-list-item { border-radius: 12px; border: 0; background: none; color: var(--bs-text); padding: 12px; width: 100%; text-align: left; }
+body.bsky.bsky-chatpage .ys-chat-list-item:hover { background: var(--bs-bg-alt); }
+body.bsky.bsky-chatpage .ys-chat-list-name { font-weight: 700; color: var(--bs-text); }
+body.bsky.bsky-chatpage .ys-chat-list-date, body.bsky.bsky-chatpage .ys-chat-list-preview { color: var(--bs-muted); }
+body.bsky.bsky-chatpage .ys-chat-thread { grid-column: 2; grid-row: 1 / span 2; display: flex !important; flex-direction: column; min-height: 0; height: 100vh; background: var(--bs-bg); }
+body.bsky.bsky-chatpage .ys-chat-thread.is-hidden > * { display: none !important; }
+body.bsky.bsky-chatpage .ys-chat-thread.is-hidden::before { content: "Select a chat"; margin: auto; color: var(--bs-muted); font-size: 16px; }
+body.bsky.bsky-chatpage .ys-chat-thread-head { padding: 12px 16px; border-bottom: 1px solid var(--bs-border); color: var(--bs-text); justify-content: flex-start; }
+body.bsky.bsky-chatpage #ys-chat-back { display: none; }
+body.bsky.bsky-chatpage .ys-chat-thread-name { font-size: 18px; font-weight: 800; color: var(--bs-text); }
+body.bsky.bsky-chatpage .ys-chat-thread-subtitle { color: var(--bs-muted); }
+body.bsky.bsky-chatpage .ys-chat-messages { flex: 1; min-height: 0; max-height: none; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 6px; }
+body.bsky.bsky-chatpage .ys-chat-bubble-row { display: flex; }
+body.bsky.bsky-chatpage .ys-chat-bubble-row.is-user { justify-content: flex-end; }
+body.bsky.bsky-chatpage .ys-chat-bubble { max-width: 74%; padding: 10px 16px; border-radius: 18px; font-size: 15.5px; line-height: 1.4; overflow-wrap: anywhere; box-shadow: none; }
+body.bsky.bsky-chatpage .ys-chat-bubble.is-assistant { background: var(--bs-bg-alt); color: var(--bs-text); border-bottom-left-radius: 4px; }
+body.bsky.bsky-chatpage .ys-chat-bubble.is-user { background: var(--bs-primary); color: #fff; border-bottom-right-radius: 4px; }
+body.bsky.bsky-chatpage .ys-chat-compose { display: flex; align-items: center; gap: 10px; padding: 12px 16px 16px; border-top: 1px solid var(--bs-border); background: var(--bs-bg); }
+body.bsky.bsky-chatpage .ys-chat-input { flex: 1; resize: none; min-height: 0; border-radius: 22px; background: var(--bs-bg-alt); border: 0; box-shadow: none; padding: 12px 18px; color: var(--bs-text); }
+body.bsky.bsky-chatpage .ys-chat-send-btn { width: 44px; height: 44px; border-radius: 50%; border: 0; padding: 0; background: var(--bs-primary); color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+body.bsky.bsky-chatpage .ys-chat-send-btn span { display: none; }
+body.bsky.bsky-chatpage .ys-chat-send-btn:disabled { opacity: .5; }
+@media (max-width: 900px) {
+  body.bsky.bsky-chatpage .ys-chat-card { grid-template-columns: 1fr; }
+  body.bsky.bsky-chatpage .ys-chat-card-header, body.bsky.bsky-chatpage .ys-chat-browser { grid-column: 1; }
+  body.bsky.bsky-chatpage .ys-chat-thread { grid-column: 1; grid-row: 1 / span 2; z-index: 2; }
+  body.bsky.bsky-chatpage .ys-chat-thread.is-hidden { display: none !important; }
+  body.bsky.bsky-chatpage #ys-chat-back { display: inline-flex; }
+}
+@media (max-width: 720px) {
+  body.bsky.bsky-chatpage .ys-chat-panel { left: 0; bottom: 60px; }
+  body.bsky.bsky-chatpage .ys-chat-card, body.bsky.bsky-chatpage .ys-chat-thread { height: calc(100vh - 60px); }
+}
+body.bsky.bsky-chatpage .ys-chat-compose { box-sizing: border-box; width: 100%; }
+body.bsky.bsky-chatpage .ys-chat-input { min-width: 0; }
+body.bsky.bsky-chatpage .ys-chat-send-btn { flex: none; }
+body.bsky.bsky-chatpage .ys-chat-messages, body.bsky.bsky-chatpage .ys-chat-thread, body.bsky.bsky-chatpage .ys-chat-card-header { background: var(--bs-bg) !important; }
+
+/* feed header: YSocial logo above the tabs; "What's up?" bar --------------------------------- */
+.bsky-feedhead { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bs-bg) 92%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--bs-border); }
+.bsky-feedhead .bsky-tabs { position: static; border-bottom: 0; background: none; backdrop-filter: none; }
+.bsky-feedhead__logo { display: flex; justify-content: center; padding: 10px 0 2px; }
+.bsky-feedhead__logo img { height: 34px; width: auto; }
+.bsky-whatsup { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--bs-border); cursor: text; background: var(--bs-bg); }
+.bsky-whatsup:hover { background: var(--bs-bg-alt); }
+.bsky-whatsup img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex: none; }
+.bsky-whatsup__text { flex: 1; color: var(--bs-muted); font-size: 17px; }
+.bsky-whatsup svg { width: 22px; height: 22px; color: var(--bs-muted); }
+
+/* ==========================================================================
+   Profile header, Bluesky style: banner, round avatar overlapping it, actions on the right,
+   name and counters on the left
+   ========================================================================== */
+body.bsky #profile-main .cover-bg { height: 150px; overflow: visible; margin: 0; }
+body.bsky #profile-main .cover-bg .cover-image { height: 150px; max-height: none; width: 100%; border-radius: 0; object-fit: cover; object-position: center; }
+body.bsky #profile-main .cover-bg .cover-overlay { display: none; }
+body.bsky #profile-main .cover-bg .avatar {
+  left: 16px; right: auto; margin: 0; bottom: -46px; width: 94px; height: 94px; box-sizing: border-box;
+  border: 4px solid var(--bs-bg); border-radius: 50%; overflow: hidden; box-shadow: none !important; background: var(--bs-bg) !important; z-index: 3;
+}
+body.bsky #profile-main .cover-bg .avatar .avatar-image { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; box-shadow: none !important; }
+.bsky-cover-back { position: absolute; top: 10px; left: 12px; z-index: 4; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff !important; display: flex; align-items: center; justify-content: center; }
+.bsky-cover-back svg { width: 20px; height: 20px; }
+
+body.bsky #profile-main .ys-profile-hero-shell { display: flex; flex-direction: column; margin: 0; padding: 0 16px 6px; }
+body.bsky #profile-main .ys-profile-hero-actions-row {
+  order: -1; position: static; transform: none; display: flex !important; justify-content: flex-end; align-items: center; gap: 8px; padding: 10px 0 0; min-height: 54px;
+}
+body.bsky #profile-main .ys-profile-hero-actions-left, body.bsky #profile-main .ys-profile-hero-actions-right { display: flex; align-items: center; gap: 8px; }
+body.bsky #profile-main .ys-profile-follow-menu-form { margin: 0; }
+body.bsky #profile-main .ys-profile-hero-action-btn {
+  min-width: 0 !important; height: auto; min-height: 0; padding: 8px 16px; border-radius: 999px; border: 1px solid var(--bs-border);
+  background: var(--bs-bg) !important; color: var(--bs-text) !important; font-size: 14px; font-weight: 700; box-shadow: none; line-height: 1.2;
+}
+body.bsky #profile-main .ys-profile-hero-action-btn:hover { background: var(--bs-bg-alt) !important; }
+body.bsky #profile-main .button.ys-profile-follow-menu-btn { background: var(--bs-primary) !important; border-color: var(--bs-primary); color: #fff !important; }
+body.bsky #profile-main .button.ys-profile-follow-menu-btn.is-following { background: var(--bs-bg-alt) !important; border-color: var(--bs-border); color: var(--bs-text) !important; }
+
+body.bsky #profile-main .ys-profile-hero-subheader { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 18px; padding: 0; margin: 0; }
+body.bsky #profile-main .ys-profile-hero-subheader .subheader-middle { order: 1; flex: 0 0 100%; text-align: left; }
+body.bsky #profile-main .ys-profile-hero-subheader .subheader-start { order: 2; width: auto; display: block !important; }
+body.bsky #profile-main .ys-profile-hero-subheader .subheader-end { order: 3; width: auto; display: block !important; }
+body.bsky #profile-main .ys-profile-hero-center h2 { font-family: inherit; font-size: 26px; line-height: 1.2; font-weight: 800; color: var(--bs-text); margin: 0; }
+body.bsky #profile-main .ys-profile-hero-stat, body.bsky #profile-main .ys-profile-hero-stat--right { flex-direction: row; align-items: baseline; gap: 5px; text-align: left; }
+body.bsky #profile-main .ys-profile-hero-stat__value { font-size: 15px; line-height: 1.3; font-weight: 700; color: var(--bs-text); }
+body.bsky #profile-main .ys-profile-hero-stat__label { font-size: 15px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--bs-muted); }
+body.bsky #profile-main .profile-menu .ys-profile-hero-action-btn, body.bsky #profile-main .profile-menu .button { flex: none; width: auto !important; min-width: 0 !important; padding: 8px 18px !important; }
+body.bsky #profile-main .ys-profile-hero-subheader .subheader-start, body.bsky #profile-main .ys-profile-hero-subheader .subheader-end { margin: 0 !important; flex: none; justify-self: auto; }
+body.bsky #profile-main .ys-profile-hero-subheader { justify-content: flex-start !important; }
+body.bsky #profile-main .ys-profile-hero-subheader .subheader-posts { order: 4; width: auto; margin: 0 !important; flex: none; }
+body.bsky #profile-main .ys-profile-hero-stat--posts { flex-direction: row; align-items: baseline; gap: 5px; text-align: left; }
+
+/* sidebar avatar: hovering shows the account name and handle as a pill */
+.bsky-nav__avatar { display: flex !important; align-items: center; width: max-content; max-width: 100%; padding: 4px 4px 4px 4px !important; margin: 0 0 10px 8px; border-radius: 999px; text-decoration: none; }
+.bsky-nav__avatar-card { display: none; flex-direction: column; min-width: 0; padding: 0 14px 0 10px; line-height: 1.25; }
+.bsky-nav__avatar-card strong { font-size: 15px; color: var(--bs-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
+.bsky-nav__avatar-card small { font-size: 13.5px; color: var(--bs-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
+.bsky-nav__avatar:hover, .bsky-nav__avatar:focus-visible { background: var(--bs-bg-alt); }
+.bsky-nav__avatar:hover .bsky-nav__avatar-card, .bsky-nav__avatar:focus-visible .bsky-nav__avatar-card { display: flex; }
+@media (max-width: 1180px) { .bsky-nav__avatar { margin-left: 0; } .bsky-nav__avatar:hover .bsky-nav__avatar-card { display: none; } }
+body.bsky #profile-main .ys-profile-edit-btn { background: var(--bs-bg-alt) !important; border-color: var(--bs-bg-alt); }
+
+/* ---- comments panel: same look as the thread page (it reuses the .profile-timeline rules) ----------- */
+body.bsky .comments-heading { position: sticky; top: 0; z-index: 5; backdrop-filter: blur(8px); background: color-mix(in srgb, var(--bs-bg) 88%, transparent); }
+body.bsky .comments-body.profile-timeline { background: var(--bs-bg); }
+body.bsky .comments-body .media.is-comment.original-post { padding: 14px 16px 6px !important; border-bottom: 1px solid var(--bs-border) !important; }
+body.bsky .comments-body .media.is-comment.original-post .post-content-section.is-threaded p { font-size: 18px; line-height: 1.4; }
+body.bsky .comments-body .media.is-comment.original-post .media-left::after { display: none !important; }
+body.bsky .comments-body > hr { display: none; }
+body.bsky .comments-body .media.is-comment:not(.original-post) { border-bottom: 1px solid var(--bs-border) !important; }
+body.bsky .comments-body .media.is-comment:hover { background: color-mix(in srgb, var(--bs-bg-alt) 45%, var(--bs-bg)); }
+body.bsky .reply-form-shell:focus-within { border-color: var(--bs-primary); box-shadow: 0 0 0 3px var(--bs-primary-soft); }
+body.bsky .media.is-comment .media-right .dropdown .button { border: 0; background: transparent; box-shadow: none; color: var(--bs-muted); width: 32px; height: 32px; padding: 0; border-radius: 50%; }
+body.bsky .media.is-comment .media-right .dropdown .button:hover { background: var(--bs-bg-alt); color: var(--bs-text); }
+body.bsky .media.is-comment .media-right .dropdown-content { background: var(--bs-bg); border: 1px solid var(--bs-border); border-radius: var(--bs-radius); box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+body.bsky .media.is-comment .media-right .dropdown-item { color: var(--bs-text); }
+body.bsky .media.is-comment .media-right .dropdown-item:hover { background: var(--bs-bg-alt); }
+/* the panel is one thread: a thick band closes it, the opening post is the large one above the nested replies */
+body.bsky .comments-wrap:not(.is-hidden) { border-bottom: 6px solid var(--bs-bg-alt); }
+body.bsky .comments-body.profile-timeline > .card.is-post:first-child { background: color-mix(in srgb, var(--bs-primary-soft) 35%, var(--bs-bg)) !important; }

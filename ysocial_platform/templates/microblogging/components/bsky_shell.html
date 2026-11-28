@@ -1,0 +1,317 @@
+{#- Bluesky-style application shell for the microblogging pages (branch frontend_v2).
+    It wraps the core header (kept for its hooks: mentions, account data, plugin widgets, search script) and adds the
+    left navigation, the "New post" button and the sticky search slot. Nothing here removes a YSocial feature. -#}
+{% include "@ysocial_server/microblogging/header.html" %}
+{% set _bs_uid = logged_id if logged_id is defined else (user_id if user_id is defined else '') %}
+{% set _bs_pic = header_logged_profile_pic if header_logged_profile_pic is defined else (profile_pic if profile_pic is defined else '') %}
+{% set _bs_mentions = mentions if mentions is defined else [] %}
+<link rel="stylesheet" type="text/css" href="{{ url_for('platform_static_ysocial_server', filename='css/bsky.css') }}"/>
+<script>document.body.classList.add('bsky');</script>
+
+<div class="bsky-frame" id="bsky-frame">
+    <nav class="bsky-nav" aria-label="{{ _('main navigation') }}">
+        <a class="bsky-nav__logo bsky-nav__avatar" href="/{{ exp_id }}/profile/{{ _bs_uid }}/recent/1" title="{{ _('Profile') }}">
+            <img {% if _bs_pic == '' %}src="{{ url_for('static', filename='assets/img/users/' + _bs_uid|user_image_id + '.png') }}"{% else %}src="{{ _bs_pic }}"{% endif %} alt="{{ logged_username|display_name }}"/>
+            <span class="bsky-nav__avatar-card"><strong>{{ logged_username|display_name }}</strong><small>@{{ logged_username }}</small></span>
+        </a>
+        {% if ui is not defined or ui.get('nav_home', True) %}
+        <a class="bsky-nav__item" data-bsky-nav="home" href="/{{ exp_id }}/feed/{{ _bs_uid }}/feed/rf/1">
+            <i data-feather="home"></i><span>{{ _('Home') }}</span>
+        </a>
+        {% endif %}
+        {% if ui is not defined or ui.get('nav_explore', True) %}
+        <a class="bsky-nav__item" data-bsky-nav="explore" href="/{{ exp_id }}/explore">
+            <i data-feather="search"></i><span>{{ _('Explore') }}</span>
+        </a>
+        {% endif %}
+        {% if ui is not defined or ui.notifications_menu %}
+        <a class="bsky-nav__item" data-bsky-nav="notifications" href="/{{ exp_id }}/notifications">
+            <i data-feather="bell"></i><span>{{ _('Notifications') }}</span>
+            {% if _bs_mentions|length > 0 %}<b class="bsky-badge">{{ _bs_mentions|length }}</b>{% endif %}
+        </a>
+        {% endif %}
+        {% if experiment_memory_enabled and current_user_role in ['admin', 'researcher'] and (ui is not defined or ui.get('nav_interview', True)) %}
+        <a class="bsky-nav__item" data-bsky-nav="interview" href="/{{ exp_id }}/interview">
+            <i data-feather="message-square"></i><span>{{ _('Interview') }}</span>
+        </a>
+        {% endif %}
+        {% if experiment_memory_enabled and (ui is not defined or ui.get('nav_chat', True)) %}
+        <a class="bsky-nav__item" data-bsky-nav="chat" href="/{{ exp_id }}/chat">
+            <i data-feather="message-circle"></i><span>{{ _('Chat') }}</span>
+            <b class="bsky-badge" id="bsky-chat-badge" hidden></b>
+        </a>
+        {% endif %}
+        {% if ui is not defined or ui.get('nav_friends', True) %}
+        <a class="bsky-nav__item" data-bsky-nav="friends" href="/{{ exp_id }}/friends/{{ _bs_uid }}/1">
+            <i data-feather="users"></i><span>{{ _('Friends') }}</span>
+        </a>
+        {% endif %}
+        {% if ui is not defined or ui.get('nav_profile', True) %}
+        <a class="bsky-nav__item" data-bsky-nav="profile" id="bsky-profile-link" href="/{{ exp_id }}/profile/{{ _bs_uid }}/recent/1">
+            <i data-feather="user"></i><span>{{ _('Profile') }}</span>
+        </a>
+        {% endif %}
+        {% if is_admin == True and (ui is not defined or ui.get('nav_admin', True)) %}
+        <a class="bsky-nav__item" data-bsky-nav="admin" href="/admin/dashboard">
+            <i data-feather="sliders"></i><span>{{ _('Admin Dashboard') }}</span>
+        </a>
+        {% endif %}
+        {% if ui is not defined or ui.interaction_post %}
+        <button type="button" class="bsky-newpost" id="bsky-newpost">
+            <i data-feather="edit-3"></i><span>{{ _('New post') }}</span>
+        </button>
+        {% endif %}
+
+        <div class="bsky-nav__spacer"></div>
+        <div class="bsky-me">
+            <a href="/{{ exp_id }}/profile/{{ _bs_uid }}/recent/1" class="bsky-me__avatar">
+                <img {% if _bs_pic == '' %}src="{{ url_for('static', filename='assets/img/users/' + _bs_uid|user_image_id + '.png') }}"{% else %}src="{{ _bs_pic }}"{% endif %} alt=""/>
+            </a>
+            <div class="bsky-me__meta">
+                <strong>{{ logged_username|display_name }}</strong>
+            </div>
+            {% if ui is not defined or ui.get('nav_theme_switch', True) %}
+            <label class="theme-toggle bsky-me__theme" title="{{ _('Theme') }}">
+                <input type="checkbox"/>
+                <span class="toggler"><span class="dark"><i data-feather="moon"></i></span><span class="light"><i data-feather="sun"></i></span></span>
+            </label>
+            <a class="bsky-me__logout" href="{{ url_for('auth.logout') }}" title="{{ _('Log out') }}"><i data-feather="log-out"></i></a>
+            {% endif %}
+        </div>
+    </nav>
+
+    {% if ui is not defined or ui.get('show_search', True) %}
+    <aside class="bsky-searchslot" id="bsky-search">
+        <form class="ys-mb-header-search bsky-search" data-mb-global-search
+              data-search-endpoint="/{{ exp_id }}/api/header_search"
+              action="/{{ exp_id }}/feed/{{ _bs_uid }}/feed/rf/1" method="get" autocomplete="off">
+            <div class="ys-mb-header-search__field">
+                <i class="mdi mdi-magnify ys-mb-header-search__icon"></i>
+                <input type="search" name="q" class="ys-mb-header-search__input"
+                       placeholder="{{ _('Search profiles, hashtags, topics') }}"
+                       aria-label="{{ _('Search profiles, hashtags, and topics') }}"/>
+            </div>
+            <div class="ys-mb-header-search__results" data-search-results hidden></div>
+        </form>
+    </aside>
+    {% endif %}
+
+    <div class="bsky-popover" id="bsky-notif-pop" hidden>
+        <div class="bsky-popover__head">{{ _('Mentioning Posts') }}</div>
+        <div class="bsky-popover__body" id="bsky-notif-body"></div>
+    </div>
+</div>
+{% if ui is not defined or ui.interaction_post %}
+<div class="bsky-composer" id="bsky-composer" role="dialog" aria-modal="true" aria-label="{{ _('New post') }}">
+    <div class="bsky-composer__bar">
+        <button type="button" class="bsky-link" data-act="cancel">{{ _('Cancel') }}</button>
+        <button id="publish-button" type="button" class="bsky-post-btn is-disabled">{{ _('Post') }}</button>
+    </div>
+    <div class="bsky-composer__body">
+        <img class="bsky-composer__avatar" alt="" {% if _bs_pic == '' %}src="{{ url_for('static', filename='assets/img/users/' + _bs_uid|user_image_id + '.png') }}"{% else %}src="{{ _bs_pic }}"{% endif %}/>
+        <textarea id="publish" data-ws-source rows="3" placeholder="{{ _('What is happening?') }}"></textarea>
+    </div>
+    <div class="bsky-composer__image" id="bsky-image-row">
+        <textarea id="link_post" data-ws-link rows="1" placeholder="{{ _('Enter the link to the image you are commenting on...') }}"></textarea>
+    </div>
+    <textarea id="activities" hidden></textarea>
+    {% set ws_exp = exp_id %}{% include 'shared/world_simulation_crosspost.html' %}
+    <div class="bsky-composer__foot">
+        <button type="button" class="bsky-icon-btn" id="bsky-add-image" title="{{ _('Share Image') }}"><i data-feather="image"></i></button>
+        <span class="bsky-counter" id="bsky-counter">0</span>
+    </div>
+</div>
+{% endif %}
+<div class="bsky-backdrop" id="bsky-backdrop"></div>
+<script>
+(function () {
+  var body = document.body;
+  // unread chat badge: mirrored from the chat panel script (loaded by every page when memory is enabled)
+  var nb = document.getElementById('bsky-chat-badge');
+  var pb = document.getElementById('ys-chat-collapse-badge');
+  if (nb) {
+    var syncBadge = function () {
+      pb = pb || document.getElementById('ys-chat-collapse-badge');
+      var t = pb ? (pb.textContent || '').trim() : '';
+      nb.textContent = t; if (t) { nb.removeAttribute('hidden'); } else { nb.setAttribute('hidden', ''); }
+    };
+    window.addEventListener('load', function () {
+      pb = document.getElementById('ys-chat-collapse-badge');
+      if (pb) { new MutationObserver(syncBadge).observe(pb, { childList: true, characterData: true, subtree: true }); }
+      syncBadge();
+    });
+  }
+
+  // follow from the suggestion boxes / notifications without reloading the page
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest ? e.target.closest('.ys-suggestion-row a.ys-icon-circle-blue[href*="/follow/"], a.bsky-pill[href*="/follow/"]') : null;
+    if (!a || a.dataset.busy) return;
+    e.preventDefault();
+    a.dataset.busy = '1';
+    a.style.opacity = '.5';
+    fetch(a.getAttribute('href'), { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.status);
+        var row = a.closest('.ys-suggestion-row');
+        if (row) {
+          var card = row.closest('.ys-suggestion-card');
+          row.style.transition = 'opacity .25s, max-height .3s';
+          row.style.overflow = 'hidden'; row.style.maxHeight = row.offsetHeight + 'px';
+          requestAnimationFrame(function () { row.style.opacity = '0'; row.style.maxHeight = '0'; row.style.paddingTop = '0'; row.style.paddingBottom = '0'; });
+          setTimeout(function () {
+            row.remove();
+            if (card && !card.querySelector('.ys-suggestion-row')) { card.remove(); }
+          }, 320);
+        } else {
+          var done = document.createElement('span');
+          done.className = 'bsky-pill bsky-pill--muted';
+          done.textContent = '{{ _("Following") }}';
+          a.replaceWith(done);
+        }
+      })
+      .catch(function () { a.style.opacity = ''; delete a.dataset.busy; a.removeAttribute('data-busy'); window.location.href = a.getAttribute('href'); });
+  });
+
+  // active nav item from the URL
+  var p = location.pathname;
+  var key = /\/profile\//.test(p) ? 'profile' : /\/friends\//.test(p) ? 'friends' : /\/interview/.test(p) ? 'interview'
+          : /\/edit_profile\//.test(p) ? 'profile' : /\/notifications/.test(p) ? 'notifications' : /\/explore/.test(p) ? 'explore'
+          : /\/chat$/.test(p) ? 'chat' : 'home';
+  var cur = document.querySelector('[data-bsky-nav="' + key + '"]');
+  if (cur) cur.classList.add('is-active');
+
+  // search focus
+  document.querySelectorAll('[data-bsky-focus-search]').forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      e.preventDefault();
+      var i = document.querySelector('#bsky-search input'); if (i) { i.focus(); }
+    });
+  });
+
+  // notifications: MOVE the core mentions list (keeps ids and the delegated cancel handler working)
+  var toggle = document.getElementById('bsky-notif-toggle');
+  var pop = document.getElementById('bsky-notif-pop');
+  if (toggle && pop) {
+    var src = {% if _bs_mentions|length > 0 %}document.querySelector('#main-navbar .nav-drop .nav-drop-body'){% else %}null{% endif %};
+    var dest = document.getElementById('bsky-notif-body');
+    if (src && dest) { dest.appendChild(src); }
+    else if (dest) { dest.innerHTML = '<p class="bsky-empty">{{ _("No notifications yet.") }}</p>'; }
+    toggle.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var open = pop.hasAttribute('hidden');
+      if (open) { pop.removeAttribute('hidden'); } else { pop.setAttribute('hidden', ''); }
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    document.addEventListener('click', function (e) {
+      if (!pop.contains(e.target)) { pop.setAttribute('hidden', ''); toggle.setAttribute('aria-expanded', 'false'); }
+    });
+  }
+
+  // composer: self-contained modal (the feed no longer has an inline composer). It keeps the ids the platform expects
+  // (#publish, #link_post, #activities, #publish-button) and publishes through the same /publish endpoint.
+  var np = document.getElementById('bsky-newpost');
+  var comp = document.getElementById('bsky-composer');
+  var back = document.getElementById('bsky-backdrop');
+  var prefix = '/{{ exp_id }}';
+  function openComposer() {
+    if (!comp) return;
+    body.classList.add('bsky-composing');
+    var ta = document.getElementById('publish'); if (ta) { setTimeout(function () { ta.focus(); }, 30); }
+  }
+  function closeComposer() { body.classList.remove('bsky-composing'); }
+  if (np) np.addEventListener('click', openComposer);
+  if (back) back.addEventListener('click', closeComposer);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeComposer(); });
+  if (comp) {
+    var ta2 = document.getElementById('publish');
+    var pb = document.getElementById('publish-button');
+    var counter = document.getElementById('bsky-counter');
+    var imgRow = document.getElementById('bsky-image-row');
+    var linkEl = document.getElementById('link_post');
+    var act = document.getElementById('activities');
+    function sync() {
+      var n = ta2.value.length;
+      if (counter) counter.textContent = n;
+      pb.classList.toggle('is-disabled', n < 1);
+      ta2.style.height = 'auto'; ta2.style.height = Math.min(ta2.scrollHeight, 320) + 'px';
+    }
+    ta2.addEventListener('input', sync); sync();
+    comp.querySelectorAll('[data-act="cancel"]').forEach(function (b2) { b2.addEventListener('click', closeComposer); });
+    var addImg = document.getElementById('bsky-add-image');
+    if (addImg) addImg.addEventListener('click', function () { imgRow.classList.toggle('is-open'); if (imgRow.classList.contains('is-open')) linkEl.focus(); });
+    pb.addEventListener('click', function (e) {
+      // this handler replaces the delegated one of async_updates.js (stopped here, so a post is never sent twice)
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      if (pb.classList.contains('is-disabled')) return;
+      pb.classList.add('is-disabled');
+      var q = new URLSearchParams({
+        post: ta2.value, url: linkEl ? linkEl.value : '', annotation: act ? act.value : '',
+        crosspost: window.wsCrossposts ? window.wsCrossposts() : '',
+        crosspost_texts: window.wsCrosspostTexts ? window.wsCrosspostTexts() : ''
+      });
+      var done = function () {
+        if (/\/feed\//.test(location.pathname)) { location.reload(); }
+        else { location.href = '/{{ exp_id }}/feed/{{ _bs_uid }}/feed/rf/1'; }
+      };
+      fetch(prefix + '/publish?' + q.toString(), { credentials: 'same-origin' }).then(done, done);
+    });
+    if (location.hash === '#compose') openComposer();
+  }
+
+  // failed actions (reply, post, like, share) used to fail silently: show a short notice instead
+  function toast(msg) {
+    var t = document.createElement('div');
+    t.className = 'bsky-toast'; t.setAttribute('role', 'alert'); t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function () { t.classList.add('is-out'); setTimeout(function () { t.remove(); }, 400); }, 6000);
+  }
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!window.jQuery) return;
+    window.jQuery(document).ajaxError(function (ev, xhr, settings) {
+      var u = (settings && settings.url) || '';
+      if (/\/(publish_comment|publish|react_to_content|share_content)(\?|$)/.test(u)) {
+        toast({{ _('The action could not be completed. Check the server log and the LLM settings.')|tojson }} + (xhr && xhr.status ? ' [' + xhr.status + ']' : ''));
+      }
+    });
+  });
+})();
+</script>
+<script>
+  // Comments panel. (1) core's initPostComments() wires the comment button, but compose.js only calls it when the inline
+  // composer (#compose-card) exists; this skin has none, so register it once everything loaded (delegated, idempotent).
+  window.addEventListener('load', function () { if (typeof window.initPostComments === 'function') window.initPostComments(); });
+  // (2) The first time a panel opens, swap its flat list for the real thread tree (the same markup as the /thread page):
+  // root post, nested replies with their rails, and the "Less/More" branch toggles. On any failure the flat list stays.
+  (function () {
+    function unwrap(n) { while (n.firstChild) n.parentNode.insertBefore(n.firstChild, n); n.remove(); }
+    document.addEventListener('click', function (e) {
+      var fab = e.target.closest && e.target.closest('.fab-wrapper.is-comment');
+      var card = fab && fab.closest('.card.is-post');
+      var wrap = card && card.querySelector(':scope > .comments-wrap');
+      var body = wrap && wrap.querySelector(':scope > .comments-body');
+      var id = card && (card.id || '').replace('feed-post-', '');
+      if (!body || !id || body.dataset.threadLoaded) return;
+      body.dataset.threadLoaded = '1';
+      fetch('/' + (window.EXP_ID || '') + '/thread/' + encodeURIComponent(id), { credentials: 'same-origin' })
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+        .then(function (html) {
+          var tl = new DOMParser().parseFromString(html, 'text/html').querySelector('.profile-timeline');
+          if (!tl || !tl.querySelector('.media.is-comment')) throw new Error('no thread');
+          // the thread page wraps every post in its own comments panel and reuses the feed ids: neutralise both
+          tl.querySelectorAll('.comments-body').forEach(unwrap);
+          tl.querySelectorAll('.comments-wrap').forEach(unwrap);
+          tl.querySelectorAll('[id^="feed-post-"]').forEach(function (n) { n.removeAttribute('id'); });
+          while (body.firstChild) body.removeChild(body.firstChild);
+          Array.prototype.slice.call(tl.childNodes).forEach(function (n) { body.appendChild(document.adoptNode(n)); });
+          body.querySelectorAll('[data-demo-src]').forEach(function (img) { img.setAttribute('src', img.getAttribute('data-demo-src')); });
+          if (window.jQuery) {
+            window.jQuery(body).find('.dropdown-trigger').off('click').on('click', function (ev) {
+              ev.stopPropagation(); window.jQuery('.dropdown-trigger').not(this).removeClass('is-active'); window.jQuery(this).toggleClass('is-active');
+            });
+          }
+          if (window.feather) window.feather.replace();
+        })
+        .catch(function () { delete body.dataset.threadLoaded; });
+    });
+  })();
+</script>

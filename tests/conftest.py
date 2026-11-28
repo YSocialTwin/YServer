@@ -54,6 +54,18 @@ def _empty_database():
             db.session.commit()
             db.session.remove()
 
+    import sys
+
+    from y_server import db as _db
+
+    real_session = _db.session
+    real_modules = {n: sys.modules.get(n) for n in ("y_server", "y_server.routes.experiment_management")}
     wipe()
     yield
+    # pytest-flask requests ``monkeypatch`` before this fixture, so a test's patches are still active here: put back
+    # the real session (and the real modules) before the final wipe
+    _db.session = real_session
+    for name, module in real_modules.items():
+        if module is not None:
+            sys.modules[name] = module
     wipe()

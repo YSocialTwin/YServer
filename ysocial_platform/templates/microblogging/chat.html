@@ -1,0 +1,28 @@
+{% include "@ysocial_server/microblogging/components/bsky_shell.html" %}
+<script>document.body.classList.add('bsky-chatpage');</script>
+
+{% if experiment_memory_enabled %}
+{% set chat_page_kind = 'page' %}
+{% include "shared/chat_panel.html" %}
+{% else %}
+<div class="view-wrapper"><div class="container is-fluid">
+    <div class="bsky-main">
+        <div class="bsky-pagehead bsky-pagehead--title"><strong>{{ _('Chats') }}</strong></div>
+        <p class="bsky-empty">{{ _('Chat is available only in experiments with agent memory enabled.') }}</p>
+    </div>
+</div></div>
+{% endif %}
+
+{% include "@ysocial_server/microblogging/components/bsky_scripts.html" %}
+{% if experiment_memory_enabled %}
+<script>
+  // the Chats page always shows the conversations: open the panel (it persists its collapsed state)
+  window.addEventListener('load', function () {
+    var panel = document.getElementById('ys-chat-panel');
+    var handle = document.getElementById('ys-chat-collapse-handle');
+    if (panel && handle && panel.classList.contains('is-collapsed')) { handle.click(); }
+  });
+</script>
+{% endif %}
+</body>
+</html>
